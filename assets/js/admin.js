@@ -11,44 +11,90 @@
     'use strict';
 
     /**
-     * Toast 通知
+     * Toast 通知系统 - 使用 WordPress 原生 notice 样式
      */
     var Toast = {
-        $el: null,
-        timeout: null,
+        container: null,
 
         init: function() {
-            this.$el = $('#wpbridge-toast');
+            if (!this.container) {
+                // 在 wpbridge-header 下方创建通知容器
+                this.container = $('<div class="wpbridge-notice-container"></div>');
+                $('.wpbridge-header').after(this.container);
+            }
         },
 
-        show: function(message, type) {
+        show: function(message, type, duration) {
+            this.init();
             type = type || 'info';
+            duration = duration || 3000;
 
-            if (this.timeout) {
-                clearTimeout(this.timeout);
+            // WordPress 原生 notice 类型映射
+            var noticeType = {
+                success: 'notice-success',
+                error: 'notice-error',
+                warning: 'notice-warning',
+                info: 'notice-info'
+            };
+
+            // 图标映射
+            var icons = {
+                success: 'dashicons-yes-alt',
+                error: 'dashicons-dismiss',
+                warning: 'dashicons-warning',
+                info: 'dashicons-info'
+            };
+
+            var $notice = $('<div class="notice ' + noticeType[type] + ' is-dismissible wpbridge-notice">' +
+                '<p><span class="dashicons ' + icons[type] + ' wpbridge-notice-icon"></span><span class="wpbridge-notice-text"></span></p>' +
+                '</div>');
+
+            // 使用 .text() 防止 XSS
+            $notice.find('.wpbridge-notice-text').text(message);
+
+            this.container.append($notice);
+
+            // 添加 WordPress 原生关闭按钮
+            $notice.append('<button type="button" class="notice-dismiss"><span class="screen-reader-text">关闭此通知</span></button>');
+
+            // 动画显示
+            $notice.hide().slideDown(200);
+
+            // 关闭按钮事件
+            $notice.find('.notice-dismiss').on('click', function() {
+                Toast.hide($notice);
+            });
+
+            // 自动关闭
+            if (duration > 0) {
+                setTimeout(function() {
+                    Toast.hide($notice);
+                }, duration);
             }
 
-            this.$el
-                .removeClass('success error warning show')
-                .addClass(type)
-                .text(message)
-                .addClass('show');
-
-            this.timeout = setTimeout(function() {
-                Toast.$el.removeClass('show');
-            }, 3000);
+            return $notice;
         },
 
-        success: function(message) {
-            this.show(message, 'success');
+        hide: function($notice) {
+            $notice.slideUp(200, function() {
+                $(this).remove();
+            });
         },
 
-        error: function(message) {
-            this.show(message, 'error');
+        success: function(message, duration) {
+            return this.show(message, 'success', duration);
         },
 
-        warning: function(message) {
-            this.show(message, 'warning');
+        error: function(message, duration) {
+            return this.show(message, 'error', duration || 5000);
+        },
+
+        warning: function(message, duration) {
+            return this.show(message, 'warning', duration);
+        },
+
+        info: function(message, duration) {
+            return this.show(message, 'info', duration);
         }
     };
 
