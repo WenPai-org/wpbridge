@@ -41,6 +41,27 @@ class Plugin {
     private Settings $settings;
 
     /**
+     * 源注册表（方案 B）
+     *
+     * @var SourceRegistry|null
+     */
+    private ?SourceRegistry $source_registry = null;
+
+    /**
+     * 项目配置管理器（方案 B）
+     *
+     * @var ItemSourceManager|null
+     */
+    private ?ItemSourceManager $item_manager = null;
+
+    /**
+     * 默认规则管理器（方案 B）
+     *
+     * @var DefaultsManager|null
+     */
+    private ?DefaultsManager $defaults_manager = null;
+
+    /**
      * 插件更新器
      *
      * @var PluginUpdater|null
@@ -106,7 +127,35 @@ class Plugin {
      */
     private function __construct() {
         $this->settings = new Settings();
+
+        // 初始化方案 B 数据模型
+        $this->source_registry  = new SourceRegistry();
+        $this->defaults_manager = new DefaultsManager();
+        $this->item_manager     = new ItemSourceManager( $this->source_registry );
+
+        // 检查并执行迁移
+        $this->maybe_migrate();
+
         $this->init_hooks();
+    }
+
+    /**
+     * 检查并执行数据迁移
+     */
+    private function maybe_migrate(): void {
+        $migration = new MigrationManager(
+            $this->source_registry,
+            $this->item_manager,
+            $this->defaults_manager
+        );
+
+        if ( $migration->needs_migration() ) {
+            $result = $migration->migrate();
+            if ( ! $result['success'] ) {
+                // 记录迁移失败
+                Logger::error( '数据迁移失败', [ 'log' => $result['log'] ] );
+            }
+        }
     }
 
     /**
