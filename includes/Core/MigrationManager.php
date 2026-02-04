@@ -70,6 +70,13 @@ class MigrationManager {
     private array $log = [];
 
     /**
+     * 源 ID 映射表（旧 ID → 新 key）
+     *
+     * @var array<string, string>
+     */
+    private array $source_id_map = [];
+
+    /**
      * 构造函数
      *
      * @param SourceRegistry    $source_registry 源注册表
@@ -103,6 +110,7 @@ class MigrationManager {
      */
     public function migrate(): array {
         $this->log = [];
+        $this->source_id_map = [];
         $this->log( 'info', '开始迁移到方案 B (v' . self::CURRENT_VERSION . ')' );
 
         try {
@@ -127,11 +135,15 @@ class MigrationManager {
             // 6. 更新版本号
             update_option( self::OPTION_VERSION, self::CURRENT_VERSION );
 
+            // 7. 清理旧数据（保留备份以便回滚）
+            $this->cleanup_old_data();
+
             $this->log( 'success', '迁移完成' );
 
             return [
-                'success' => true,
-                'log'     => $this->log,
+                'success'        => true,
+                'log'            => $this->log,
+                'source_id_map'  => $this->source_id_map,
             ];
 
         } catch ( \Exception $e ) {
@@ -193,8 +205,23 @@ class MigrationManager {
      * @return string|false 成功返回 source_key
      */
     private function convert_source( array $old_source ) {
+        $old_id = $old_source['id'] ?? '';
+
         // 跳过预置源（新系统会自动创建）
         if ( ! empty( $old_source['is_preset'] ) ) {
+            // 预置源映射到新的预置源 key
+            $preset_map = [
+                'wporg'           => 'wporg',
+                'wenpai'          => 'wenpai-mirror',
+                'wenpai-mirror'   => 'wenpai-mirror',
+                'fair'            => 'fair-aspirecloud',
+                'fair-aspirecloud' => 'fair-aspirecloud',
+            ];
+
+            if ( $old_id && isset( $preset_map[ $old_id ] ) ) {
+                $this->source_id_map[ $old_id ] = $preset_map[ $old_id ];
+            }
+
             return false;
         }
 
@@ -208,7 +235,7 @@ class MigrationManager {
         ];
 
         $new_source = [
-            'source_key'       => $old_source['id'] ?? '',
+            'source_key'       => $old_id,
             'name'             => $old_source['name'] ?? '',
             'type'             => $type_map[ $old_source['type'] ?? 'custom' ] ?? SourceRegistry::TYPE_CUSTOM,
             'api_url'          => $old_source['api_url'] ?? '',
@@ -218,7 +245,14 @@ class MigrationManager {
             'auth_secret_ref'  => ! empty( $old_source['auth_token'] ) ? $this->store_secret( $old_source['auth_token'] ) : '',
         ];
 
-        return $this->source_registry->add( $new_source );
+        $new_key = $this->source_registry->add( $new_source );
+
+        // 记录映射关系
+        if ( $new_key && $old_id ) {
+            $this->source_id_map[ $old_id ] = $new_key;
+        }
+
+        return $new_key;
     }
 
     /**
@@ -229,6 +263,7 @@ class MigrationManager {
 
         $old_sources = get_option( self::OLD_SOURCES, [] );
         $migrated    = 0;
+        $skipped     = 0;
 
         foreach ( $old_sources as $old_source ) {
             // 跳过通配符配置（将作为默认规则处理）
@@ -239,18 +274,32 @@ class MigrationManager {
             $item_type = $old_source['item_type'] ?? 'plugin';
             $item_key  = $this->resolve_item_key( $old_source['slug'], $item_type );
 
-            if ( $item_key ) {
-                $this->item_manager->set( $item_key, [
-                    'item_type'  => $item_type,
-                    'item_slug'  => $old_source['slug'],
-                    'mode'       => ItemSourceManager::MODE_CUSTOM,
-                    'source_ids' => [ $old_source['id'] => $old_source['priority'] ?? 50 ],
-                ] );
-                $migrated++;
+            if ( ! $item_key ) {
+                $skipped++;
+                continue;
             }
+
+            // 使用映射后的源 key
+            $old_source_id = $old_source['id'] ?? '';
+            $new_source_key = $this->source_id_map[ $old_source_id ] ?? $old_source_id;
+
+            // 验证新源存在
+            if ( ! $this->source_registry->get( $new_source_key ) ) {
+                $this->log( 'warning', "跳过项目 {$item_key}: 源 {$new_source_key} 不存在" );
+                $skipped++;
+                continue;
+            }
+
+            $this->item_manager->set( $item_key, [
+                'item_type'  => $item_type,
+                'item_slug'  => $old_source['slug'],
+                'mode'       => ItemSourceManager::MODE_CUSTOM,
+                'source_ids' => [ $new_source_key => $old_source['priority'] ?? 50 ],
+            ] );
+            $migrated++;
         }
 
-        $this->log( 'info', "项目配置迁移完成: {$migrated} 个" );
+        $this->log( 'info', "项目配置迁移完成: {$migrated} 成功, {$skipped} 跳过" );
     }
 
     /**
@@ -312,13 +361,21 @@ class MigrationManager {
 
         foreach ( $old_sources as $old_source ) {
             if ( empty( $old_source['slug'] ) || $old_source['slug'] === '*' ) {
-                $item_type = $old_source['item_type'] ?? 'plugin';
-                $source_id = $old_source['id'] ?? '';
+                $item_type     = $old_source['item_type'] ?? 'plugin';
+                $old_source_id = $old_source['id'] ?? '';
 
-                if ( $item_type === 'plugin' && $source_id ) {
-                    $plugin_defaults[] = $source_id;
-                } elseif ( $item_type === 'theme' && $source_id ) {
-                    $theme_defaults[] = $source_id;
+                // 使用映射后的源 key
+                $new_source_key = $this->source_id_map[ $old_source_id ] ?? $old_source_id;
+
+                // 验证源存在
+                if ( ! $this->source_registry->get( $new_source_key ) ) {
+                    continue;
+                }
+
+                if ( $item_type === 'plugin' && $new_source_key ) {
+                    $plugin_defaults[] = $new_source_key;
+                } elseif ( $item_type === 'theme' && $new_source_key ) {
+                    $theme_defaults[] = $new_source_key;
                 }
             }
         }
@@ -418,6 +475,35 @@ class MigrationManager {
     }
 
     /**
+     * 清理旧数据
+     *
+     * 迁移成功后删除旧的选项数据
+     * 注意：备份数据保留以便回滚
+     */
+    private function cleanup_old_data(): void {
+        $this->log( 'info', '清理旧数据...' );
+
+        // 删除旧的选项
+        delete_option( self::OLD_SOURCES );
+        delete_option( self::OLD_SETTINGS );
+
+        $this->log( 'info', '旧数据清理完成' );
+    }
+
+    /**
+     * 完全清理（包括备份）
+     *
+     * 在确认迁移稳定后调用
+     *
+     * @return bool
+     */
+    public function full_cleanup(): bool {
+        $this->cleanup_old_data();
+        $this->cleanup_backup();
+        return true;
+    }
+
+    /**
      * 存储敏感信息
      *
      * @param string $secret 敏感信息
@@ -455,5 +541,14 @@ class MigrationManager {
      */
     public function get_log(): array {
         return $this->log;
+    }
+
+    /**
+     * 获取源 ID 映射表
+     *
+     * @return array<string, string> 旧 ID → 新 key
+     */
+    public function get_source_id_map(): array {
+        return $this->source_id_map;
     }
 }
