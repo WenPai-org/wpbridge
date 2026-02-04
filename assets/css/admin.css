@@ -63,6 +63,15 @@
 
     /* Transitions */
     --wpbridge-transition: 150ms ease;
+
+    /* Additional Variables (used in project list) */
+    --wpbridge-border: #e5e7eb;
+    --wpbridge-bg: #fff;
+    --wpbridge-bg-secondary: #f9fafb;
+    --wpbridge-radius: 4px;
+    --wpbridge-text: #1f2937;
+    --wpbridge-text-secondary: #6b7280;
+    --wpbridge-text-lg: 16px;
 }
 
 /* ========================================
@@ -1399,4 +1408,16 @@
 
 .wpbridge-radio span {
     color: var(--wpbridge-gray-700);
+}
+
+/* Custom Source Row - 自定义源字段行 */
+.wpbridge-custom-source-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--wpbridge-space-4);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-custom-source-row:last-of-type {
+    margin-bottom: 0;
 }
