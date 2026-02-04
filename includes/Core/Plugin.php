@@ -111,6 +111,13 @@ class Plugin {
     private ?RestController $rest_controller = null;
 
     /**
+     * 商业插件检测器
+     *
+     * @var CommercialDetector|null
+     */
+    private ?CommercialDetector $commercial_detector = null;
+
+    /**
      * 获取单例实例
      *
      * @return Plugin
@@ -172,6 +179,9 @@ class Plugin {
         if ( is_admin() ) {
             $this->init_admin();
             add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
+
+            // AJAX 处理
+            add_action( 'wp_ajax_wpbridge_set_plugin_type', [ $this, 'ajax_set_plugin_type' ] );
         }
 
         // 插件链接
@@ -200,6 +210,7 @@ class Plugin {
         $this->notification_manager = new NotificationManager( $this->settings );
         $this->group_manager        = new GroupManager( $this->settings );
         $this->rest_controller      = new RestController( $this->settings );
+        $this->commercial_detector  = CommercialDetector::get_instance();
 
         // 注册 AI 适配器
         $this->register_ai_adapters();
@@ -296,6 +307,14 @@ class Plugin {
                 'warning'              => __( '警告', 'wpbridge' ),
                 'not_tested'           => __( '未测试', 'wpbridge' ),
                 'status'               => __( '状态', 'wpbridge' ),
+                // 插件类型相关
+                'type_free'            => __( '免费', 'wpbridge' ),
+                'type_commercial'      => __( '商业', 'wpbridge' ),
+                'type_private'         => __( '私有', 'wpbridge' ),
+                'type_unknown'         => __( '第三方', 'wpbridge' ),
+                'type_saved'           => __( '插件类型已保存', 'wpbridge' ),
+                'manual_mark'          => __( '手动标记', 'wpbridge' ),
+                'manual_marked'        => __( '当前为手动标记', 'wpbridge' ),
             ],
         ] );
     }
@@ -368,6 +387,50 @@ class Plugin {
      */
     public function get_rest_controller(): ?RestController {
         return $this->rest_controller;
+    }
+
+    /**
+     * 获取商业插件检测器
+     *
+     * @return CommercialDetector|null
+     */
+    public function get_commercial_detector(): ?CommercialDetector {
+        return $this->commercial_detector;
+    }
+
+    /**
+     * AJAX: 设置插件类型
+     */
+    public function ajax_set_plugin_type(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+        }
+
+        $plugin_slug = isset( $_POST['plugin_slug'] ) ? sanitize_text_field( wp_unslash( $_POST['plugin_slug'] ) ) : '';
+        $plugin_type = isset( $_POST['plugin_type'] ) ? sanitize_text_field( wp_unslash( $_POST['plugin_type'] ) ) : '';
+
+        if ( empty( $plugin_slug ) ) {
+            wp_send_json_error( array( 'message' => __( '插件标识不能为空', 'wpbridge' ) ) );
+        }
+
+        if ( empty( $plugin_type ) ) {
+            wp_send_json_error( array( 'message' => __( '插件类型不能为空', 'wpbridge' ) ) );
+        }
+
+        $detector = CommercialDetector::get_instance();
+        $result   = $detector->set_user_mark( $plugin_slug, $plugin_type );
+
+        if ( $result ) {
+            wp_send_json_success( array(
+                'message' => __( '插件类型已保存', 'wpbridge' ),
+                'type'    => $plugin_type,
+                'label'   => CommercialDetector::get_type_label( $plugin_type ),
+            ) );
+        } else {
+            wp_send_json_error( array( 'message' => __( '保存失败', 'wpbridge' ) ) );
+        }
     }
 
     /**
