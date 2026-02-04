@@ -8,6 +8,7 @@
 namespace WPBridge\UpdateSource;
 
 use WPBridge\Security\Encryption;
+use WPBridge\Core\Logger;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -168,6 +169,12 @@ class SourceModel {
             $errors['api_url'] = __( 'API URL 不能为空', 'wpbridge' );
         } elseif ( ! filter_var( $this->api_url, FILTER_VALIDATE_URL ) ) {
             $errors['api_url'] = __( '无效的 URL 格式', 'wpbridge' );
+        } else {
+            // 检查协议是否为 http/https
+            $scheme = parse_url( $this->api_url, PHP_URL_SCHEME );
+            if ( ! in_array( $scheme, [ 'http', 'https' ], true ) ) {
+                $errors['api_url'] = __( 'URL 必须使用 http 或 https 协议', 'wpbridge' );
+            }
         }
 
         // 验证项目类型
@@ -232,8 +239,13 @@ class SourceModel {
             // 解密 auth_token
             $decrypted_token = Encryption::decrypt( $this->auth_token );
 
-            // 如果解密失败，可能是未加密的旧数据，直接使用
+            // 如果解密失败且数据看起来是加密的，记录错误并返回空
             if ( empty( $decrypted_token ) ) {
+                if ( Encryption::is_encrypted( $this->auth_token ) ) {
+                    Logger::error( 'Token 解密失败', [ 'source' => $this->id ] );
+                    return [];
+                }
+                // 可能是未加密的旧数据，直接使用
                 $decrypted_token = $this->auth_token;
             }
 

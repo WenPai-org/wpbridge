@@ -482,8 +482,23 @@ class BridgeCommand {
         $json = wp_json_encode( $export, JSON_PRETTY_PRINT );
 
         if ( ! empty( $args[0] ) ) {
-            file_put_contents( $args[0], $json );
-            WP_CLI::success( sprintf( '已导出到 %s', $args[0] ) );
+            $file_path = $args[0];
+            // 验证路径是否可写
+            $dir = dirname( $file_path );
+            if ( ! is_dir( $dir ) || ! is_writable( $dir ) ) {
+                WP_CLI::error( '目标目录不存在或不可写' );
+            }
+            // 使用 WordPress 文件系统 API
+            global $wp_filesystem;
+            if ( ! function_exists( 'WP_Filesystem' ) ) {
+                require_once ABSPATH . 'wp-admin/includes/file.php';
+            }
+            WP_Filesystem();
+            if ( $wp_filesystem->put_contents( $file_path, $json, FS_CHMOD_FILE ) ) {
+                WP_CLI::success( sprintf( '已导出到 %s', $file_path ) );
+            } else {
+                WP_CLI::error( '写入文件失败' );
+            }
         } else {
             WP_CLI::log( $json );
         }
@@ -513,7 +528,18 @@ class BridgeCommand {
             WP_CLI::error( '文件不存在' );
         }
 
-        $json = file_get_contents( $file );
+        // 使用 WordPress 文件系统 API
+        global $wp_filesystem;
+        if ( ! function_exists( 'WP_Filesystem' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+        }
+        WP_Filesystem();
+        $json = $wp_filesystem->get_contents( $file );
+
+        if ( false === $json ) {
+            WP_CLI::error( '读取文件失败' );
+        }
+
         $data = json_decode( $json, true );
 
         if ( json_last_error() !== JSON_ERROR_NONE ) {

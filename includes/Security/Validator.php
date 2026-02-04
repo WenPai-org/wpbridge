@@ -71,11 +71,11 @@ class Validator {
         $ip = gethostbyname( $host );
 
         if ( $ip === $host ) {
-            // 无法解析，可能是内部域名
-            return false;
+            // 无法解析，为安全起见视为本地地址
+            return true;
         }
 
-        // 检查私有 IP 范围
+        // 检查私有 IP 范围（IPv4）
         $private_ranges = [
             '10.0.0.0/8',
             '172.16.0.0/12',
@@ -85,6 +85,15 @@ class Validator {
 
         foreach ( $private_ranges as $range ) {
             if ( self::ip_in_range( $ip, $range ) ) {
+                return true;
+            }
+        }
+
+        // 检查 IPv6 私有地址
+        if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) ) {
+            // fc00::/7 (Unique Local Addresses)
+            // fe80::/10 (Link-Local Addresses)
+            if ( preg_match( '/^(fc|fd|fe80)/i', $ip ) ) {
                 return true;
             }
         }

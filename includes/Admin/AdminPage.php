@@ -10,7 +10,6 @@ namespace WPBridge\Admin;
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
 use WPBridge\Security\Encryption;
-use WPBridge\Core\Logger;
 use WPBridge\UpdateSource\SourceManager;
 use WPBridge\UpdateSource\SourceModel;
 use WPBridge\UpdateSource\SourceType;
@@ -110,6 +109,12 @@ class AdminPage {
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- 仅用于页面路由
         $action = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : 'list';
 
+        // 白名单验证
+        $allowed_actions = [ 'list', 'add', 'edit' ];
+        if ( ! in_array( $action, $allowed_actions, true ) ) {
+            $action = 'list';
+        }
+
         switch ( $action ) {
             case 'add':
             case 'edit':
@@ -205,7 +210,13 @@ class AdminPage {
 
         // 加密存储 auth_token
         $raw_token = sanitize_text_field( $_POST['auth_token'] ?? '' );
-        $source->auth_token = ! empty( $raw_token ) ? Encryption::encrypt( $raw_token ) : '';
+        // 如果是占位符或空值，保留原有 token
+        if ( $raw_token === '********' || empty( $raw_token ) ) {
+            $existing = $this->source_manager->get( $source_id );
+            $source->auth_token = $existing ? $existing->auth_token : '';
+        } else {
+            $source->auth_token = Encryption::encrypt( $raw_token );
+        }
 
         $source->enabled   = ! empty( $_POST['enabled'] );
         $source->priority  = (int) ( $_POST['priority'] ?? 50 );
