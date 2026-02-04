@@ -305,7 +305,7 @@
                 return;
             }
 
-            var keyIndex = $button.data('key-index');
+            var keyId = $button.data('key-id');
             $button.prop('disabled', true);
 
             $.ajax({
@@ -314,7 +314,7 @@
                 data: {
                     action: 'wpbridge_revoke_api_key',
                     nonce: wpbridge.nonce,
-                    key_index: keyIndex
+                    key_id: keyId
                 },
                 success: function(response) {
                     if (response.success) {

@@ -81,7 +81,7 @@ $api_keys     = $api_settings['keys'] ?? [];
         <div class="wpbridge-settings-row">
             <div class="wpbridge-settings-info">
                 <h3 class="wpbridge-settings-title"><?php esc_html_e( '速率限制', 'wpbridge' ); ?></h3>
-                <p class="wpbridge-settings-desc"><?php esc_html_e( '每个 IP 每小时允许的最大请求数。', 'wpbridge' ); ?></p>
+                <p class="wpbridge-settings-desc"><?php esc_html_e( '每个 IP 每分钟允许的最大请求数。', 'wpbridge' ); ?></p>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="number"
@@ -91,7 +91,7 @@ $api_keys     = $api_settings['keys'] ?? [];
                        max="10000"
                        class="wpbridge-form-input"
                        style="max-width: 100px;">
-                <span style="color: var(--wpbridge-gray-500);"><?php esc_html_e( '次/小时', 'wpbridge' ); ?></span>
+                <span style="color: var(--wpbridge-gray-500);"><?php esc_html_e( '次/分钟', 'wpbridge' ); ?></span>
             </div>
         </div>
     </div>
@@ -122,24 +122,36 @@ $api_keys     = $api_settings['keys'] ?? [];
         </div>
     <?php else : ?>
         <div class="wpbridge-api-keys-list">
-            <?php foreach ( $api_keys as $index => $key_data ) : ?>
-                <div class="wpbridge-settings-row" data-key-index="<?php echo esc_attr( $index ); ?>">
+            <?php foreach ( $api_keys as $key_data ) : ?>
+                <div class="wpbridge-settings-row" data-key-id="<?php echo esc_attr( $key_data['id'] ?? '' ); ?>">
                     <div class="wpbridge-settings-info">
                         <h3 class="wpbridge-settings-title">
                             <?php echo esc_html( $key_data['name'] ?? __( '未命名', 'wpbridge' ) ); ?>
+                            <?php if ( ! empty( $key_data['key_prefix'] ) ) : ?>
+                                <code style="margin-left: 8px; font-size: 11px; color: var(--wpbridge-gray-500);">
+                                    <?php echo esc_html( $key_data['key_prefix'] ); ?>
+                                </code>
+                            <?php endif; ?>
                         </h3>
                         <p class="wpbridge-settings-desc">
                             <?php
-                            /* translators: %s: date */
-                            printf(
-                                esc_html__( '创建于 %s', 'wpbridge' ),
-                                esc_html( date_i18n( get_option( 'date_format' ), $key_data['created_at'] ?? time() ) )
-                            );
-                            if ( ! empty( $key_data['last_used'] ) ) {
+                            $created_at = $key_data['created_at'] ?? '';
+                            if ( ! empty( $created_at ) ) {
+                                // 支持 MySQL 格式和 Unix 时间戳
+                                $timestamp = is_numeric( $created_at ) ? $created_at : strtotime( $created_at );
+                                /* translators: %s: date */
+                                printf(
+                                    esc_html__( '创建于 %s', 'wpbridge' ),
+                                    esc_html( date_i18n( get_option( 'date_format' ), $timestamp ) )
+                                );
+                            }
+                            $last_used = $key_data['last_used'] ?? null;
+                            if ( ! empty( $last_used ) ) {
+                                $last_timestamp = is_numeric( $last_used ) ? $last_used : strtotime( $last_used );
                                 /* translators: %s: relative time */
                                 printf(
                                     ' &middot; ' . esc_html__( '最后使用 %s', 'wpbridge' ),
-                                    esc_html( human_time_diff( $key_data['last_used'], time() ) . __( '前', 'wpbridge' ) )
+                                    esc_html( human_time_diff( $last_timestamp, time() ) . __( '前', 'wpbridge' ) )
                                 );
                             }
                             ?>
@@ -147,7 +159,7 @@ $api_keys     = $api_settings['keys'] ?? [];
                     </div>
                     <button type="button"
                             class="wpbridge-btn wpbridge-btn-danger wpbridge-btn-sm wpbridge-revoke-api-key"
-                            data-key-index="<?php echo esc_attr( $index ); ?>">
+                            data-key-id="<?php echo esc_attr( $key_data['id'] ?? '' ); ?>">
                         <span class="dashicons dashicons-no"></span>
                         <?php esc_html_e( '撤销', 'wpbridge' ); ?>
                     </button>
