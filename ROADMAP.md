@@ -6,81 +6,77 @@
 
 ---
 
+## 当前版本: v0.8.0
+
 ## 版本规划
 
 ```
-v0.1.0 - MVP：最小可用桥接 + 基础缓存/降级
+v0.1.0 - MVP：最小可用桥接 + 基础缓存/降级 ✅ 已完成
     ↓
-v0.2.0 - Git 仓库支持 + WP-CLI + 性能优化
+v0.2.0 - Git 仓库支持 + WP-CLI + 性能优化 ✅ 已完成
     ↓
-v0.3.0 - AI 桥接层 + 源分组 + 高级功能
+v0.3.0 - 源分组 + 商业插件检测 ✅ 已完成
     ↓
-v0.4.0 - Cloud API（可选）
+v0.4.0 - Bridge API ✅ 已完成
+    ↓
+v0.8.0 - 配置导入导出 + 稳定性优化 ← 当前目标
     ↓
 v1.0.0 - 正式发布
 ```
 
 ---
 
-## v0.1.0 - MVP：最小可用桥接 + 基础缓存/降级
+## v0.1.0 - MVP：最小可用桥接 + 基础缓存/降级 ✅
 
 ### 目标
 实现最小可用的更新源桥接功能，确保基础稳定性
 
-### 范围限定
-- ✅ 核心桥接功能（JSON API + 预置源）
-- ✅ 基础缓存和降级
-- ✅ 简单管理界面
-- ❌ 不含 Git 仓库支持（移至 v0.2.0）
-- ❌ 不含 WP-CLI（移至 v0.2.0）
-- ❌ 不含诊断工具（移至 v0.2.0）
-
 ### 任务清单
 
 #### 插件基础结构
-- [ ] 主文件 `wpbridge.php`
-- [ ] 自动加载器
-- [ ] 设置页面框架
-- [ ] 数据存储结构
+- [x] 主文件 `wpbridge.php`
+- [x] 自动加载器 `Loader.php`
+- [x] 设置页面框架 `Settings.php`
+- [x] 数据存储结构
 
 #### 预置更新源
-- [ ] 文派开源更新源（默认启用）
-- [ ] ArkPress 支持（文派自托管方案）
-- [ ] AspireCloud 支持（可选）
+- [x] 文派开源更新源（默认启用）
+- [x] ArkPress 支持（文派自托管方案）
+- [x] AspireCloud 支持（可选）
 
 #### 更新源管理（基础）
-- [ ] 更新源数据模型（使用统一 SourceType 枚举）
-- [ ] 更新源 CRUD 操作
-- [ ] 更新源列表界面
-- [ ] 添加/编辑更新源表单
+- [x] 更新源数据模型（使用统一 SourceType 枚举）
+- [x] 更新源 CRUD 操作
+- [x] 更新源列表界面
+- [x] 添加/编辑更新源表单
 
 #### 核心桥接功能
-- [ ] `pre_set_site_transient_update_plugins` 钩子
-- [ ] `pre_set_site_transient_update_themes` 钩子
-- [ ] JSON API 处理器（JsonHandler）
-- [ ] ArkPress 处理器（ArkPressHandler）
-- [ ] AspireCloud 处理器（AspireCloudHandler）
-- [ ] Plugin Update Checker JSON 格式兼容
+- [x] `pre_set_site_transient_update_plugins` 钩子
+- [x] `pre_set_site_transient_update_themes` 钩子
+- [x] JSON API 处理器（JsonHandler）
+- [x] ArkPress 处理器（ArkPressHandler）
+- [x] AspireCloud 处理器（AspireCloudHandler）
+- [x] Plugin Update Checker JSON 格式兼容（PUCHandler）
 
 #### 基础缓存与降级
-- [ ] Transient 缓存（12 小时 TTL）
-- [ ] 源健康状态缓存（1 小时 TTL）
-- [ ] 失败源冷却机制（30 分钟）
-- [ ] 过期缓存兜底（源不可用时返回旧数据）
-- [ ] 请求超时限制（10 秒）
+- [x] Transient 缓存（12 小时 TTL）
+- [x] 源健康状态缓存（1 小时 TTL）
+- [x] 失败源冷却机制（30 分钟）
+- [x] 过期缓存兜底（源不可用时返回旧数据）
+- [x] 请求超时限制（10 秒）
 
 #### 安全基础
-- [ ] URL 格式校验
-- [ ] API Key 加密存储
-- [ ] JSON 响应结构校验
+- [x] URL 格式校验
+- [x] API Key 加密存储
+- [x] JSON 响应结构校验
 
 #### 日志与错误处理
-- [ ] 调试日志（可开关）
-- [ ] 用户友好的错误信息
+- [x] 调试日志（可开关）
+- [x] 用户友好的错误信息
 
 ---
 
-## v0.2.0 - Git 仓库支持 + WP-CLI + 性能优化
+## v0.2.0 - Git 仓库支持 + WP-CLI + 性能优化 ✅
 
 ### 目标
 支持 Git 仓库作为更新源，提供命令行工具，实现性能优化
@@ -88,33 +84,33 @@ v1.0.0 - 正式发布
 ### 任务清单
 
 #### 性能优化（核心）
-- [ ] 并行请求（`Requests::request_multiple`）
+- [x] 并行请求（`ParallelRequestManager`）
+- [x] 条件请求（ETag/Last-Modified）
+- [x] WP-Cron 后台预热任务（`BackgroundUpdater`）
 - [ ] 请求去重与合并窗口
-- [ ] 条件请求（ETag/Last-Modified）
 - [ ] 缓存分层（对象缓存优先，DB 兜底）
-- [ ] WP-Cron 后台预热任务
 
 #### WP-CLI 支持（`wp bridge`）
-- [ ] `wp bridge source list` - 列出所有源
-- [ ] `wp bridge source add <url>` - 添加源
-- [ ] `wp bridge source remove <id>` - 删除源
-- [ ] `wp bridge source enable/disable <id>` - 启用/禁用源
-- [ ] `wp bridge check` - 检查所有源
-- [ ] `wp bridge cache clear` - 清除缓存
-- [ ] `wp bridge diagnose` - 诊断报告
+- [x] `wp bridge source list` - 列出所有源
+- [x] `wp bridge source add <url>` - 添加源
+- [x] `wp bridge source remove <id>` - 删除源
+- [x] `wp bridge source enable/disable <id>` - 启用/禁用源
+- [x] `wp bridge check` - 检查所有源
+- [x] `wp bridge cache clear` - 清除缓存
+- [x] `wp bridge diagnose` - 诊断报告
 - [ ] `wp bridge config export/import` - 配置导入导出
 
 #### Git 仓库支持
-- [ ] 统一接口 SourceHandlerInterface
-- [ ] GitHub Releases 支持（GitHubHandler）
-- [ ] GitLab Releases 支持（GitLabHandler）
-- [ ] Gitee Releases 支持（GiteeHandler，国内）
-- [ ] 菲码源库支持（WenPaiGitHandler）
-- [ ] 私有仓库认证
+- [x] 统一接口 SourceHandlerInterface
+- [x] GitHub Releases 支持（GitHubHandler）
+- [x] GitLab Releases 支持（GitLabHandler）
+- [x] Gitee Releases 支持（GiteeHandler，国内）
+- [x] 菲码源库支持（WenPaiGitHandler）
+- [x] 私有仓库认证
 
 #### 诊断工具
-- [ ] 诊断页面（源状态、请求日志）
-- [ ] 一键测试源连通性
+- [x] 诊断页面（源状态、请求日志）
+- [x] 一键测试源连通性
 - [ ] 导出诊断报告
 
 #### 配置管理
@@ -122,97 +118,89 @@ v1.0.0 - 正式发布
 - [ ] 配置备份
 
 #### 认证支持
-- [ ] API Key 认证
-- [ ] Basic Auth 认证
-- [ ] 自定义 HTTP 头
+- [x] API Key 认证
+- [x] Basic Auth 认证
+- [x] 自定义 HTTP 头
 
 #### 源优先级
-- [ ] 源优先级设置
-- [ ] 多源冲突处理（版本号最高优先）
+- [x] 源优先级设置
+- [x] 多源冲突处理（版本号最高优先）
 
 #### FAIR 支持
-- [ ] FAIR Package Manager 处理器（FairHandler）
+- [x] FAIR Package Manager 处理器（FairHandler）
 
 ---
 
-## v0.3.0 - AI 桥接层 + 源分组 + 商业插件
+## v0.3.0 - 源分组 + 商业插件检测 ✅
 
 ### 目标
-实现 OpenAI API 兼容层和商业插件 AI 适配，支持源分组管理
+支持源分组管理，实现商业插件检测
 
 ### 任务清单
 
 #### 源分组管理
-- [ ] 源组数据模型
-- [ ] 批量管理界面
-- [ ] 共享认证信息
-- [ ] 统一启用/禁用
+- [x] 源组数据模型（GroupModel）
+- [x] 批量管理界面（GroupManager）
+- [x] 共享认证信息
+- [x] 统一启用/禁用
 
 #### 商业插件适配
-- [ ] 商业插件检测机制
-- [ ] 更新源覆盖逻辑
+- [x] 商业插件检测机制（CommercialDetector）
+- [x] 远程 JSON 配置支持
+- [x] 检测结果永久缓存
+- [x] 手动刷新检测功能
 - [ ] 授权验证代理（可选）
 - [ ] 版本锁定功能
 - [ ] 回滚机制（更新前备份）
 
-#### 预置配置框架
-- [ ] 通用配置模板
-- [ ] EDD Software Licensing 兼容
-- [ ] WooCommerce Licensing 兼容
-
 #### 通知系统
-- [ ] 邮件通知（可选）
-- [ ] Webhook 通知（面向开发者）
+- [x] 邮件通知（EmailHandler）
+- [x] Webhook 通知（WebhookHandler）
 - [ ] 更新日志聚合显示
-
-#### OpenAI 兼容层
-- [ ] `pre_http_request` 拦截器
-- [ ] 用户可配置白名单
-- [ ] OpenAI Chat API 转发
-- [ ] 响应格式转换
-- [ ] 自定义端点支持（透传模式）
-- [ ] WPMind 集成（可选）
-
-#### 商业插件 AI 适配
-- [ ] 嗅探模式（收集 API 格式）
-- [ ] Yoast SEO Pro 适配器
-- [ ] Rank Math 适配器
-
-#### 设置界面
-- [ ] AI 桥接开关
-- [ ] 模式选择（禁用/透传/WPMind）
-- [ ] 白名单管理
-- [ ] 适配器管理
-
-#### 无 WPMind 时的行为
-- [ ] 透传到用户指定端点
-- [ ] 清晰的功能状态提示
 
 ---
 
-## v0.4.0 - Cloud API（可选）
+## v0.4.0 - Bridge API ✅
 
 ### 目标
-提供云端 API 服务，支持无需安装插件的场景
+提供 REST API 服务，支持外部调用
 
 ### 任务清单
 
-#### Cloud API 基础
-- [ ] REST API 端点设计
-- [ ] 认证机制（API Key）
+#### Bridge API 基础
+- [x] REST API 端点设计（`/wp-json/bridge/v1/`）
+- [x] 认证机制（API Key）
+- [x] 状态端点 `/status`
 - [ ] 限流策略
 - [ ] 可用性 SLA 定义
 
 #### API 端点
-- [ ] GET /api/v1/sources - 获取可用更新源列表
-- [ ] GET /api/v1/check/{source_id} - 检查指定源更新
-- [ ] GET /api/v1/plugins/{slug}/info - 获取插件信息
-- [ ] GET /api/v1/themes/{slug}/info - 获取主题信息
-- [ ] GET /api/v1/wenpai-git/{repo}/releases - 菲码源库 Release
+- [x] GET /bridge/v1/status - 获取状态
+- [ ] GET /bridge/v1/sources - 获取可用更新源列表
+- [ ] GET /bridge/v1/check/{source_id} - 检查指定源更新
+- [ ] GET /bridge/v1/plugins/{slug}/info - 获取插件信息
+- [ ] GET /bridge/v1/themes/{slug}/info - 获取主题信息
 
-#### 文派叶子集成
-- [ ] WPCY 调用 WPBridge API 示例
-- [ ] 菲码源库集成文档
+---
+
+## v0.8.0 - 配置导入导出 + 稳定性优化 ← 下一版本
+
+### 目标
+完善配置管理，提升稳定性
+
+### 任务清单
+
+#### 配置管理
+- [ ] 导入配置（JSON 格式）
+- [ ] 导出配置（JSON 格式）
+- [ ] 配置备份/恢复
+- [ ] WP-CLI 配置命令
+
+#### 稳定性优化
+- [ ] 完善错误处理
+- [ ] 添加单元测试
+- [ ] 性能优化（请求去重）
+- [ ] 缓存分层优化
 
 ---
 
@@ -232,7 +220,7 @@ v1.0.0 - 正式发布
 
 #### 用户体验
 - [ ] 设置向导
-- [ ] 状态仪表板
+- [ ] 状态仪表板优化
 - [ ] 性能基准测试报告
 - [ ] WordPress Site Health 集成
 
@@ -250,6 +238,26 @@ v1.0.0 - 正式发布
 
 ---
 
+## AI 桥接层（暂缓）
+
+> 以下功能暂缓开发，待核心功能稳定后考虑
+
+### OpenAI 兼容层
+- [ ] `pre_http_request` 拦截器
+- [ ] 用户可配置白名单
+- [ ] OpenAI Chat API 转发
+- [ ] 响应格式转换
+- [ ] 自定义端点支持（透传模式）
+- [ ] WPMind 集成（可选）
+
+### 商业插件 AI 适配
+- [x] AI 网关基础（AIGateway）
+- [x] Yoast SEO Pro 适配器
+- [x] Rank Math 适配器
+- [ ] 嗅探模式（收集 API 格式）
+
+---
+
 ## 技术架构
 
 ```
@@ -259,29 +267,71 @@ wpbridge/
 │   ├── Core/
 │   │   ├── Plugin.php           # 插件主类
 │   │   ├── Loader.php           # 自动加载
-│   │   └── Settings.php         # 设置管理
+│   │   ├── Settings.php         # 设置管理
+│   │   ├── Logger.php           # 日志系统
+│   │   ├── CommercialDetector.php # 商业插件检测
+│   │   ├── RemoteConfig.php     # 远程配置
+│   │   └── ItemSourceManager.php # 项目源管理
 │   │
 │   ├── UpdateSource/
 │   │   ├── SourceManager.php    # 更新源管理
 │   │   ├── SourceModel.php      # 数据模型
+│   │   ├── SourceType.php       # 源类型枚举
 │   │   ├── PluginUpdater.php    # 插件更新器
-│   │   └── ThemeUpdater.php     # 主题更新器
+│   │   ├── ThemeUpdater.php     # 主题更新器
+│   │   └── Handlers/            # 各类处理器
+│   │       ├── JsonHandler.php
+│   │       ├── GitHubHandler.php
+│   │       ├── GitLabHandler.php
+│   │       ├── GiteeHandler.php
+│   │       ├── ArkPressHandler.php
+│   │       ├── AspireCloudHandler.php
+│   │       ├── FairHandler.php
+│   │       └── ...
+│   │
+│   ├── SourceGroup/
+│   │   ├── GroupManager.php     # 分组管理
+│   │   └── GroupModel.php       # 分组模型
+│   │
+│   ├── Cache/
+│   │   ├── CacheManager.php     # 缓存管理
+│   │   ├── HealthChecker.php    # 健康检查
+│   │   └── FallbackStrategy.php # 降级策略
+│   │
+│   ├── Performance/
+│   │   ├── ParallelRequestManager.php # 并行请求
+│   │   ├── ConditionalRequest.php     # 条件请求
+│   │   └── BackgroundUpdater.php      # 后台更新
+│   │
+│   ├── API/
+│   │   ├── RestController.php   # REST API
+│   │   └── ApiKeyManager.php    # API Key 管理
+│   │
+│   ├── CLI/
+│   │   └── BridgeCommand.php    # WP-CLI 命令
+│   │
+│   ├── Notification/
+│   │   ├── NotificationManager.php
+│   │   ├── EmailHandler.php
+│   │   └── WebhookHandler.php
 │   │
 │   ├── AIBridge/
 │   │   ├── AIGateway.php        # AI 网关
-│   │   ├── OpenAIProxy.php      # OpenAI 代理
 │   │   └── Adapters/
 │   │       ├── YoastAdapter.php
 │   │       └── RankMathAdapter.php
 │   │
 │   └── Admin/
-│       ├── AdminPage.php        # 管理页面
-│       └── SourceEditor.php     # 更新源编辑器
+│       └── AdminPage.php        # 管理页面
 │
 ├── templates/
 │   └── admin/
-│       ├── settings.php
-│       └── source-editor.php
+│       ├── main.php
+│       └── tabs/
+│           ├── overview.php
+│           ├── sources.php
+│           ├── diagnostics.php
+│           └── api.php
 │
 └── assets/
     ├── css/
@@ -295,10 +345,9 @@ wpbridge/
 ```
 WPBridge 核心功能
 ├── 更新源桥接 - 无依赖，独立运行
-├── 商业插件更新 - 无依赖，独立运行
-└── AI 桥接 - 可选依赖 WPMind
-              └── 无 WPMind 时：仅支持 OpenAI 兼容层
-              └── 有 WPMind 时：支持国内 AI 服务商
+├── 商业插件检测 - 无依赖，独立运行
+├── Bridge API - 无依赖，独立运行
+└── AI 桥接 - 可选依赖 WPMind（暂缓）
 ```
 
 ---
@@ -315,4 +364,4 @@ WPBridge 核心功能
 
 ---
 
-*最后更新: 2026-02-04*
+*最后更新: 2026-02-05*
