@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // 插件常量
-define( 'WPBRIDGE_VERSION', '0.6.2' );
+define( 'WPBRIDGE_VERSION', '0.6.3' );
 define( 'WPBRIDGE_FILE', __FILE__ );
 define( 'WPBRIDGE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'WPBRIDGE_URL', plugin_dir_url( __FILE__ ) );
