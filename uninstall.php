@@ -20,6 +20,9 @@ delete_option( 'wpbridge_logs' );
 delete_option( 'wpbridge_activated' );
 delete_option( 'wpbridge_admin_notices' );
 delete_option( 'wpbridge_encryption_key' );
+delete_option( 'wpbridge_source_groups' );
+delete_option( 'wpbridge_version_locks' );
+delete_option( 'wpbridge_notifications' );
 
 // 删除所有加密存储的数据
 global $wpdb;
