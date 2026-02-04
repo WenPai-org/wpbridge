@@ -120,25 +120,6 @@ use WPBridge\Core\ItemSourceManager;
                 <!-- 内联配置面板（默认折叠） -->
                 <div class="wpbridge-project-config-panel" data-item-key="<?php echo esc_attr( $item_key ); ?>" style="display: none;">
                     <div class="wpbridge-config-row">
-                        <label class="wpbridge-config-label"><?php esc_html_e( '更新模式', 'wpbridge' ); ?></label>
-                        <div class="wpbridge-config-field">
-                            <div class="wpbridge-radio-group">
-                                <label class="wpbridge-radio">
-                                    <input type="radio" name="mode_<?php echo esc_attr( $item_key ); ?>" value="default" class="wpbridge-mode-radio" <?php checked( $mode, ItemSourceManager::MODE_DEFAULT ); ?>>
-                                    <span><?php esc_html_e( '使用默认源', 'wpbridge' ); ?></span>
-                                </label>
-                                <label class="wpbridge-radio">
-                                    <input type="radio" name="mode_<?php echo esc_attr( $item_key ); ?>" value="custom" class="wpbridge-mode-radio" <?php checked( $mode, ItemSourceManager::MODE_CUSTOM ); ?>>
-                                    <span><?php esc_html_e( '自定义源', 'wpbridge' ); ?></span>
-                                </label>
-                                <label class="wpbridge-radio">
-                                    <input type="radio" name="mode_<?php echo esc_attr( $item_key ); ?>" value="disabled" class="wpbridge-mode-radio" <?php checked( $mode, ItemSourceManager::MODE_DISABLED ); ?>>
-                                    <span><?php esc_html_e( '禁用更新', 'wpbridge' ); ?></span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="wpbridge-config-row wpbridge-custom-source-row" style="<?php echo $mode !== ItemSourceManager::MODE_CUSTOM ? 'display: none;' : ''; ?>">
                         <label class="wpbridge-config-label"><?php esc_html_e( '更新地址', 'wpbridge' ); ?></label>
                         <div class="wpbridge-config-field">
                             <input type="url" class="wpbridge-form-input wpbridge-inline-url"
@@ -148,7 +129,7 @@ use WPBridge\Core\ItemSourceManager;
                             <p class="wpbridge-form-help"><?php esc_html_e( '粘贴更新源地址，系统会自动识别类型', 'wpbridge' ); ?></p>
                         </div>
                     </div>
-                    <div class="wpbridge-config-row wpbridge-custom-source-row" style="<?php echo $mode !== ItemSourceManager::MODE_CUSTOM ? 'display: none;' : ''; ?>">
+                    <div class="wpbridge-config-row">
                         <label class="wpbridge-config-label"><?php esc_html_e( '访问密码', 'wpbridge' ); ?></label>
                         <div class="wpbridge-config-field">
                             <input type="password" class="wpbridge-form-input wpbridge-inline-token"
@@ -163,10 +144,25 @@ use WPBridge\Core\ItemSourceManager;
                             <span class="dashicons dashicons-saved"></span>
                             <?php esc_html_e( '保存', 'wpbridge' ); ?>
                         </button>
-                        <button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-cancel-inline"
+                        <?php if ( $mode !== ItemSourceManager::MODE_DEFAULT ) : ?>
+                        <button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-reset-default"
                                 data-item-key="<?php echo esc_attr( $item_key ); ?>">
-                            <?php esc_html_e( '取消', 'wpbridge' ); ?>
+                            <?php esc_html_e( '重置为默认', 'wpbridge' ); ?>
                         </button>
+                        <?php endif; ?>
+                        <?php if ( $mode === ItemSourceManager::MODE_DISABLED ) : ?>
+                        <button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-enable-update"
+                                data-item-key="<?php echo esc_attr( $item_key ); ?>">
+                            <span class="dashicons dashicons-update"></span>
+                            <?php esc_html_e( '启用更新', 'wpbridge' ); ?>
+                        </button>
+                        <?php else : ?>
+                        <button type="button" class="wpbridge-btn wpbridge-btn-danger wpbridge-btn-sm wpbridge-disable-update"
+                                data-item-key="<?php echo esc_attr( $item_key ); ?>">
+                            <span class="dashicons dashicons-dismiss"></span>
+                            <?php esc_html_e( '禁用更新', 'wpbridge' ); ?>
+                        </button>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
