@@ -272,14 +272,21 @@ class RestController {
      * @param string $key_id Key ID
      */
     private function record_api_key_usage( string $key_id ): void {
-        // 使用对象缓存记录，避免频繁写入数据库
+        // 使用缓存记录，避免频繁写入数据库
         $cache_key = 'api_usage_' . $key_id;
-        $count     = wp_cache_get( $cache_key, 'wpbridge' ) ?: 0;
-        wp_cache_set( $cache_key, $count + 1, 'wpbridge', 300 );
+        $count     = $this->cache->get( $cache_key );
+
+        if ( false === $count ) {
+            $count = 0;
+        }
+
+        $count++;
+        $this->cache->set( $cache_key, $count, 300 );
 
         // 每 50 次批量写入数据库
-        if ( ( $count + 1 ) % 50 === 0 ) {
-            $this->flush_usage_to_db( $key_id, $count + 1 );
+        if ( $count >= 50 ) {
+            $this->flush_usage_to_db( $key_id, $count );
+            $this->cache->set( $cache_key, 0, 300 );
         }
     }
 

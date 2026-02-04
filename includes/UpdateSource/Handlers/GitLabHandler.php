@@ -47,9 +47,10 @@ class GitLabHandler extends AbstractHandler {
     public function get_headers(): array {
         $headers = [];
 
-        if ( ! empty( $this->source->auth_token ) ) {
+        $token = $this->get_auth_token();
+        if ( ! empty( $token ) ) {
             // GitLab 使用 PRIVATE-TOKEN 头
-            $headers['PRIVATE-TOKEN'] = $this->source->auth_token;
+            $headers['PRIVATE-TOKEN'] = $token;
         }
 
         return $headers;

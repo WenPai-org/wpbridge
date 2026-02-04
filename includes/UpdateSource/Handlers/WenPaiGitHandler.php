@@ -1,6 +1,6 @@
 <?php
 /**
- * Gitee 处理器
+ * 菲码源库处理器
  *
  * @package WPBridge
  */
@@ -15,16 +15,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Gitee 处理器类（国内 Git 平台）
+ * 菲码源库处理器（Gitea API）
  */
-class GiteeHandler extends AbstractHandler {
+class WenPaiGitHandler extends AbstractHandler {
 
     /**
-     * Gitee API 基础 URL
+     * API 基础 URL
      *
      * @var string
      */
-    const API_BASE = 'https://gitee.com/api/v5';
+    const API_BASE = 'https://git.wenpai.org/api/v1';
 
     /**
      * 获取能力列表
@@ -46,6 +46,7 @@ class GiteeHandler extends AbstractHandler {
      */
     public function get_headers(): array {
         $headers = parent::get_headers();
+        $headers['Accept'] = 'application/json';
         $headers['User-Agent'] = 'WPBridge/' . WPBRIDGE_VERSION;
         return $headers;
     }
@@ -60,7 +61,7 @@ class GiteeHandler extends AbstractHandler {
         if ( empty( $repo ) ) {
             return $this->source->api_url;
         }
-        return self::API_BASE . '/repos/' . $repo . '/releases/latest';
+        return self::API_BASE . '/repos/' . $repo . '/releases';
     }
 
     /**
@@ -74,65 +75,45 @@ class GiteeHandler extends AbstractHandler {
         $repo = $this->parse_repo_url( $this->source->api_url );
 
         if ( empty( $repo ) ) {
-            Logger::warning( 'Gitee: 无效的仓库 URL', [ 'url' => $this->source->api_url ] );
+            Logger::warning( '菲码源库: 无效的仓库 URL', [ 'url' => $this->source->api_url ] );
             return null;
         }
 
-        // 构建 URL（带 access_token 参数）
-        $url = self::API_BASE . '/repos/' . $repo . '/releases/latest';
-
-        $token = $this->get_auth_token();
-        if ( ! empty( $token ) ) {
-            $url = add_query_arg( 'access_token', $token, $url );
-        }
-
+        $url  = self::API_BASE . '/repos/' . $repo . '/releases';
         $data = $this->request( $url );
 
-        if ( null === $data ) {
+        if ( null === $data || empty( $data ) ) {
             return null;
         }
 
-        // 解析版本号
-        $remote_version = $data['tag_name'] ?? '';
-        $remote_version = ltrim( $remote_version, 'v' );
+        $latest = $data[0] ?? null;
+        if ( null === $latest ) {
+            return null;
+        }
 
+        $remote_version = ltrim( $latest['tag_name'] ?? '', 'v' );
         if ( empty( $remote_version ) ) {
-            Logger::warning( 'Gitee: 响应缺少版本信息', [ 'repo' => $repo ] );
+            Logger::warning( '菲码源库: 响应缺少版本信息', [ 'repo' => $repo ] );
             return null;
         }
 
-        // 检查是否有更新
         if ( ! $this->is_newer_version( $version, $remote_version ) ) {
-            Logger::debug( 'Gitee: 无可用更新', [
-                'repo'    => $repo,
-                'current' => $version,
-                'remote'  => $remote_version,
-            ] );
             return null;
         }
 
-        // 查找下载 URL
-        $download_url = $this->find_download_url( $data, $slug, $repo, $remote_version );
-
+        $download_url = $this->find_download_url( $latest, $slug, $repo );
         if ( empty( $download_url ) ) {
-            Logger::warning( 'Gitee: 未找到下载 URL', [ 'repo' => $repo ] );
+            Logger::warning( '菲码源库: 未找到下载 URL', [ 'repo' => $repo ] );
             return null;
         }
 
-        // 构建更新信息
         $info = new UpdateInfo();
         $info->slug         = $slug;
         $info->version      = $remote_version;
         $info->download_url = $download_url;
-        $info->details_url  = 'https://gitee.com/' . $repo . '/releases/tag/' . $data['tag_name'];
-        $info->last_updated = $data['created_at'] ?? '';
-        $info->changelog    = $data['body'] ?? '';
-
-        Logger::info( 'Gitee: 发现更新', [
-            'repo'    => $repo,
-            'current' => $version,
-            'new'     => $remote_version,
-        ] );
+        $info->details_url  = $latest['html_url'] ?? '';
+        $info->last_updated = $latest['published_at'] ?? $latest['created_at'] ?? '';
+        $info->changelog    = $latest['body'] ?? '';
 
         return $info;
     }
@@ -145,42 +126,32 @@ class GiteeHandler extends AbstractHandler {
      */
     public function get_info( string $slug ): ?array {
         $repo = $this->parse_repo_url( $this->source->api_url );
-
         if ( empty( $repo ) ) {
             return null;
         }
 
-        // 获取仓库信息
-        $repo_url = self::API_BASE . '/repos/' . $repo;
-        $token = $this->get_auth_token();
-        if ( ! empty( $token ) ) {
-            $repo_url = add_query_arg( 'access_token', $token, $repo_url );
-        }
-        $repo_data = $this->request( $repo_url );
-
-        // 获取最新 Release
-        $release_url = self::API_BASE . '/repos/' . $repo . '/releases/latest';
-        if ( ! empty( $token ) ) {
-            $release_url = add_query_arg( 'access_token', $token, $release_url );
-        }
-        $release_data = $this->request( $release_url );
+        $repo_url     = self::API_BASE . '/repos/' . $repo;
+        $repo_data    = $this->request( $repo_url );
+        $releases_url = self::API_BASE . '/repos/' . $repo . '/releases';
+        $release_data = $this->request( $releases_url );
 
         if ( null === $repo_data ) {
             return null;
         }
 
-        $version = ltrim( $release_data['tag_name'] ?? '', 'v' );
+        $latest  = $release_data[0] ?? [];
+        $version = ltrim( $latest['tag_name'] ?? '', 'v' );
 
         return [
             'name'         => $repo_data['name'] ?? $slug,
             'slug'         => $slug,
             'version'      => $version,
-            'download_url' => $this->find_download_url( $release_data ?? [], $slug, $repo, $version ),
+            'download_url' => $this->find_download_url( $latest, $slug, $repo ),
             'details_url'  => $repo_data['html_url'] ?? '',
-            'last_updated' => $release_data['created_at'] ?? '',
+            'last_updated' => $latest['published_at'] ?? $latest['created_at'] ?? '',
             'sections'     => [
                 'description' => $repo_data['description'] ?? '',
-                'changelog'   => $release_data['body'] ?? '',
+                'changelog'   => $latest['body'] ?? '',
             ],
         ];
     }
@@ -194,16 +165,10 @@ class GiteeHandler extends AbstractHandler {
     private function parse_repo_url( string $url ): ?string {
         $url = trim( $url );
 
-        // 移除协议
         $url = preg_replace( '#^https?://#', '', $url );
-
-        // 移除 gitee.com
-        $url = preg_replace( '#^gitee\.com/#', '', $url );
-
-        // 移除 .git 后缀
+        $url = preg_replace( '#^git\.wenpai\.org/#', '', $url );
         $url = preg_replace( '#\.git$#', '', $url );
 
-        // 验证格式
         if ( preg_match( '#^[\w.-]+/[\w.-]+$#', $url ) ) {
             return $url;
         }
@@ -217,11 +182,9 @@ class GiteeHandler extends AbstractHandler {
      * @param array  $release Release 数据
      * @param string $slug    插件 slug
      * @param string $repo    仓库路径
-     * @param string $version 版本号
      * @return string|null
      */
-    private function find_download_url( array $release, string $slug, string $repo, string $version ): ?string {
-        // 查找 assets 中的 zip 文件
+    private function find_download_url( array $release, string $slug, string $repo ): ?string {
         if ( ! empty( $release['assets'] ) ) {
             foreach ( $release['assets'] as $asset ) {
                 $name = $asset['name'] ?? '';
@@ -233,7 +196,6 @@ class GiteeHandler extends AbstractHandler {
                 }
             }
 
-            // 返回第一个 zip
             foreach ( $release['assets'] as $asset ) {
                 if ( preg_match( '/\.zip$/i', $asset['name'] ?? '' ) ) {
                     return $asset['browser_download_url'] ?? null;
@@ -241,10 +203,13 @@ class GiteeHandler extends AbstractHandler {
             }
         }
 
-        // 使用归档 URL 作为后备
+        if ( ! empty( $release['zipball_url'] ) ) {
+            return $release['zipball_url'];
+        }
+
         $tag = $release['tag_name'] ?? '';
         if ( ! empty( $tag ) ) {
-            return 'https://gitee.com/' . $repo . '/repository/archive/' . $tag . '.zip';
+            return self::API_BASE . '/repos/' . $repo . '/archive/' . $tag . '.zip';
         }
 
         return null;
