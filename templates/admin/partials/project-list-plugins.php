@@ -127,8 +127,6 @@ use WPBridge\Core\ItemSourceManager;
                     </select>
                 </div>
 
-                </div>
-
                 <!-- 内联配置面板（默认折叠） -->
                 <div class="wpbridge-project-config-panel" data-item-key="<?php echo esc_attr( $item_key ); ?>" style="display: none;">
                     <div class="wpbridge-config-row">
