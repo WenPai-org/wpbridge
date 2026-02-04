@@ -1213,7 +1213,7 @@
     /* 保持原有布局 */
 }
 
-/* 展开按钮 */
+/* 展开按钮 - 位于 checkbox 后面 */
 .wpbridge-project-expand {
     display: flex;
     align-items: center;
@@ -1226,6 +1226,8 @@
     border-radius: var(--wpbridge-radius);
     cursor: pointer;
     transition: all 0.15s ease;
+    flex-shrink: 0;
+    margin-right: var(--wpbridge-space-2);
 }
 
 .wpbridge-project-expand:hover {
