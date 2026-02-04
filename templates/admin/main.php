@@ -46,7 +46,7 @@ foreach ( $sources as $source ) {
         <div class="wpbridge-header-left">
             <span class="dashicons dashicons-networking wpbridge-logo"></span>
             <h1 class="wpbridge-title">
-                <?php esc_html_e( '文派云桥', 'wpbridge' ); ?>
+                <?php esc_html_e( '云桥', 'wpbridge' ); ?>
                 <span class="wpbridge-version">v<?php echo esc_html( WPBRIDGE_VERSION ); ?></span>
             </h1>
         </div>

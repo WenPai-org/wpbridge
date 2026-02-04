@@ -67,6 +67,9 @@ class AdminPage {
         add_action( 'wp_ajax_wpbridge_toggle_source', [ $this, 'ajax_toggle_source' ] );
         add_action( 'wp_ajax_wpbridge_test_source', [ $this, 'ajax_test_source' ] );
         add_action( 'wp_ajax_wpbridge_clear_cache', [ $this, 'ajax_clear_cache' ] );
+        add_action( 'wp_ajax_wpbridge_clear_logs', [ $this, 'ajax_clear_logs' ] );
+        add_action( 'wp_ajax_wpbridge_generate_api_key', [ $this, 'ajax_generate_api_key' ] );
+        add_action( 'wp_ajax_wpbridge_revoke_api_key', [ $this, 'ajax_revoke_api_key' ] );
     }
 
     /**
@@ -74,31 +77,13 @@ class AdminPage {
      */
     public function add_menu(): void {
         add_menu_page(
-            __( 'WPBridge', 'wpbridge' ),
-            __( 'WPBridge', 'wpbridge' ),
+            __( '云桥', 'wpbridge' ),
+            __( '云桥', 'wpbridge' ),
             'manage_options',
             self::PAGE_SLUG,
             [ $this, 'render_page' ],
             'dashicons-networking',
             80
-        );
-
-        add_submenu_page(
-            self::PAGE_SLUG,
-            __( '更新源', 'wpbridge' ),
-            __( '更新源', 'wpbridge' ),
-            'manage_options',
-            self::PAGE_SLUG,
-            [ $this, 'render_page' ]
-        );
-
-        add_submenu_page(
-            self::PAGE_SLUG,
-            __( '设置', 'wpbridge' ),
-            __( '设置', 'wpbridge' ),
-            'manage_options',
-            self::PAGE_SLUG . '-settings',
-            [ $this, 'render_settings_page' ]
         );
     }
 
@@ -198,6 +183,9 @@ class AdminPage {
             case 'save_settings':
                 $this->handle_save_settings();
                 break;
+            case 'save_api_settings':
+                $this->handle_save_api_settings();
+                break;
         }
     }
 
@@ -295,11 +283,14 @@ class AdminPage {
             $cache_ttl = 43200;
         }
 
+        // 保留现有的 api 设置
+        $current  = $this->settings->get_all();
         $settings = [
             'debug_mode'       => ! empty( $_POST['debug_mode'] ),
             'cache_ttl'        => $cache_ttl,
             'request_timeout'  => $request_timeout,
             'fallback_enabled' => ! empty( $_POST['fallback_enabled'] ),
+            'api'              => $current['api'] ?? [],
         ];
 
         if ( $this->settings->update( $settings ) ) {
@@ -308,7 +299,41 @@ class AdminPage {
             $this->add_notice( 'error', __( '保存失败', 'wpbridge' ) );
         }
 
-        wp_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '-settings' ) );
+        wp_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '#settings' ) );
+        exit;
+    }
+
+    /**
+     * 处理保存 API 设置
+     */
+    private function handle_save_api_settings(): void {
+        // 验证速率限制范围
+        $rate_limit = (int) ( $_POST['rate_limit'] ?? 100 );
+        $rate_limit = max( 10, min( 10000, $rate_limit ) );
+
+        // 获取当前设置
+        $current      = $this->settings->get_all();
+        $api_settings = $current['api'] ?? [];
+
+        // 更新 API 设置
+        $api_settings['enabled']      = ! empty( $_POST['api_enabled'] );
+        $api_settings['require_auth'] = ! empty( $_POST['require_auth'] );
+        $api_settings['rate_limit']   = $rate_limit;
+
+        // 保留现有的 keys
+        if ( ! isset( $api_settings['keys'] ) ) {
+            $api_settings['keys'] = [];
+        }
+
+        $current['api'] = $api_settings;
+
+        if ( $this->settings->update( $current ) ) {
+            $this->add_notice( 'success', __( 'API 设置已保存', 'wpbridge' ) );
+        } else {
+            $this->add_notice( 'error', __( '保存失败', 'wpbridge' ) );
+        }
+
+        wp_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '#api' ) );
         exit;
     }
 
@@ -372,6 +397,100 @@ class AdminPage {
         \WPBridge\Core\Plugin::clear_all_cache();
 
         wp_send_json_success( [ 'message' => __( '缓存已清除', 'wpbridge' ) ] );
+    }
+
+    /**
+     * AJAX: 清除日志
+     */
+    public function ajax_clear_logs(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+        }
+
+        Logger::clear();
+
+        wp_send_json_success( [ 'message' => __( '日志已清除', 'wpbridge' ) ] );
+    }
+
+    /**
+     * AJAX: 生成 API Key
+     */
+    public function ajax_generate_api_key(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+        }
+
+        $key_name = sanitize_text_field( $_POST['key_name'] ?? '' );
+        if ( empty( $key_name ) ) {
+            $key_name = __( '未命名', 'wpbridge' );
+        }
+
+        // 生成随机 API Key
+        $api_key = 'wpb_' . bin2hex( random_bytes( 24 ) );
+
+        // 获取当前 API 设置
+        $settings     = $this->settings->get_all();
+        $api_settings = $settings['api'] ?? [];
+        $keys         = $api_settings['keys'] ?? [];
+
+        // 添加新 Key（存储哈希值）
+        $keys[] = [
+            'name'       => $key_name,
+            'hash'       => password_hash( $api_key, PASSWORD_DEFAULT ),
+            'prefix'     => substr( $api_key, 0, 8 ),
+            'created_at' => time(),
+            'last_used'  => 0,
+        ];
+
+        $api_settings['keys'] = $keys;
+        $settings['api']      = $api_settings;
+
+        if ( $this->settings->update( $settings ) ) {
+            wp_send_json_success( [
+                'message' => __( 'API Key 已生成', 'wpbridge' ),
+                'api_key' => $api_key,
+            ] );
+        } else {
+            wp_send_json_error( [ 'message' => __( '生成失败', 'wpbridge' ) ] );
+        }
+    }
+
+    /**
+     * AJAX: 撤销 API Key
+     */
+    public function ajax_revoke_api_key(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+        }
+
+        $key_index = intval( $_POST['key_index'] ?? -1 );
+
+        // 获取当前 API 设置
+        $settings     = $this->settings->get_all();
+        $api_settings = $settings['api'] ?? [];
+        $keys         = $api_settings['keys'] ?? [];
+
+        if ( ! isset( $keys[ $key_index ] ) ) {
+            wp_send_json_error( [ 'message' => __( 'Key 不存在', 'wpbridge' ) ] );
+        }
+
+        // 移除 Key
+        array_splice( $keys, $key_index, 1 );
+
+        $api_settings['keys'] = $keys;
+        $settings['api']      = $api_settings;
+
+        if ( $this->settings->update( $settings ) ) {
+            wp_send_json_success( [ 'message' => __( 'API Key 已撤销', 'wpbridge' ) ] );
+        } else {
+            wp_send_json_error( [ 'message' => __( '撤销失败', 'wpbridge' ) ] );
+        }
     }
 
     /**

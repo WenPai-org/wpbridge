@@ -11,11 +11,11 @@
    CSS Variables - 设计令牌
    ======================================== */
 :root {
-    /* Primary Colors - WordPress Core Blue */
-    --wpbridge-primary: #2271b1;
-    --wpbridge-primary-hover: #135e96;
-    --wpbridge-primary-light: #f0f6fc;
-    --wpbridge-primary-dark: #0a4b78;
+    /* Primary Colors - 文派品牌蓝 */
+    --wpbridge-primary: #3858e9;
+    --wpbridge-primary-hover: #2d47c7;
+    --wpbridge-primary-light: #eef1fd;
+    --wpbridge-primary-dark: #2a3eb8;
 
     /* Gray Scale */
     --wpbridge-gray-50: #f9fafb;
@@ -140,6 +140,27 @@
 
 .wpbridge-header-link:hover {
     color: var(--wpbridge-primary);
+}
+
+.wpbridge-back-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: var(--wpbridge-gray-600);
+    text-decoration: none;
+    transition: color var(--wpbridge-transition);
+}
+
+.wpbridge-back-link:hover {
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-back-link .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
 }
 
 /* ========================================
