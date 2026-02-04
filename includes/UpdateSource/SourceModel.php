@@ -98,6 +98,13 @@ class SourceModel {
     public bool $is_preset = false;
 
     /**
+     * 是否是内联源（项目专属，通过快速设置创建）
+     *
+     * @var bool
+     */
+    public bool $is_inline = false;
+
+    /**
      * 额外元数据
      *
      * @var array
@@ -124,6 +131,7 @@ class SourceModel {
         $model->enabled    = (bool) ( $data['enabled'] ?? true );
         $model->priority   = (int) ( $data['priority'] ?? 50 );
         $model->is_preset  = (bool) ( $data['is_preset'] ?? false );
+        $model->is_inline  = (bool) ( $data['is_inline'] ?? false );
         $model->metadata   = $data['metadata'] ?? [];
 
         return $model;
@@ -147,6 +155,7 @@ class SourceModel {
             'enabled'    => $this->enabled,
             'priority'   => $this->priority,
             'is_preset'  => $this->is_preset,
+            'is_inline'  => $this->is_inline,
             'metadata'   => $this->metadata,
         ];
     }

@@ -74,6 +74,7 @@ class AdminPage {
         add_action( 'wp_ajax_wpbridge_set_item_source', [ $this, 'ajax_set_item_source' ] );
         add_action( 'wp_ajax_wpbridge_batch_set_source', [ $this, 'ajax_batch_set_source' ] );
         add_action( 'wp_ajax_wpbridge_save_defaults', [ $this, 'ajax_save_defaults' ] );
+        add_action( 'wp_ajax_wpbridge_quick_setup_source', [ $this, 'ajax_quick_setup_source' ] );
     }
 
     /**
@@ -218,11 +219,19 @@ class AdminPage {
         }
 
         $source->enabled   = ! empty( $_POST['enabled'] );
-        $source->priority  = (int) ( $_POST['priority'] ?? 50 );
 
-        // 验证优先级范围
-        if ( $source->priority < 0 || $source->priority > 100 ) {
-            $source->priority = 50;
+        // 处理语义化优先级选项
+        $priority_level = sanitize_text_field( $_POST['priority_level'] ?? 'secondary' );
+        $priority_map   = [
+            'primary'   => 10,  // 首选源
+            'secondary' => 50,  // 备选源
+            'fallback'  => 90,  // 最后选择
+        ];
+        $source->priority = $priority_map[ $priority_level ] ?? 50;
+
+        // 兼容旧的数字优先级（如果直接传入）
+        if ( isset( $_POST['priority'] ) && is_numeric( $_POST['priority'] ) ) {
+            $source->priority = (int) $_POST['priority'];
         }
 
         // 验证
@@ -676,5 +685,97 @@ class AdminPage {
         }
 
         wp_send_json_success( [ 'message' => __( '默认规则已保存', 'wpbridge' ) ] );
+    }
+
+    /**
+     * AJAX: 快速设置更新源 (P1)
+     *
+     * 允许用户直接输入 URL，自动创建内联源并关联到项目
+     */
+    public function ajax_quick_setup_source(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+        }
+
+        $item_key = sanitize_text_field( $_POST['item_key'] ?? '' );
+        $url      = esc_url_raw( $_POST['url'] ?? '' );
+        $type     = sanitize_text_field( $_POST['type'] ?? 'json' );
+        $name     = sanitize_text_field( $_POST['name'] ?? '' );
+        $token    = sanitize_text_field( $_POST['token'] ?? '' );
+
+        if ( empty( $item_key ) || empty( $url ) ) {
+            wp_send_json_error( [ 'message' => __( '缺少必要参数', 'wpbridge' ) ] );
+        }
+
+        // 验证 URL 格式
+        if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
+            wp_send_json_error( [ 'message' => __( '无效的 URL 格式', 'wpbridge' ) ] );
+        }
+
+        // 验证 URL 协议（防止 javascript: 或 data: URL）
+        $scheme = wp_parse_url( $url, PHP_URL_SCHEME );
+        if ( ! in_array( $scheme, [ 'http', 'https' ], true ) ) {
+            wp_send_json_error( [ 'message' => __( 'URL 必须使用 http 或 https 协议', 'wpbridge' ) ] );
+        }
+
+        // 验证源类型白名单
+        $allowed_types = [ 'json', 'github', 'gitlab', 'gitee', 'wenpai_git', 'zip', 'arkpress', 'aspirecloud', 'fair', 'puc' ];
+        if ( ! in_array( $type, $allowed_types, true ) ) {
+            $type = 'json';
+        }
+
+        // 生成唯一的源 key（内联源使用 inline_ 前缀）
+        $source_key = 'inline_' . md5( $item_key . '_' . $url );
+
+        // 如果名称为空，从 URL 生成
+        if ( empty( $name ) ) {
+            $parsed_url = wp_parse_url( $url );
+            $name       = $parsed_url['host'] ?? 'Custom Source';
+        }
+
+        // 创建内联源
+        $source = new SourceModel();
+        $source->id        = $source_key;
+        $source->name      = $name;
+        $source->type      = $type;
+        $source->api_url   = $url;
+        $source->enabled   = true;
+        $source->priority  = 10; // 首选源
+        $source->is_inline = true; // 标记为内联源
+
+        // 如果提供了 token，加密存储
+        if ( ! empty( $token ) ) {
+            $source->auth_token = Encryption::encrypt( $token );
+        }
+
+        // 从 item_key 推断项目类型
+        if ( strpos( $item_key, 'plugin:' ) === 0 ) {
+            $source->item_type = 'plugin';
+            $source->slug      = str_replace( 'plugin:', '', $item_key );
+        } elseif ( strpos( $item_key, 'theme:' ) === 0 ) {
+            $source->item_type = 'theme';
+            $source->slug      = str_replace( 'theme:', '', $item_key );
+        }
+
+        // 保存源
+        $result = $this->source_manager->add( $source );
+
+        if ( ! $result ) {
+            wp_send_json_error( [ 'message' => __( '创建更新源失败', 'wpbridge' ) ] );
+        }
+
+        // 关联到项目
+        $item_manager = new \WPBridge\Core\ItemSourceManager( $this->source_manager );
+        $item_manager->set( $item_key, [
+            'mode'       => \WPBridge\Core\ItemSourceManager::MODE_CUSTOM,
+            'source_ids' => [ $source_key => 10 ],
+        ] );
+
+        wp_send_json_success( [
+            'message'    => __( '更新源已设置', 'wpbridge' ),
+            'source_key' => $source_key,
+        ] );
     }
 }
