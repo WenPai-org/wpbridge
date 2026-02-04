@@ -27,7 +27,7 @@ class RestController {
      *
      * @var string
      */
-    const NAMESPACE = 'wpbridge/v1';
+    const NAMESPACE = 'bridge/v1';
 
     /**
      * 设置实例
