@@ -32,6 +32,16 @@ class CommercialDetector {
     const TYPE_UNKNOWN    = 'unknown';
 
     /**
+     * 缓存键名
+     */
+    const CACHE_KEY = 'wpbridge_commercial_detection_cache';
+
+    /**
+     * 缓存时间（秒）- 默认 24 小时
+     */
+    const CACHE_TTL = 86400;
+
+    /**
      * 单例实例
      *
      * @var CommercialDetector|null
@@ -44,6 +54,13 @@ class CommercialDetector {
      * @var array
      */
     private $user_marks = array();
+
+    /**
+     * 检测结果缓存
+     *
+     * @var array
+     */
+    private $detection_cache = array();
 
     /**
      * 远程配置实例
@@ -69,6 +86,7 @@ class CommercialDetector {
      */
     private function __construct() {
         $this->load_user_marks();
+        $this->load_detection_cache();
         $this->remote_config = RemoteConfig::get_instance();
     }
 
@@ -80,14 +98,30 @@ class CommercialDetector {
     }
 
     /**
+     * 加载检测结果缓存
+     */
+    private function load_detection_cache() {
+        $cached = get_transient( self::CACHE_KEY );
+        $this->detection_cache = is_array( $cached ) ? $cached : array();
+    }
+
+    /**
+     * 保存检测结果缓存
+     */
+    private function save_detection_cache() {
+        set_transient( self::CACHE_KEY, $this->detection_cache, self::CACHE_TTL );
+    }
+
+    /**
      * 检测插件类型
      *
      * @param string $plugin_slug 插件 slug
      * @param string $plugin_file 插件文件路径（可选）
      * @param bool   $skip_api    是否跳过 API 检查（默认 true）
+     * @param bool   $use_cache   是否使用缓存（默认 true）
      * @return array 包含 type 和 source 的数组
      */
-    public function detect( $plugin_slug, $plugin_file = '', $skip_api = true ) {
+    public function detect( $plugin_slug, $plugin_file = '', $skip_api = true, $use_cache = true ) {
         if ( empty( $plugin_slug ) ) {
             return array(
                 'type'   => self::TYPE_UNKNOWN,
@@ -95,7 +129,7 @@ class CommercialDetector {
             );
         }
 
-        // P2: 用户手动标记优先
+        // P2: 用户手动标记优先（不缓存，实时读取）
         if ( isset( $this->user_marks[ $plugin_slug ] ) ) {
             return array(
                 'type'   => $this->user_marks[ $plugin_slug ],
@@ -103,6 +137,29 @@ class CommercialDetector {
             );
         }
 
+        // 检查缓存
+        if ( $use_cache && isset( $this->detection_cache[ $plugin_slug ] ) ) {
+            return $this->detection_cache[ $plugin_slug ];
+        }
+
+        // 执行检测
+        $result = $this->do_detect( $plugin_slug, $plugin_file, $skip_api );
+
+        // 保存到缓存
+        $this->detection_cache[ $plugin_slug ] = $result;
+
+        return $result;
+    }
+
+    /**
+     * 执行实际检测逻辑
+     *
+     * @param string $plugin_slug 插件 slug
+     * @param string $plugin_file 插件文件路径
+     * @param bool   $skip_api    是否跳过 API 检查
+     * @return array
+     */
+    private function do_detect( $plugin_slug, $plugin_file, $skip_api ) {
         // P1: 远程配置的商业插件列表
         $commercial_plugins = $this->remote_config->get_commercial_plugins();
         if ( in_array( $plugin_slug, $commercial_plugins, true ) ) {
@@ -531,13 +588,74 @@ class CommercialDetector {
      * 批量检测插件类型
      *
      * @param array $plugins 插件列表
+     * @param bool  $use_cache 是否使用缓存
      * @return array
      */
-    public function detect_batch( $plugins ) {
+    public function detect_batch( $plugins, $use_cache = true ) {
         $results = array();
         foreach ( $plugins as $slug => $file ) {
-            $results[ $slug ] = $this->detect( $slug, $file );
+            $results[ $slug ] = $this->detect( $slug, $file, true, $use_cache );
         }
+        // 批量检测后保存缓存
+        $this->save_detection_cache();
         return $results;
+    }
+
+    /**
+     * 清除检测缓存
+     *
+     * @return bool
+     */
+    public function clear_cache() {
+        $this->detection_cache = array();
+        return delete_transient( self::CACHE_KEY );
+    }
+
+    /**
+     * 重新检测所有插件
+     *
+     * @return array 检测结果
+     */
+    public function refresh_all() {
+        // 清除缓存
+        $this->clear_cache();
+
+        // 刷新远程配置
+        $this->remote_config->refresh();
+
+        // 获取所有已安装插件
+        if ( ! function_exists( 'get_plugins' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        $all_plugins = get_plugins();
+
+        // 重新检测
+        $results = array();
+        foreach ( $all_plugins as $plugin_file => $plugin_data ) {
+            $plugin_slug = dirname( $plugin_file );
+            if ( $plugin_slug === '.' ) {
+                $plugin_slug = basename( $plugin_file, '.php' );
+            }
+            $results[ $plugin_slug ] = $this->detect( $plugin_slug, $plugin_file, true, false );
+        }
+
+        // 保存缓存
+        $this->save_detection_cache();
+
+        return $results;
+    }
+
+    /**
+     * 获取缓存统计信息
+     *
+     * @return array
+     */
+    public function get_cache_stats() {
+        return array(
+            'count'      => count( $this->detection_cache ),
+            'cache_key'  => self::CACHE_KEY,
+            'ttl'        => self::CACHE_TTL,
+            'ttl_human'  => human_time_diff( 0, self::CACHE_TTL ),
+        );
     }
 }

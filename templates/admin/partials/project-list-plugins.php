@@ -48,6 +48,10 @@ $commercial_detector = CommercialDetector::get_instance();
         </button>
     </div>
     <div class="wpbridge-toolbar-right">
+        <button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm" id="wpbridge-refresh-detection" title="<?php esc_attr_e( '重新检测所有插件类型', 'wpbridge' ); ?>">
+            <span class="dashicons dashicons-update"></span>
+            <?php esc_html_e( '刷新检测', 'wpbridge' ); ?>
+        </button>
         <input type="search" class="wpbridge-search" id="wpbridge-search-plugins" placeholder="<?php esc_attr_e( '搜索插件...', 'wpbridge' ); ?>" autocomplete="off">
     </div>
 </div>

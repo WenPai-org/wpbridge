@@ -182,6 +182,7 @@ class Plugin {
 
             // AJAX 处理
             add_action( 'wp_ajax_wpbridge_set_plugin_type', [ $this, 'ajax_set_plugin_type' ] );
+            add_action( 'wp_ajax_wpbridge_refresh_commercial_detection', [ $this, 'ajax_refresh_commercial_detection' ] );
         }
 
         // 插件链接
@@ -431,6 +432,45 @@ class Plugin {
         } else {
             wp_send_json_error( array( 'message' => __( '保存失败', 'wpbridge' ) ) );
         }
+    }
+
+    /**
+     * AJAX: 刷新商业插件检测
+     */
+    public function ajax_refresh_commercial_detection(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+        }
+
+        $detector = CommercialDetector::get_instance();
+        $results  = $detector->refresh_all();
+
+        $stats = array(
+            'total'      => count( $results ),
+            'free'       => 0,
+            'commercial' => 0,
+            'private'    => 0,
+            'unknown'    => 0,
+        );
+
+        foreach ( $results as $result ) {
+            if ( isset( $stats[ $result['type'] ] ) ) {
+                $stats[ $result['type'] ]++;
+            }
+        }
+
+        wp_send_json_success( array(
+            'message' => sprintf(
+                __( '已重新检测 %d 个插件：%d 免费，%d 商业，%d 第三方', 'wpbridge' ),
+                $stats['total'],
+                $stats['free'],
+                $stats['commercial'],
+                $stats['unknown'] + $stats['private']
+            ),
+            'stats'   => $stats,
+        ) );
     }
 
     /**

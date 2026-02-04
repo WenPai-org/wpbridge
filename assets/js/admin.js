@@ -524,6 +524,11 @@
             $(document).on('change', '.wpbridge-plugin-type-select', function() {
                 self.setPluginType($(this));
             });
+
+            // 刷新商业插件检测
+            $(document).on('click', '#wpbridge-refresh-detection', function() {
+                self.refreshCommercialDetection($(this));
+            });
         },
 
         switchSubtab: function(subtab) {
@@ -736,6 +741,45 @@
                 },
                 complete: function() {
                     $select.prop('disabled', false);
+                }
+            });
+        },
+
+        /**
+         * 刷新商业插件检测
+         */
+        refreshCommercialDetection: function($btn) {
+            var $icon = $btn.find('.dashicons');
+            var originalClass = $icon.attr('class');
+
+            // 显示加载状态
+            $btn.prop('disabled', true);
+            $icon.attr('class', 'dashicons dashicons-update wpbridge-spin');
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wpbridge_refresh_commercial_detection',
+                    nonce: wpbridge.nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Toast.success(response.data.message);
+                        // 刷新页面以显示新的检测结果
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                },
+                complete: function() {
+                    $btn.prop('disabled', false);
+                    $icon.attr('class', originalClass);
                 }
             });
         }
