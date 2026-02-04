@@ -1335,3 +1335,68 @@
     width: 16px;
     height: 16px;
 }
+
+/* ========================================
+   Status Badge - 状态徽章
+   ======================================== */
+.wpbridge-project-status {
+    flex-shrink: 0;
+    min-width: 80px;
+}
+
+.wpbridge-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 4px;
+}
+
+.wpbridge-status-badge .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+.wpbridge-status-default {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-600);
+}
+
+.wpbridge-status-custom {
+    background: var(--wpbridge-info-light);
+    color: var(--wpbridge-info);
+}
+
+.wpbridge-status-disabled {
+    background: var(--wpbridge-warning-light);
+    color: var(--wpbridge-warning);
+}
+
+/* ========================================
+   Radio Group - 单选按钮组
+   ======================================== */
+.wpbridge-radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wpbridge-space-4);
+}
+
+.wpbridge-radio {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.wpbridge-radio input[type="radio"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.wpbridge-radio span {
+    color: var(--wpbridge-gray-700);
+}

@@ -98,11 +98,6 @@ $current_theme_slug = $current_theme->get_stylesheet();
                         <?php if ( $is_active ) : ?>
                             <span class="wpbridge-badge wpbridge-badge-success"><?php esc_html_e( '当前主题', 'wpbridge' ); ?></span>
                         <?php endif; ?>
-                        <?php if ( $mode === ItemSourceManager::MODE_DISABLED ) : ?>
-                            <span class="wpbridge-badge wpbridge-badge-warning"><?php esc_html_e( '更新已禁用', 'wpbridge' ); ?></span>
-                        <?php elseif ( $mode === ItemSourceManager::MODE_CUSTOM ) : ?>
-                            <span class="wpbridge-badge wpbridge-badge-info"><?php esc_html_e( '自定义源', 'wpbridge' ); ?></span>
-                        <?php endif; ?>
                     </div>
                     <div class="wpbridge-project-meta">
                         <span class="wpbridge-project-version">v<?php echo esc_html( $theme->get( 'Version' ) ); ?></span>
@@ -113,47 +108,63 @@ $current_theme_slug = $current_theme->get_stylesheet();
                     </div>
                 </div>
 
-                <div class="wpbridge-project-source">
-                    <label class="wpbridge-project-source-label"><?php esc_html_e( '更新源', 'wpbridge' ); ?></label>
-                    <select class="wpbridge-source-select" data-item-key="<?php echo esc_attr( $item_key ); ?>">
-                        <option value="default" <?php selected( $mode, ItemSourceManager::MODE_DEFAULT ); ?>>
-                            <?php esc_html_e( '使用默认', 'wpbridge' ); ?>
-                        </option>
-                        <option value="disabled" <?php selected( $mode, ItemSourceManager::MODE_DISABLED ); ?>>
-                            <?php esc_html_e( '禁用更新', 'wpbridge' ); ?>
-                        </option>
-                        <optgroup label="<?php esc_attr_e( '自定义源', 'wpbridge' ); ?>">
-                            <?php foreach ( $all_sources as $source ) : ?>
-                                <?php
-                                $is_selected = $mode === ItemSourceManager::MODE_CUSTOM &&
-                                               isset( $config['source_ids'] ) &&
-                                               array_key_exists( $source['source_key'], $config['source_ids'] );
-                                ?>
-                                <option value="<?php echo esc_attr( $source['source_key'] ); ?>" <?php selected( $is_selected ); ?>>
-                                    <?php echo esc_html( $source['name'] ); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </optgroup>
-                    </select>
+                <div class="wpbridge-project-status">
+                    <?php if ( $mode === ItemSourceManager::MODE_DISABLED ) : ?>
+                        <span class="wpbridge-status-badge wpbridge-status-disabled">
+                            <span class="dashicons dashicons-dismiss"></span>
+                            <?php esc_html_e( '已禁用', 'wpbridge' ); ?>
+                        </span>
+                    <?php elseif ( $mode === ItemSourceManager::MODE_CUSTOM ) : ?>
+                        <span class="wpbridge-status-badge wpbridge-status-custom">
+                            <span class="dashicons dashicons-admin-links"></span>
+                            <?php esc_html_e( '自定义', 'wpbridge' ); ?>
+                        </span>
+                    <?php else : ?>
+                        <span class="wpbridge-status-badge wpbridge-status-default">
+                            <span class="dashicons dashicons-yes-alt"></span>
+                            <?php esc_html_e( '默认', 'wpbridge' ); ?>
+                        </span>
+                    <?php endif; ?>
                 </div>
 
                 <!-- 内联配置面板（默认折叠） -->
                 <div class="wpbridge-project-config-panel" data-item-key="<?php echo esc_attr( $item_key ); ?>" style="display: none;">
                     <div class="wpbridge-config-row">
+                        <label class="wpbridge-config-label"><?php esc_html_e( '更新模式', 'wpbridge' ); ?></label>
+                        <div class="wpbridge-config-field">
+                            <div class="wpbridge-radio-group">
+                                <label class="wpbridge-radio">
+                                    <input type="radio" name="mode_<?php echo esc_attr( $item_key ); ?>" value="default" class="wpbridge-mode-radio" <?php checked( $mode, ItemSourceManager::MODE_DEFAULT ); ?>>
+                                    <span><?php esc_html_e( '使用默认源', 'wpbridge' ); ?></span>
+                                </label>
+                                <label class="wpbridge-radio">
+                                    <input type="radio" name="mode_<?php echo esc_attr( $item_key ); ?>" value="custom" class="wpbridge-mode-radio" <?php checked( $mode, ItemSourceManager::MODE_CUSTOM ); ?>>
+                                    <span><?php esc_html_e( '自定义源', 'wpbridge' ); ?></span>
+                                </label>
+                                <label class="wpbridge-radio">
+                                    <input type="radio" name="mode_<?php echo esc_attr( $item_key ); ?>" value="disabled" class="wpbridge-mode-radio" <?php checked( $mode, ItemSourceManager::MODE_DISABLED ); ?>>
+                                    <span><?php esc_html_e( '禁用更新', 'wpbridge' ); ?></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="wpbridge-config-row wpbridge-custom-source-row" style="<?php echo $mode !== ItemSourceManager::MODE_CUSTOM ? 'display: none;' : ''; ?>">
                         <label class="wpbridge-config-label"><?php esc_html_e( '更新地址', 'wpbridge' ); ?></label>
                         <div class="wpbridge-config-field">
                             <input type="url" class="wpbridge-form-input wpbridge-inline-url"
                                    data-item-key="<?php echo esc_attr( $item_key ); ?>"
-                                   placeholder="https://github.com/user/repo 或 https://example.com/update.json">
+                                   placeholder="https://github.com/user/repo 或 https://example.com/update.json"
+                                   autocomplete="off">
                             <p class="wpbridge-form-help"><?php esc_html_e( '粘贴更新源地址，系统会自动识别类型', 'wpbridge' ); ?></p>
                         </div>
                     </div>
-                    <div class="wpbridge-config-row">
+                    <div class="wpbridge-config-row wpbridge-custom-source-row" style="<?php echo $mode !== ItemSourceManager::MODE_CUSTOM ? 'display: none;' : ''; ?>">
                         <label class="wpbridge-config-label"><?php esc_html_e( '访问密码', 'wpbridge' ); ?></label>
                         <div class="wpbridge-config-field">
                             <input type="password" class="wpbridge-form-input wpbridge-inline-token"
                                    data-item-key="<?php echo esc_attr( $item_key ); ?>"
-                                   placeholder="<?php esc_attr_e( '可选，用于私有仓库', 'wpbridge' ); ?>">
+                                   placeholder="<?php esc_attr_e( '可选，用于私有仓库', 'wpbridge' ); ?>"
+                                   autocomplete="new-password">
                         </div>
                     </div>
                     <div class="wpbridge-config-actions">
