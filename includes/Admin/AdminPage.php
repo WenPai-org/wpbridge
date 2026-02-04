@@ -121,13 +121,20 @@ class AdminPage {
                 $this->render_editor_page();
                 break;
             default:
-                $this->render_list_page();
+                $this->render_main_page();
                 break;
         }
     }
 
     /**
-     * 渲染列表页面
+     * 渲染主页面（新版 Tab 布局）
+     */
+    private function render_main_page(): void {
+        include WPBRIDGE_PATH . 'templates/admin/main.php';
+    }
+
+    /**
+     * 渲染列表页面（旧版，保留兼容）
      */
     private function render_list_page(): void {
         $sources = $this->source_manager->get_all();
