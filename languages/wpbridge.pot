@@ -1,0 +1,355 @@
+# WPBridge Translation Template
+# Copyright (C) 2026 WenPai.org
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: WPBridge 0.1.0\n"
+"Report-Msgid-Bugs-To: https://wenpai.org/\n"
+"POT-Creation-Date: 2026-02-04 00:00:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: wpbridge.php
+msgid "WPBridge"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "更新源"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "设置"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "安全检查失败"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "权限不足"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "更新源已添加"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "更新源已更新"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "保存失败"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "无效的源 ID"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "更新源已删除"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "删除失败，可能是预置源"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "设置已保存"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "状态已更新"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "更新失败"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "源不存在"
+msgstr ""
+
+#: includes/Admin/AdminPage.php
+msgid "缓存已清除"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "WPBridge 更新源"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "添加更新源"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "总数"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "已启用"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "清除缓存"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "状态"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "名称"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "类型"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "Slug"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "优先级"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "操作"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "暂无更新源"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "预置"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "全部"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "测试"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "编辑"
+msgstr ""
+
+#: templates/admin/source-list.php
+msgid "删除"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "编辑更新源"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "添加更新源"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "更新源的显示名称"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "更新源的类型"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "API URL"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "更新源的 API 地址。对于 JSON 类型，可以使用 {slug} 占位符。"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "插件/主题的 slug。留空表示匹配所有。"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "项目类型"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "插件"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "主题"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "认证令牌"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "用于私有仓库或需要认证的 API。留空表示无需认证。"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "数字越小优先级越高（0-100）"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "启用"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "启用此更新源"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "更新"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "添加"
+msgstr ""
+
+#: templates/admin/source-editor.php
+msgid "取消"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "WPBridge 设置"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "常规设置"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "调试模式"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "启用调试日志"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "启用后会记录详细的调试信息，仅在排查问题时启用。"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "缓存时间"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "1 小时"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "6 小时"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "12 小时"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "24 小时"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "更新检查结果的缓存时间"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "请求超时"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "秒"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "HTTP 请求的超时时间（5-60 秒）"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "降级策略"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "启用过期缓存兜底"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "当更新源不可用时，使用过期的缓存数据。"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "保存设置"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "调试日志"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "暂无日志"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "时间"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "级别"
+msgstr ""
+
+#: templates/admin/settings.php
+msgid "消息"
+msgstr ""
+
+#: includes/UpdateSource/SourceType.php
+msgid "JSON API"
+msgstr ""
+
+#: includes/UpdateSource/SourceType.php
+msgid "GitHub"
+msgstr ""
+
+#: includes/UpdateSource/SourceType.php
+msgid "GitLab"
+msgstr ""
+
+#: includes/UpdateSource/SourceType.php
+msgid "Gitee"
+msgstr ""
+
+#: includes/UpdateSource/SourceType.php
+msgid "菲码源库"
+msgstr ""
+
+#: includes/UpdateSource/SourceType.php
+msgid "ZIP URL"
+msgstr ""
+
+#: includes/UpdateSource/SourceType.php
+msgid "ArkPress"
+msgstr ""
+
+#: includes/UpdateSource/SourceType.php
+msgid "AspireCloud"
+msgstr ""
+
+#: includes/UpdateSource/SourceType.php
+msgid "FAIR"
+msgstr ""
+
+#: includes/UpdateSource/SourceType.php
+msgid "PUC Server"
+msgstr ""
+
+#: includes/Core/Settings.php
+msgid "文派开源更新源"
+msgstr ""
