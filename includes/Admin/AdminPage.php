@@ -589,6 +589,12 @@ class AdminPage {
             wp_send_json_error( [ 'message' => __( '请选择项目', 'wpbridge' ) ] );
         }
 
+        // 白名单验证操作类型
+        $allowed_actions = [ 'set_source', 'reset_default', 'disable' ];
+        if ( ! in_array( $action, $allowed_actions, true ) ) {
+            wp_send_json_error( [ 'message' => __( '无效操作', 'wpbridge' ) ] );
+        }
+
         $source_registry = new \WPBridge\Core\SourceRegistry();
         $item_manager    = new \WPBridge\Core\ItemSourceManager( $source_registry );
 
@@ -643,13 +649,17 @@ class AdminPage {
 
         $defaults_manager = new \WPBridge\Core\DefaultsManager();
 
-        // 全局默认
-        $global_sources = isset( $_POST['global_sources'] ) ? array_keys( (array) $_POST['global_sources'] ) : [];
+        // 全局默认 - 清理输入
+        $global_sources = isset( $_POST['global_sources'] )
+            ? array_map( 'sanitize_text_field', array_keys( (array) $_POST['global_sources'] ) )
+            : [];
         $defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_GLOBAL, $global_sources );
 
         // 插件默认
         if ( ! empty( $_POST['plugin_override'] ) ) {
-            $plugin_sources = isset( $_POST['plugin_sources'] ) ? array_keys( (array) $_POST['plugin_sources'] ) : [];
+            $plugin_sources = isset( $_POST['plugin_sources'] )
+                ? array_map( 'sanitize_text_field', array_keys( (array) $_POST['plugin_sources'] ) )
+                : [];
             $defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_PLUGIN, $plugin_sources );
         } else {
             $defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_PLUGIN, [] );
@@ -657,7 +667,9 @@ class AdminPage {
 
         // 主题默认
         if ( ! empty( $_POST['theme_override'] ) ) {
-            $theme_sources = isset( $_POST['theme_sources'] ) ? array_keys( (array) $_POST['theme_sources'] ) : [];
+            $theme_sources = isset( $_POST['theme_sources'] )
+                ? array_map( 'sanitize_text_field', array_keys( (array) $_POST['theme_sources'] ) )
+                : [];
             $defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_THEME, $theme_sources );
         } else {
             $defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_THEME, [] );
