@@ -9,6 +9,7 @@ namespace WPBridge\Admin;
 
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
+use WPBridge\Core\SourceRegistry;
 use WPBridge\Security\Encryption;
 use WPBridge\UpdateSource\SourceManager;
 use WPBridge\UpdateSource\SourceModel;
@@ -253,6 +254,7 @@ class AdminPage {
         }
 
         if ( $result ) {
+            $this->sync_source_to_registry( $source );
             $this->add_notice( 'success', $message );
             wp_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) );
             exit;
@@ -273,6 +275,8 @@ class AdminPage {
         }
 
         if ( $this->source_manager->delete( $source_id ) ) {
+            $registry = new SourceRegistry();
+            $registry->delete( $source_id );
             $this->add_notice( 'success', __( '更新源已删除', 'wpbridge' ) );
         } else {
             $this->add_notice( 'error', __( '删除失败，可能是预置源', 'wpbridge' ) );
@@ -538,6 +542,93 @@ class AdminPage {
     }
 
     /**
+     * 同步更新源到 SourceRegistry（方案 B）
+     *
+     * @param SourceModel $source 源模型
+     */
+    private function sync_source_to_registry( SourceModel $source ): void {
+        $registry = new SourceRegistry();
+        $existing = $registry->get( $source->id );
+
+        $type_map = [
+            SourceType::JSON        => SourceRegistry::TYPE_JSON,
+            SourceType::GITHUB      => SourceRegistry::TYPE_GIT,
+            SourceType::GITLAB      => SourceRegistry::TYPE_GIT,
+            SourceType::GITEE       => SourceRegistry::TYPE_GIT,
+            SourceType::WENPAI_GIT  => SourceRegistry::TYPE_GIT,
+            SourceType::ZIP         => SourceRegistry::TYPE_CUSTOM,
+            SourceType::ARKPRESS    => SourceRegistry::TYPE_ARKPRESS,
+            SourceType::ASPIRECLOUD => SourceRegistry::TYPE_CUSTOM,
+            SourceType::FAIR        => SourceRegistry::TYPE_FAIR,
+            SourceType::PUC         => SourceRegistry::TYPE_CUSTOM,
+        ];
+
+        $base_url = '';
+        $parsed   = wp_parse_url( $source->api_url );
+        if ( ! empty( $parsed['scheme'] ) && ! empty( $parsed['host'] ) ) {
+            $base_url = $parsed['scheme'] . '://' . $parsed['host'];
+            if ( ! empty( $parsed['port'] ) ) {
+                $base_url .= ':' . $parsed['port'];
+            }
+        }
+
+        $auth_type       = $existing['auth_type'] ?? SourceRegistry::AUTH_NONE;
+        $auth_secret_ref = $existing['auth_secret_ref'] ?? '';
+
+        $token = $this->decrypt_auth_token( $source->auth_token );
+        if ( '' !== $token ) {
+            if ( empty( $auth_secret_ref ) ) {
+                $auth_secret_ref = 'secret_' . wp_generate_uuid4();
+            }
+            update_option( 'wpbridge_secret_' . $auth_secret_ref, $token, false );
+            $auth_type = SourceRegistry::AUTH_TOKEN;
+        }
+
+        $data = [
+            'name'             => $source->name,
+            'type'             => $type_map[ $source->type ] ?? SourceRegistry::TYPE_CUSTOM,
+            'base_url'         => $base_url,
+            'api_url'          => $source->api_url,
+            'enabled'          => $source->enabled,
+            'default_priority' => $source->priority,
+            'auth_type'        => $auth_type,
+            'auth_secret_ref'  => $auth_secret_ref,
+            'headers'          => [],
+            'is_preset'        => false,
+        ];
+
+        if ( $existing ) {
+            $registry->update( $source->id, $data );
+        } else {
+            $data['source_key'] = $source->id;
+            $registry->add( $data );
+        }
+    }
+
+    /**
+     * 解密认证令牌
+     *
+     * @param string $token 加密令牌
+     * @return string
+     */
+    private function decrypt_auth_token( string $token ): string {
+        if ( empty( $token ) ) {
+            return '';
+        }
+
+        $decrypted = Encryption::decrypt( $token );
+        if ( ! empty( $decrypted ) ) {
+            return $decrypted;
+        }
+
+        if ( ! Encryption::is_encrypted( $token ) ) {
+            return $token;
+        }
+
+        return '';
+    }
+
+    /**
      * AJAX: 设置项目更新源
      */
     public function ajax_set_item_source(): void {
@@ -767,8 +858,11 @@ class AdminPage {
             wp_send_json_error( [ 'message' => __( '创建更新源失败', 'wpbridge' ) ] );
         }
 
+        $this->sync_source_to_registry( $source );
+
         // 关联到项目
-        $item_manager = new \WPBridge\Core\ItemSourceManager( $this->source_manager );
+        $source_registry = new SourceRegistry();
+        $item_manager    = new \WPBridge\Core\ItemSourceManager( $source_registry );
         $item_manager->set( $item_key, [
             'mode'       => \WPBridge\Core\ItemSourceManager::MODE_CUSTOM,
             'source_ids' => [ $source_key => 10 ],
@@ -890,6 +984,8 @@ class AdminPage {
                 if ( ! $save_result ) {
                     wp_send_json_error( [ 'message' => __( '创建更新源失败', 'wpbridge' ) ] );
                 }
+
+                $this->sync_source_to_registry( $source );
 
                 // 关联到项目
                 $result = $item_manager->set( $item_key, [

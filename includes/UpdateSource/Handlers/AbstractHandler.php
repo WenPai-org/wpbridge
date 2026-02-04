@@ -9,6 +9,7 @@ namespace WPBridge\UpdateSource\Handlers;
 
 use WPBridge\UpdateSource\SourceModel;
 use WPBridge\Core\Logger;
+use WPBridge\Security\Encryption;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -134,7 +135,7 @@ abstract class AbstractHandler implements HandlerInterface {
 
         if ( is_wp_error( $response ) ) {
             Logger::error( '请求失败', [
-                'url'   => $url,
+                'url'   => $this->redact_url( $url ),
                 'error' => $response->get_error_message(),
             ] );
             return null;
@@ -145,7 +146,7 @@ abstract class AbstractHandler implements HandlerInterface {
 
         if ( $code < 200 || $code >= 300 ) {
             Logger::warning( '请求返回非 2xx 状态码', [
-                'url'  => $url,
+                'url'  => $this->redact_url( $url ),
                 'code' => $code,
             ] );
             return null;
@@ -155,7 +156,7 @@ abstract class AbstractHandler implements HandlerInterface {
 
         if ( json_last_error() !== JSON_ERROR_NONE ) {
             Logger::error( 'JSON 解析失败', [
-                'url'   => $url,
+                'url'   => $this->redact_url( $url ),
                 'error' => json_last_error_msg(),
             ] );
             return null;
@@ -173,5 +174,66 @@ abstract class AbstractHandler implements HandlerInterface {
      */
     protected function is_newer_version( string $current, string $remote ): bool {
         return version_compare( $remote, $current, '>' );
+    }
+
+    /**
+     * 获取解密后的认证令牌
+     *
+     * @return string
+     */
+    protected function get_auth_token(): string {
+        if ( empty( $this->source->auth_token ) ) {
+            return '';
+        }
+
+        $token = Encryption::decrypt( $this->source->auth_token );
+
+        if ( empty( $token ) ) {
+            if ( Encryption::is_encrypted( $this->source->auth_token ) ) {
+                Logger::error( 'Token 解密失败', [ 'source' => $this->source->id ] );
+                return '';
+            }
+
+            return $this->source->auth_token;
+        }
+
+        return $token;
+    }
+
+    /**
+     * 脱敏 URL 中的敏感参数
+     *
+     * @param string $url 原始 URL
+     * @return string
+     */
+    protected function redact_url( string $url ): string {
+        $parts = wp_parse_url( $url );
+        if ( empty( $parts ) || empty( $parts['query'] ) ) {
+            return $url;
+        }
+
+        parse_str( $parts['query'], $query );
+        if ( empty( $query ) ) {
+            return $url;
+        }
+
+        $sensitive_keys = [ 'access_token', 'api_key', 'token', 'key', 'auth', 'authorization' ];
+        foreach ( $query as $key => $value ) {
+            if ( in_array( strtolower( (string) $key ), $sensitive_keys, true ) ) {
+                $query[ $key ] = '***';
+            }
+        }
+
+        $scheme   = isset( $parts['scheme'] ) ? $parts['scheme'] . '://' : '';
+        $user     = $parts['user'] ?? '';
+        $pass     = isset( $parts['pass'] ) ? ':' . $parts['pass'] : '';
+        $auth     = $user ? $user . $pass . '@' : '';
+        $host     = $parts['host'] ?? '';
+        $port     = isset( $parts['port'] ) ? ':' . $parts['port'] : '';
+        $path     = $parts['path'] ?? '';
+        $querystr = http_build_query( $query );
+        $fragment = isset( $parts['fragment'] ) ? '#' . $parts['fragment'] : '';
+
+        return $scheme . $auth . $host . $port . $path . ( $querystr ? '?' . $querystr : '' ) . $fragment;
     }
 }

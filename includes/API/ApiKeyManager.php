@@ -217,7 +217,7 @@ class ApiKeyManager {
         $keys         = $api_settings['keys'] ?? [];
 
         foreach ( $keys as $index => $key ) {
-            if ( hash_equals( $key['key'], $api_key ) ) {
+            if ( isset( $key['key_hash'] ) && password_verify( $api_key, $key['key_hash'] ) ) {
                 $keys[ $index ]['last_used']   = current_time( 'mysql' );
                 $keys[ $index ]['usage_count'] = ( $key['usage_count'] ?? 0 ) + 1;
                 break;
