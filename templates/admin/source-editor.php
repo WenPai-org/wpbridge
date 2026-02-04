@@ -116,9 +116,10 @@ $title   = $is_edit ? __( '编辑更新源', 'wpbridge' ) : __( '添加更新源
                     <input type="password"
                            id="wpbridge-auth-token"
                            name="auth_token"
-                           value="<?php echo esc_attr( $source->auth_token ?? '' ); ?>"
+                           value="<?php echo esc_attr( ! empty( $source->auth_token ) ? '********' : '' ); ?>"
                            class="regular-text"
-                           autocomplete="new-password">
+                           autocomplete="new-password"
+                           placeholder="<?php echo esc_attr( ! empty( $source->auth_token ) ? __( '已设置（留空保持不变）', 'wpbridge' ) : '' ); ?>">
                     <p class="description">
                         <?php esc_html_e( '用于私有仓库或需要认证的 API。留空表示无需认证。', 'wpbridge' ); ?>
                     </p>

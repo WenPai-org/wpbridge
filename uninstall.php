@@ -19,6 +19,7 @@ delete_option( 'wpbridge_ai_settings' );
 delete_option( 'wpbridge_logs' );
 delete_option( 'wpbridge_activated' );
 delete_option( 'wpbridge_admin_notices' );
+delete_option( 'wpbridge_encryption_key' );
 
 // 删除所有加密存储的数据
 global $wpdb;
@@ -48,5 +49,9 @@ wp_clear_scheduled_hook( 'wpbridge_update_sources' );
 
 // 清除对象缓存
 if ( wp_using_ext_object_cache() ) {
-    wp_cache_delete( 'wpbridge', 'wpbridge' );
+    if ( function_exists( 'wp_cache_flush_group' ) ) {
+        wp_cache_flush_group( 'wpbridge' );
+    } else {
+        wp_cache_delete( 'wpbridge', 'wpbridge' );
+    }
 }

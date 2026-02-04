@@ -160,7 +160,10 @@ class CacheManager {
         global $wpdb;
 
         $count = $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_wpbridge_%'"
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE %s",
+                $wpdb->esc_like( '_transient_wpbridge_' ) . '%'
+            )
         );
 
         return [

@@ -158,7 +158,7 @@ class BackgroundUpdater {
      *
      * @return int|false 时间戳或 false
      */
-    public function get_next_scheduled(): int|false {
+    public function get_next_scheduled() {
         return wp_next_scheduled( self::CRON_HOOK );
     }
 

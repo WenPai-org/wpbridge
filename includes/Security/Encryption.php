@@ -45,8 +45,13 @@ class Encryption {
             return SECURE_AUTH_KEY;
         }
 
-        // 如果都没有，使用站点 URL 的哈希（不推荐）
-        return hash( 'sha256', get_site_url() );
+        // 如果都没有，生成并存储一个随机密钥
+        $key = get_option( 'wpbridge_encryption_key' );
+        if ( empty( $key ) ) {
+            $key = bin2hex( random_bytes( 32 ) );
+            update_option( 'wpbridge_encryption_key', $key, false );
+        }
+        return $key;
     }
 
     /**
