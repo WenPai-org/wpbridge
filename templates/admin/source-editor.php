@@ -79,7 +79,7 @@ $title   = $is_edit ? __( '编辑更新源', 'wpbridge' ) : __( '添加更新源
 
                         <div class="wpbridge-form-row">
                             <label class="wpbridge-form-label">
-                                <?php esc_html_e( 'API URL', 'wpbridge' ); ?>
+                                <?php esc_html_e( '更新地址', 'wpbridge' ); ?>
                                 <span class="required">*</span>
                             </label>
                             <div>
@@ -91,7 +91,7 @@ $title   = $is_edit ? __( '编辑更新源', 'wpbridge' ) : __( '添加更新源
                                        placeholder="https://example.com/api/v1"
                                        required>
                                 <p class="wpbridge-form-help">
-                                    <?php esc_html_e( '更新源的 API 地址。对于 JSON 类型，可以使用 {slug} 占位符。', 'wpbridge' ); ?>
+                                    <?php esc_html_e( '更新源的地址。对于 JSON 类型，可以使用 {slug} 占位符。', 'wpbridge' ); ?>
                                 </p>
                             </div>
                         </div>
@@ -117,7 +117,7 @@ $title   = $is_edit ? __( '编辑更新源', 'wpbridge' ) : __( '添加更新源
                         </div>
 
                         <div class="wpbridge-form-row">
-                            <label class="wpbridge-form-label"><?php esc_html_e( 'Slug', 'wpbridge' ); ?></label>
+                            <label class="wpbridge-form-label"><?php esc_html_e( '插件/主题标识', 'wpbridge' ); ?></label>
                             <div>
                                 <input type="text"
                                        name="slug"
@@ -125,23 +125,38 @@ $title   = $is_edit ? __( '编辑更新源', 'wpbridge' ) : __( '添加更新源
                                        class="wpbridge-form-input"
                                        placeholder="<?php esc_attr_e( '留空匹配所有', 'wpbridge' ); ?>">
                                 <p class="wpbridge-form-help">
-                                    <?php esc_html_e( '指定插件/主题的 slug。留空表示匹配所有。', 'wpbridge' ); ?>
+                                    <?php esc_html_e( '指定插件/主题的标识名称（通常是文件夹名）。留空表示匹配所有。', 'wpbridge' ); ?>
                                 </p>
                             </div>
                         </div>
 
                         <div class="wpbridge-form-row">
-                            <label class="wpbridge-form-label"><?php esc_html_e( '优先级', 'wpbridge' ); ?></label>
+                            <label class="wpbridge-form-label"><?php esc_html_e( '首选程度', 'wpbridge' ); ?></label>
                             <div>
-                                <input type="number"
-                                       name="priority"
-                                       value="<?php echo esc_attr( $source->priority ?? 50 ); ?>"
-                                       min="0"
-                                       max="100"
-                                       class="wpbridge-form-input"
-                                       style="max-width: 100px;">
+                                <?php
+                                $current_priority = $source->priority ?? 50;
+                                // 将数字优先级映射到语义化选项
+                                if ( $current_priority <= 20 ) {
+                                    $priority_level = 'primary';
+                                } elseif ( $current_priority <= 60 ) {
+                                    $priority_level = 'secondary';
+                                } else {
+                                    $priority_level = 'fallback';
+                                }
+                                ?>
+                                <select name="priority_level" class="wpbridge-form-select">
+                                    <option value="primary" <?php selected( $priority_level, 'primary' ); ?>>
+                                        <?php esc_html_e( '首选源 - 优先使用此源', 'wpbridge' ); ?>
+                                    </option>
+                                    <option value="secondary" <?php selected( $priority_level, 'secondary' ); ?>>
+                                        <?php esc_html_e( '备选源 - 首选不可用时使用', 'wpbridge' ); ?>
+                                    </option>
+                                    <option value="fallback" <?php selected( $priority_level, 'fallback' ); ?>>
+                                        <?php esc_html_e( '最后选择 - 其他源都不可用时使用', 'wpbridge' ); ?>
+                                    </option>
+                                </select>
                                 <p class="wpbridge-form-help">
-                                    <?php esc_html_e( '数字越小优先级越高（0-100）', 'wpbridge' ); ?>
+                                    <?php esc_html_e( '当多个源可用时，按此顺序尝试获取更新', 'wpbridge' ); ?>
                                 </p>
                             </div>
                         </div>
@@ -152,7 +167,7 @@ $title   = $is_edit ? __( '编辑更新源', 'wpbridge' ) : __( '添加更新源
                         <h2 class="wpbridge-form-section-title"><?php esc_html_e( '认证设置', 'wpbridge' ); ?></h2>
 
                         <div class="wpbridge-form-row">
-                            <label class="wpbridge-form-label"><?php esc_html_e( '认证令牌', 'wpbridge' ); ?></label>
+                            <label class="wpbridge-form-label"><?php esc_html_e( '访问密码', 'wpbridge' ); ?></label>
                             <div>
                                 <input type="password"
                                        name="auth_token"
@@ -161,7 +176,7 @@ $title   = $is_edit ? __( '编辑更新源', 'wpbridge' ) : __( '添加更新源
                                        autocomplete="new-password"
                                        placeholder="<?php echo esc_attr( ! empty( $source->auth_token ) ? __( '已设置（留空保持不变）', 'wpbridge' ) : __( '可选', 'wpbridge' ) ); ?>">
                                 <p class="wpbridge-form-help">
-                                    <?php esc_html_e( '用于私有仓库或需要认证的 API。留空表示无需认证。', 'wpbridge' ); ?>
+                                    <?php esc_html_e( '用于私有仓库或需要认证的更新源。留空表示无需认证。', 'wpbridge' ); ?>
                                 </p>
                             </div>
                         </div>

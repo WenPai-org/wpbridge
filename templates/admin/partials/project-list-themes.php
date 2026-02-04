@@ -35,6 +35,14 @@ $current_theme_slug = $current_theme->get_stylesheet();
             <option value="reset_default"><?php esc_html_e( '重置为默认', 'wpbridge' ); ?></option>
             <option value="disable"><?php esc_html_e( '禁用更新', 'wpbridge' ); ?></option>
         </select>
+        <select id="wpbridge-bulk-source-themes" class="wpbridge-select wpbridge-bulk-source-select" style="display: none;">
+            <option value=""><?php esc_html_e( '-- 选择更新源 --', 'wpbridge' ); ?></option>
+            <?php foreach ( $all_sources as $source ) : ?>
+                <option value="<?php echo esc_attr( $source['source_key'] ); ?>">
+                    <?php echo esc_html( $source['name'] ); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
         <button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm" id="wpbridge-apply-bulk-themes">
             <?php esc_html_e( '应用', 'wpbridge' ); ?>
         </button>
@@ -124,11 +132,43 @@ $current_theme_slug = $current_theme->get_stylesheet();
                 </div>
 
                 <div class="wpbridge-project-actions">
-                    <button type="button" class="wpbridge-btn wpbridge-btn-icon wpbridge-project-config"
+                    <button type="button" class="wpbridge-btn wpbridge-btn-icon wpbridge-project-expand"
                             data-item-key="<?php echo esc_attr( $item_key ); ?>"
-                            title="<?php esc_attr_e( '高级配置', 'wpbridge' ); ?>">
-                        <span class="dashicons dashicons-admin-generic"></span>
+                            title="<?php esc_attr_e( '展开配置', 'wpbridge' ); ?>">
+                        <span class="dashicons dashicons-arrow-down-alt2"></span>
                     </button>
+                </div>
+
+                <!-- 内联配置面板（默认折叠） -->
+                <div class="wpbridge-project-config-panel" data-item-key="<?php echo esc_attr( $item_key ); ?>" style="display: none;">
+                    <div class="wpbridge-config-row">
+                        <label class="wpbridge-config-label"><?php esc_html_e( '更新地址', 'wpbridge' ); ?></label>
+                        <div class="wpbridge-config-field">
+                            <input type="url" class="wpbridge-form-input wpbridge-inline-url"
+                                   data-item-key="<?php echo esc_attr( $item_key ); ?>"
+                                   placeholder="https://github.com/user/repo 或 https://example.com/update.json">
+                            <p class="wpbridge-form-help"><?php esc_html_e( '粘贴更新源地址，系统会自动识别类型', 'wpbridge' ); ?></p>
+                        </div>
+                    </div>
+                    <div class="wpbridge-config-row">
+                        <label class="wpbridge-config-label"><?php esc_html_e( '访问密码', 'wpbridge' ); ?></label>
+                        <div class="wpbridge-config-field">
+                            <input type="password" class="wpbridge-form-input wpbridge-inline-token"
+                                   data-item-key="<?php echo esc_attr( $item_key ); ?>"
+                                   placeholder="<?php esc_attr_e( '可选，用于私有仓库', 'wpbridge' ); ?>">
+                        </div>
+                    </div>
+                    <div class="wpbridge-config-actions">
+                        <button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm wpbridge-save-inline"
+                                data-item-key="<?php echo esc_attr( $item_key ); ?>">
+                            <span class="dashicons dashicons-saved"></span>
+                            <?php esc_html_e( '保存', 'wpbridge' ); ?>
+                        </button>
+                        <button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-cancel-inline"
+                                data-item-key="<?php echo esc_attr( $item_key ); ?>">
+                            <?php esc_html_e( '取消', 'wpbridge' ); ?>
+                        </button>
+                    </div>
                 </div>
             </div>
         <?php endforeach; ?>

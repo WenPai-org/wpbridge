@@ -432,6 +432,17 @@
                 self.applyBulkAction('themes');
             });
 
+            // 批量操作类型变化时显示/隐藏源选择
+            $(document).on('change', '#wpbridge-bulk-action-plugins, #wpbridge-bulk-action-themes', function() {
+                var type = $(this).attr('id').replace('wpbridge-bulk-action-', '');
+                var action = $(this).val();
+                if (action === 'set_source') {
+                    $('#wpbridge-bulk-source-' + type).show();
+                } else {
+                    $('#wpbridge-bulk-source-' + type).hide();
+                }
+            });
+
             // 搜索（带防抖）
             $(document).on('input', '#wpbridge-search-plugins', function() {
                 self.debouncedFilter('plugins', $(this).val());
@@ -542,15 +553,11 @@
                 item_keys: items
             };
 
-            // 如果是设置源，显示源选择
+            // 如果是设置源，从下拉框获取选择的源
             if (action === 'set_source') {
-                var $sources = $('.wpbridge-source-select:first optgroup option');
-                if ($sources.length === 0) {
-                    Toast.error(wpbridge.i18n.no_sources || '没有可用的更新源');
-                    return;
-                }
-                var sourceKey = prompt(wpbridge.i18n.enter_source_key || '请输入源 Key (如: wporg, wenpai-mirror):');
+                var sourceKey = $('#wpbridge-bulk-source-' + type).val();
                 if (!sourceKey) {
+                    Toast.error(wpbridge.i18n.select_source || '请选择更新源');
                     return;
                 }
                 data.source_key = sourceKey;
@@ -623,6 +630,223 @@
     };
 
     /**
+     * URL 自动推断模块 (P1)
+     */
+    var UrlInference = {
+        patterns: {
+            'github.com': {
+                type: 'github',
+                extract: /github\.com\/([^\/]+\/[^\/]+)/,
+                namePrefix: 'GitHub: '
+            },
+            'gitlab.com': {
+                type: 'gitlab',
+                extract: /gitlab\.com\/([^\/]+\/[^\/]+)/,
+                namePrefix: 'GitLab: '
+            },
+            'gitee.com': {
+                type: 'gitee',
+                extract: /gitee\.com\/([^\/]+\/[^\/]+)/,
+                namePrefix: 'Gitee: '
+            },
+            'api.wordpress.org': {
+                type: 'json',
+                namePrefix: 'WordPress.org: '
+            },
+            'wpmirror.com': {
+                type: 'json',
+                namePrefix: '文派镜像: '
+            }
+        },
+
+        init: function() {
+            this.bindEvents();
+        },
+
+        bindEvents: function() {
+            var self = this;
+
+            // 监听 URL 输入变化
+            $(document).on('blur', 'input[name="api_url"]', function() {
+                self.inferFromUrl($(this).val());
+            });
+        },
+
+        inferFromUrl: function(url) {
+            if (!url) return;
+
+            var result = this.parseUrl(url);
+            if (!result) return;
+
+            // 自动填充类型
+            var $typeSelect = $('select[name="type"]');
+            if ($typeSelect.length && !$typeSelect.data('user-changed')) {
+                $typeSelect.val(result.type);
+            }
+
+            // 自动填充名称（如果为空）
+            var $nameInput = $('input[name="name"]');
+            if ($nameInput.length && !$nameInput.val()) {
+                $nameInput.val(result.name);
+            }
+        },
+
+        parseUrl: function(url) {
+            try {
+                var urlObj = new URL(url);
+                var hostname = urlObj.hostname;
+
+                for (var domain in this.patterns) {
+                    // 精确匹配域名（防止 fakegithub.com 匹配 github.com）
+                    if (hostname === domain || hostname.endsWith('.' + domain)) {
+                        var pattern = this.patterns[domain];
+                        var name = pattern.namePrefix || '';
+
+                        if (pattern.extract) {
+                            var match = url.match(pattern.extract);
+                            if (match && match[1]) {
+                                name += match[1];
+                            }
+                        } else {
+                            name += hostname;
+                        }
+
+                        return {
+                            type: pattern.type,
+                            name: name
+                        };
+                    }
+                }
+
+                // 默认为 JSON 类型
+                if (url.indexOf('.json') !== -1) {
+                    return {
+                        type: 'json',
+                        name: hostname
+                    };
+                }
+
+                return {
+                    type: 'json',
+                    name: hostname
+                };
+            } catch (e) {
+                return null;
+            }
+        }
+    };
+
+    /**
+     * 快速设置模块 (P1) - 内联折叠面板设计
+     */
+    var QuickSetup = {
+        init: function() {
+            this.bindEvents();
+        },
+
+        bindEvents: function() {
+            var self = this;
+
+            // 展开/折叠配置面板
+            $(document).on('click', '.wpbridge-project-expand', function(e) {
+                e.preventDefault();
+                var itemKey = $(this).data('item-key');
+                self.togglePanel(itemKey, $(this));
+            });
+
+            // 取消按钮
+            $(document).on('click', '.wpbridge-cancel-inline', function(e) {
+                e.preventDefault();
+                var itemKey = $(this).data('item-key');
+                self.closePanel(itemKey);
+            });
+
+            // 保存按钮
+            $(document).on('click', '.wpbridge-save-inline', function(e) {
+                e.preventDefault();
+                var itemKey = $(this).data('item-key');
+                self.saveInlineConfig(itemKey, $(this));
+            });
+        },
+
+        togglePanel: function(itemKey, $button) {
+            var $panel = $('.wpbridge-project-config-panel[data-item-key="' + itemKey + '"]');
+            var $icon = $button.find('.dashicons');
+
+            if ($panel.is(':visible')) {
+                $panel.slideUp(200);
+                $icon.removeClass('dashicons-arrow-up-alt2').addClass('dashicons-arrow-down-alt2');
+            } else {
+                // 关闭其他打开的面板
+                $('.wpbridge-project-config-panel:visible').slideUp(200);
+                $('.wpbridge-project-expand .dashicons').removeClass('dashicons-arrow-up-alt2').addClass('dashicons-arrow-down-alt2');
+
+                $panel.slideDown(200);
+                $icon.removeClass('dashicons-arrow-down-alt2').addClass('dashicons-arrow-up-alt2');
+            }
+        },
+
+        closePanel: function(itemKey) {
+            var $panel = $('.wpbridge-project-config-panel[data-item-key="' + itemKey + '"]');
+            var $button = $('.wpbridge-project-expand[data-item-key="' + itemKey + '"]');
+
+            $panel.slideUp(200);
+            $button.find('.dashicons').removeClass('dashicons-arrow-up-alt2').addClass('dashicons-arrow-down-alt2');
+
+            // 清空输入
+            $panel.find('input').val('');
+        },
+
+        saveInlineConfig: function(itemKey, $button) {
+            var $panel = $('.wpbridge-project-config-panel[data-item-key="' + itemKey + '"]');
+            var url = $panel.find('.wpbridge-inline-url').val();
+            var token = $panel.find('.wpbridge-inline-token').val();
+
+            if (!url) {
+                Toast.error(wpbridge.i18n.enter_url || '请输入更新地址');
+                return;
+            }
+
+            // 推断源类型和名称
+            var inferred = UrlInference.parseUrl(url);
+            if (!inferred) {
+                Toast.error(wpbridge.i18n.invalid_url || '无效的 URL');
+                return;
+            }
+
+            $button.prop('disabled', true);
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wpbridge_quick_setup_source',
+                    nonce: wpbridge.nonce,
+                    item_key: itemKey,
+                    url: url,
+                    type: inferred.type,
+                    name: inferred.name,
+                    token: token
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Toast.success(response.data.message);
+                        location.reload();
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                },
+                complete: function() {
+                    $button.prop('disabled', false);
+                }
+            });
+        }
+    };
+
+    /**
      * 初始化
      */
     $(document).ready(function() {
@@ -632,6 +856,8 @@
         ApiKeys.init();
         Logs.init();
         Projects.init();
+        UrlInference.init();
+        QuickSetup.init();
     });
 
     // 添加旋转动画样式
