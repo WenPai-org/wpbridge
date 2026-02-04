@@ -69,7 +69,12 @@ abstract class AbstractAdapter implements AdapterInterface {
      */
     public function matches( string $url, array $args ): bool {
         foreach ( $this->url_patterns as $pattern ) {
-            if ( preg_match( $pattern, $url ) ) {
+            $result = @preg_match( $pattern, $url );
+            if ( $result === false ) {
+                $this->log( '无效的 URL 匹配模式', [ 'pattern' => $pattern ] );
+                continue;
+            }
+            if ( $result === 1 ) {
                 return true;
             }
         }

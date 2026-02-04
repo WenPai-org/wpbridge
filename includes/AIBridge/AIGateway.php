@@ -9,6 +9,7 @@ namespace WPBridge\AIBridge;
 
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
+use WPBridge\Security\Validator;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -154,7 +155,15 @@ class AIGateway {
             return false;
         }
 
-        return in_array( $host, $this->whitelist, true );
+        $host = strtolower( $host );
+
+        foreach ( $this->whitelist as $allowed ) {
+            if ( strtolower( $allowed ) === $host ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -170,6 +179,12 @@ class AIGateway {
 
         if ( empty( $custom_endpoint ) ) {
             Logger::warning( '透传模式未配置自定义端点' );
+            return false;
+        }
+
+        // SSRF 防护：验证端点安全性
+        if ( ! Validator::is_valid_url( $custom_endpoint ) ) {
+            Logger::error( '自定义端点不安全', [ 'endpoint' => $custom_endpoint ] );
             return false;
         }
 

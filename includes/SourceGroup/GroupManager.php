@@ -200,14 +200,28 @@ class GroupManager {
             return false;
         }
 
+        // 先更新分组状态
         $group->enabled = $enabled;
-
-        // 同时切换分组内所有源的状态
-        foreach ( $group->source_ids as $source_id ) {
-            $this->source_manager->toggle( $source_id, $enabled );
+        if ( ! $this->update( $group ) ) {
+            return false;
         }
 
-        return $this->update( $group );
+        // 然后批量更新源状态，记录失败的源
+        $failed_sources = [];
+        foreach ( $group->source_ids as $source_id ) {
+            if ( ! $this->source_manager->toggle( $source_id, $enabled ) ) {
+                $failed_sources[] = $source_id;
+            }
+        }
+
+        if ( ! empty( $failed_sources ) ) {
+            Logger::warning( '部分源状态切换失败', [
+                'group_id' => $id,
+                'failed'   => $failed_sources,
+            ] );
+        }
+
+        return true;
     }
 
     /**
@@ -242,6 +256,11 @@ class GroupManager {
      * @return bool
      */
     public function add_source_to_group( string $group_id, string $source_id ): bool {
+        // 权限检查
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return false;
+        }
+
         $group = $this->get( $group_id );
 
         if ( null === $group ) {
@@ -261,6 +280,11 @@ class GroupManager {
      * @return bool
      */
     public function remove_source_from_group( string $group_id, string $source_id ): bool {
+        // 权限检查
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return false;
+        }
+
         $group = $this->get( $group_id );
 
         if ( null === $group ) {

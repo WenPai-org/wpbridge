@@ -9,6 +9,7 @@ namespace WPBridge\Commercial;
 
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
+use WPBridge\Security\Validator;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -118,8 +119,8 @@ class CommercialManager {
      * @return bool
      */
     private function is_commercial_plugin( string $file, array $data ): bool {
-        // 已知商业插件列表
-        $known_commercial = [
+        // 已知商业插件列表（允许通过过滤器扩展）
+        $known_commercial = apply_filters( 'wpbridge_known_commercial_plugins', [
             'elementor-pro',
             'wordpress-seo-premium',
             'seo-by-rank-math-pro',
@@ -135,7 +136,7 @@ class CommercialManager {
             'updraftplus-premium',
             'wp-rocket',
             'perfmatters',
-        ];
+        ] );
 
         $slug = dirname( $file );
 
@@ -145,8 +146,17 @@ class CommercialManager {
 
         // 检查插件头信息
         $plugin_path = WP_PLUGIN_DIR . '/' . $file;
-        if ( file_exists( $plugin_path ) ) {
-            $content = file_get_contents( $plugin_path, false, null, 0, 8192 );
+
+        // 路径安全验证：防止路径遍历
+        $real_path       = realpath( $plugin_path );
+        $plugin_dir_real = realpath( WP_PLUGIN_DIR );
+
+        if ( ! $real_path || ! $plugin_dir_real || strpos( $real_path, $plugin_dir_real . DIRECTORY_SEPARATOR ) !== 0 ) {
+            return false; // 路径不安全，跳过
+        }
+
+        if ( file_exists( $real_path ) ) {
+            $content = file_get_contents( $real_path, false, null, 0, 8192 );
 
             // 检查授权相关关键词
             $license_keywords = [
@@ -249,8 +259,19 @@ class CommercialManager {
      * @return bool
      */
     public function lock_version( string $slug, string $version ): bool {
+        // 权限检查
+        if ( ! current_user_can( 'update_plugins' ) ) {
+            Logger::warning( '无权限锁定版本', [ 'slug' => $slug, 'user' => get_current_user_id() ] );
+            return false;
+        }
+
+        // 验证版本号格式
+        if ( ! Validator::is_valid_version( $version ) ) {
+            return false;
+        }
+
         $this->version_locks[ $slug ] = [
-            'version'    => $version,
+            'version'    => sanitize_text_field( $version ),
             'locked_at'  => current_time( 'mysql' ),
             'locked_by'  => get_current_user_id(),
         ];
@@ -271,6 +292,12 @@ class CommercialManager {
      * @return bool
      */
     public function unlock_version( string $slug ): bool {
+        // 权限检查
+        if ( ! current_user_can( 'update_plugins' ) ) {
+            Logger::warning( '无权限解锁版本', [ 'slug' => $slug, 'user' => get_current_user_id() ] );
+            return false;
+        }
+
         if ( ! isset( $this->version_locks[ $slug ] ) ) {
             return false;
         }

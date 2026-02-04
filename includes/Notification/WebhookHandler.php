@@ -9,6 +9,7 @@ namespace WPBridge\Notification;
 
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
+use WPBridge\Security\Validator;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -92,6 +93,11 @@ class WebhookHandler implements HandlerInterface {
 
         if ( empty( $webhook_url ) ) {
             throw new \Exception( __( 'Webhook URL 未配置', 'wpbridge' ) );
+        }
+
+        // SSRF 防护：验证 URL 安全性
+        if ( ! Validator::is_valid_url( $webhook_url ) ) {
+            throw new \Exception( __( 'Webhook URL 不安全，禁止访问内网地址', 'wpbridge' ) );
         }
 
         // 构建 payload
