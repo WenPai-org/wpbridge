@@ -526,7 +526,7 @@ class RestController {
             }
 
             try {
-                $info = $handler->get_update_info( $slug );
+                $info = $handler->get_info( $slug );
                 if ( null !== $info ) {
                     break;
                 }
@@ -597,7 +597,7 @@ class RestController {
             }
 
             try {
-                $info = $handler->get_update_info( $slug );
+                $info = $handler->get_info( $slug );
                 if ( null !== $info ) {
                     break;
                 }
