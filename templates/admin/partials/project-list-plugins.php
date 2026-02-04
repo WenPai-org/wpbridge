@@ -16,6 +16,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 use WPBridge\Core\ItemSourceManager;
+use WPBridge\Core\CommercialDetector;
+
+// 获取商业插件检测器
+$commercial_detector = CommercialDetector::get_instance();
 ?>
 
 <!-- 批量操作工具栏 -->
@@ -70,6 +74,10 @@ use WPBridge\Core\ItemSourceManager;
 
             // 判断是否激活
             $is_active = is_plugin_active( $plugin_file );
+
+            // 检测插件类型
+            $type_info = $commercial_detector->detect( $plugin_slug, $plugin_file );
+            $type_label = CommercialDetector::get_type_label( $type_info['type'] );
         ?>
             <div class="wpbridge-project-item" data-item-key="<?php echo esc_attr( $item_key ); ?>" data-item-type="plugin">
                 <div class="wpbridge-project-checkbox">
@@ -88,6 +96,14 @@ use WPBridge\Core\ItemSourceManager;
                         <?php if ( $is_active ) : ?>
                             <span class="wpbridge-badge wpbridge-badge-success"><?php esc_html_e( '已激活', 'wpbridge' ); ?></span>
                         <?php endif; ?>
+                        <!-- 插件类型徽章 -->
+                        <span class="wpbridge-badge wpbridge-badge-type-<?php echo esc_attr( $type_info['type'] ); ?>"
+                              data-plugin-slug="<?php echo esc_attr( $plugin_slug ); ?>"
+                              data-source="<?php echo esc_attr( $type_info['source'] ); ?>"
+                              title="<?php echo esc_attr( $type_info['source'] === 'manual' ? __( '手动标记', 'wpbridge' ) : __( '自动检测', 'wpbridge' ) ); ?>">
+                            <span class="dashicons <?php echo esc_attr( $type_label['icon'] ); ?>"></span>
+                            <?php echo esc_html( $type_label['label'] ); ?>
+                        </span>
                     </div>
                     <div class="wpbridge-project-meta">
                         <span class="wpbridge-project-version">v<?php echo esc_html( $plugin_data['Version'] ); ?></span>
@@ -119,6 +135,44 @@ use WPBridge\Core\ItemSourceManager;
 
                 <!-- 内联配置面板（默认折叠） -->
                 <div class="wpbridge-project-config-panel" data-item-key="<?php echo esc_attr( $item_key ); ?>" style="display: none;">
+                    <!-- P2: 插件类型手动标记 -->
+                    <div class="wpbridge-config-row">
+                        <label class="wpbridge-config-label"><?php esc_html_e( '插件类型', 'wpbridge' ); ?></label>
+                        <div class="wpbridge-config-field">
+                            <select class="wpbridge-form-input wpbridge-plugin-type-select"
+                                    data-plugin-slug="<?php echo esc_attr( $plugin_slug ); ?>">
+                                <option value="<?php echo esc_attr( CommercialDetector::TYPE_UNKNOWN ); ?>"
+                                    <?php selected( $type_info['type'], CommercialDetector::TYPE_UNKNOWN ); ?>>
+                                    <?php esc_html_e( '自动检测', 'wpbridge' ); ?>
+                                </option>
+                                <option value="<?php echo esc_attr( CommercialDetector::TYPE_FREE ); ?>"
+                                    <?php selected( $type_info['type'], CommercialDetector::TYPE_FREE ); ?>>
+                                    <?php esc_html_e( '免费插件', 'wpbridge' ); ?>
+                                </option>
+                                <option value="<?php echo esc_attr( CommercialDetector::TYPE_COMMERCIAL ); ?>"
+                                    <?php selected( $type_info['type'], CommercialDetector::TYPE_COMMERCIAL ); ?>>
+                                    <?php esc_html_e( '商业插件', 'wpbridge' ); ?>
+                                </option>
+                                <option value="<?php echo esc_attr( CommercialDetector::TYPE_PRIVATE ); ?>"
+                                    <?php selected( $type_info['type'], CommercialDetector::TYPE_PRIVATE ); ?>>
+                                    <?php esc_html_e( '私有插件', 'wpbridge' ); ?>
+                                </option>
+                            </select>
+                            <p class="wpbridge-form-help">
+                                <?php if ( $type_info['source'] === 'manual' ) : ?>
+                                    <?php esc_html_e( '当前为手动标记', 'wpbridge' ); ?>
+                                <?php else : ?>
+                                    <?php
+                                    printf(
+                                        /* translators: %s: detection source */
+                                        esc_html__( '自动检测结果（来源：%s）', 'wpbridge' ),
+                                        esc_html( $type_info['source'] )
+                                    );
+                                    ?>
+                                <?php endif; ?>
+                            </p>
+                        </div>
+                    </div>
                     <div class="wpbridge-config-row">
                         <label class="wpbridge-config-label"><?php esc_html_e( '更新地址', 'wpbridge' ); ?></label>
                         <div class="wpbridge-config-field">

@@ -460,6 +460,38 @@
     color: #fff;
 }
 
+/* 插件类型徽章 */
+.wpbridge-badge-type-free {
+    background: var(--wpbridge-success-light);
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-badge-type-commercial {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.wpbridge-badge-type-private {
+    background: var(--wpbridge-info-light);
+    color: var(--wpbridge-info);
+}
+
+.wpbridge-badge-type-unknown {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-600);
+}
+
+.wpbridge-badge-type-free .dashicons,
+.wpbridge-badge-type-commercial .dashicons,
+.wpbridge-badge-type-private .dashicons,
+.wpbridge-badge-type-unknown .dashicons {
+    font-size: 12px;
+    width: 12px;
+    height: 12px;
+    vertical-align: middle;
+    margin-right: 2px;
+}
+
 .wpbridge-badge-status {
     padding: 4px 10px;
 }
@@ -1443,299 +1475,367 @@
 }
 
 /* ========================================
-   Overview Tab - 概览页面 (P3)
+   Overview Tab - 概览页面 (P3) - 重新设计
    ======================================== */
 
-/* 欢迎区域 */
-.wpbridge-welcome {
+/* 状态摘要栏 */
+.wpbridge-status-bar {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: var(--wpbridge-space-6);
-    background: linear-gradient(135deg, var(--wpbridge-primary) 0%, var(--wpbridge-primary-dark) 100%);
-    color: #fff;
-    margin-bottom: var(--wpbridge-space-6);
-}
-
-.wpbridge-welcome h2 {
-    font-size: 20px;
-    font-weight: 600;
-    margin: 0 0 var(--wpbridge-space-2) 0;
-}
-
-.wpbridge-welcome p {
-    margin: 0;
-    opacity: 0.9;
-}
-
-.wpbridge-welcome-actions {
-    display: flex;
-    gap: var(--wpbridge-space-3);
-}
-
-.wpbridge-welcome .wpbridge-btn-primary {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.3);
-}
-
-.wpbridge-welcome .wpbridge-btn-primary:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.wpbridge-welcome .wpbridge-btn-secondary {
-    background: transparent;
-    border-color: rgba(255, 255, 255, 0.5);
-    color: #fff;
-}
-
-.wpbridge-welcome .wpbridge-btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-}
-
-/* 概览卡片网格 */
-.wpbridge-overview-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: var(--wpbridge-space-4);
-    margin-bottom: var(--wpbridge-space-6);
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-4);
+    background: var(--wpbridge-gray-50);
+    border: 1px solid var(--wpbridge-gray-200);
+    margin-bottom: var(--wpbridge-space-5);
 }
 
-.wpbridge-overview-card {
-    background: #fff;
-    box-shadow: var(--wpbridge-shadow);
-    display: flex;
-    flex-direction: column;
-}
-
-.wpbridge-overview-card-header {
+.wpbridge-status-bar-item {
     display: flex;
     align-items: center;
     gap: var(--wpbridge-space-2);
-    padding: var(--wpbridge-space-4);
-    border-bottom: 1px solid var(--wpbridge-gray-100);
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-700);
 }
 
-.wpbridge-overview-card-header .dashicons {
-    font-size: 20px;
-    width: 20px;
-    height: 20px;
+.wpbridge-status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--wpbridge-gray-400);
+}
+
+.wpbridge-status-indicator.active {
+    background: var(--wpbridge-success);
+}
+
+.wpbridge-status-indicator.inactive {
+    background: var(--wpbridge-gray-400);
+}
+
+.wpbridge-status-bar-warning {
+    color: var(--wpbridge-warning);
+}
+
+.wpbridge-status-bar-warning .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.wpbridge-status-bar-actions {
+    margin-left: auto;
+}
+
+/* 核心指标卡片 */
+.wpbridge-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--wpbridge-space-4);
+    margin-bottom: var(--wpbridge-space-5);
+}
+
+.wpbridge-metric-card {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-4);
+    padding: var(--wpbridge-space-5);
+    background: #fff;
+    border: 1px solid var(--wpbridge-gray-200);
+    position: relative;
+    transition: border-color var(--wpbridge-transition), box-shadow var(--wpbridge-transition);
+}
+
+.wpbridge-metric-card:hover {
+    border-color: var(--wpbridge-gray-300);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.wpbridge-metric-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    background: var(--wpbridge-primary-light);
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.wpbridge-metric-icon .dashicons {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
     color: var(--wpbridge-primary);
 }
 
-.wpbridge-overview-card-header h3 {
-    font-size: var(--wpbridge-text-md);
-    font-weight: 600;
-    color: var(--wpbridge-gray-800);
-    margin: 0;
+.wpbridge-metric-icon-success {
+    background: var(--wpbridge-success-light);
 }
 
-.wpbridge-overview-card-body {
-    padding: var(--wpbridge-space-4);
+.wpbridge-metric-icon-success .dashicons {
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-metric-icon-warning {
+    background: var(--wpbridge-warning-light);
+}
+
+.wpbridge-metric-icon-warning .dashicons {
+    color: var(--wpbridge-warning);
+}
+
+.wpbridge-metric-icon-error {
+    background: var(--wpbridge-error-light);
+}
+
+.wpbridge-metric-icon-error .dashicons {
+    color: var(--wpbridge-error);
+}
+
+.wpbridge-metric-content {
     flex: 1;
+    min-width: 0;
 }
 
-.wpbridge-overview-stat-main {
-    text-align: center;
-    margin-bottom: var(--wpbridge-space-4);
-}
-
-.wpbridge-overview-number {
-    display: block;
-    font-size: 32px;
+.wpbridge-metric-value {
+    font-size: 28px;
     font-weight: 600;
     color: var(--wpbridge-gray-900);
     line-height: 1.2;
 }
 
-.wpbridge-overview-number.success {
+.wpbridge-metric-value-success {
     color: var(--wpbridge-success);
 }
 
-.wpbridge-overview-number.warning {
+.wpbridge-metric-value-warning {
     color: var(--wpbridge-warning);
 }
 
-.wpbridge-overview-number.error {
+.wpbridge-metric-value-error {
     color: var(--wpbridge-error);
 }
 
-.wpbridge-overview-label {
-    font-size: var(--wpbridge-text-sm);
-    color: var(--wpbridge-gray-500);
-}
-
-.wpbridge-overview-stat-details {
-    display: flex;
-    flex-direction: column;
-    gap: var(--wpbridge-space-2);
-}
-
-.wpbridge-overview-stat-item {
-    display: flex;
-    align-items: center;
-    gap: var(--wpbridge-space-2);
-    font-size: var(--wpbridge-text-sm);
-    color: var(--wpbridge-gray-600);
-}
-
-.wpbridge-overview-stat-item .dashicons {
-    font-size: 14px;
-    width: 14px;
-    height: 14px;
+.wpbridge-metric-value-muted {
     color: var(--wpbridge-gray-400);
 }
 
-.wpbridge-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+.wpbridge-metric-label {
+    font-size: var(--wpbridge-text-sm);
+    font-weight: 500;
+    color: var(--wpbridge-gray-600);
+    margin-top: 2px;
+}
+
+.wpbridge-metric-sub {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    margin-top: 4px;
+}
+
+.wpbridge-metric-highlight {
+    font-weight: 600;
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-metric-muted {
+    color: var(--wpbridge-gray-400);
+}
+
+.wpbridge-metric-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: var(--wpbridge-gray-400);
+    text-decoration: none;
+    transition: color var(--wpbridge-transition);
     flex-shrink: 0;
 }
 
-.wpbridge-dot-success {
-    background: var(--wpbridge-success);
-}
-
-.wpbridge-dot-warning {
-    background: var(--wpbridge-warning);
-}
-
-.wpbridge-dot-error {
-    background: var(--wpbridge-error);
-}
-
-.wpbridge-dot-info {
-    background: var(--wpbridge-info);
-}
-
-.wpbridge-dot-gray {
-    background: var(--wpbridge-gray-400);
-}
-
-.wpbridge-overview-card-footer {
-    padding: var(--wpbridge-space-3) var(--wpbridge-space-4);
-    background: var(--wpbridge-gray-50);
-    border-top: 1px solid var(--wpbridge-gray-100);
-}
-
-.wpbridge-overview-card-footer a {
-    font-size: var(--wpbridge-text-sm);
+.wpbridge-metric-link:hover {
     color: var(--wpbridge-primary);
-    text-decoration: none;
 }
 
-.wpbridge-overview-card-footer a:hover {
-    text-decoration: underline;
+.wpbridge-metric-link .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
 }
 
-.wpbridge-overview-empty {
-    text-align: center;
-    padding: var(--wpbridge-space-4);
-    color: var(--wpbridge-gray-500);
-}
-
-.wpbridge-overview-empty .dashicons {
-    font-size: 24px;
-    width: 24px;
-    height: 24px;
-    color: var(--wpbridge-gray-300);
-    margin-bottom: var(--wpbridge-space-2);
-}
-
-.wpbridge-overview-empty p {
-    margin: 0;
-    font-size: var(--wpbridge-text-sm);
-}
-
-/* 快速操作 */
-.wpbridge-quick-actions {
-    margin-bottom: var(--wpbridge-space-6);
-}
-
-.wpbridge-quick-actions h3 {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--wpbridge-gray-800);
-    margin: 0 0 var(--wpbridge-space-4) 0;
-}
-
-.wpbridge-quick-actions-grid {
+/* 双栏面板布局 */
+.wpbridge-overview-panels {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: var(--wpbridge-space-3);
+    grid-template-columns: 1fr 1fr;
+    gap: var(--wpbridge-space-4);
 }
 
-.wpbridge-quick-action {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--wpbridge-space-2);
-    padding: var(--wpbridge-space-4);
+.wpbridge-panel {
     background: #fff;
     border: 1px solid var(--wpbridge-gray-200);
-    cursor: pointer;
-    text-decoration: none;
-    color: var(--wpbridge-gray-700);
-    transition: all var(--wpbridge-transition);
 }
 
-.wpbridge-quick-action:hover {
-    border-color: var(--wpbridge-primary);
-    color: var(--wpbridge-primary);
+.wpbridge-panel-header {
+    padding: var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-gray-100);
 }
 
-.wpbridge-quick-action .dashicons {
-    font-size: 24px;
-    width: 24px;
-    height: 24px;
-}
-
-.wpbridge-quick-action span:last-child {
-    font-size: var(--wpbridge-text-sm);
-}
-
-/* 系统信息 */
-.wpbridge-system-info h3 {
+.wpbridge-panel-header h3 {
     font-size: 15px;
     font-weight: 600;
     color: var(--wpbridge-gray-800);
-    margin: 0 0 var(--wpbridge-space-4) 0;
+    margin: 0;
 }
 
-.wpbridge-system-info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--wpbridge-space-3);
-    background: #fff;
-    padding: var(--wpbridge-space-4);
-    box-shadow: var(--wpbridge-shadow);
+.wpbridge-panel-body {
+    padding: 0;
 }
 
-.wpbridge-system-info-item {
+/* 快速入口列表 */
+.wpbridge-action-list {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+}
+
+.wpbridge-action-item {
+    display: flex;
     align-items: center;
-    padding: var(--wpbridge-space-2) 0;
+    gap: var(--wpbridge-space-3);
+    padding: var(--wpbridge-space-4);
+    text-decoration: none;
+    color: var(--wpbridge-gray-700);
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+    transition: background var(--wpbridge-transition);
 }
 
-.wpbridge-system-info-label {
-    font-size: var(--wpbridge-text-sm);
-    color: var(--wpbridge-gray-500);
+.wpbridge-action-item:last-child {
+    border-bottom: none;
 }
 
-.wpbridge-system-info-value {
-    font-size: var(--wpbridge-text-sm);
+.wpbridge-action-item:hover {
+    background: var(--wpbridge-gray-50);
+}
+
+.wpbridge-action-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: var(--wpbridge-gray-100);
+    border-radius: 6px;
+    flex-shrink: 0;
+    transition: background var(--wpbridge-transition);
+}
+
+.wpbridge-action-item:hover .wpbridge-action-icon {
+    background: var(--wpbridge-primary-light);
+}
+
+.wpbridge-action-icon .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--wpbridge-gray-600);
+    transition: color var(--wpbridge-transition);
+}
+
+.wpbridge-action-item:hover .wpbridge-action-icon .dashicons {
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-action-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.wpbridge-action-title {
+    font-size: var(--wpbridge-text-md);
     font-weight: 500;
     color: var(--wpbridge-gray-800);
 }
 
-.wpbridge-system-info-value.success {
+.wpbridge-action-desc {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+}
+
+/* 系统信息列表 */
+.wpbridge-info-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.wpbridge-info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+}
+
+.wpbridge-info-item:last-child {
+    border-bottom: none;
+}
+
+.wpbridge-info-label {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-info-value {
+    font-size: var(--wpbridge-text-sm);
+    font-weight: 500;
+    color: var(--wpbridge-gray-800);
+    font-family: var(--wpbridge-font-mono);
+}
+
+.wpbridge-info-value-success {
     color: var(--wpbridge-success);
 }
 
-.wpbridge-system-info-value.warning {
-    color: var(--wpbridge-warning);
+.wpbridge-info-value-muted {
+    color: var(--wpbridge-gray-400);
+}
+
+/* 响应式 - 概览页面 */
+@media screen and (max-width: 1200px) {
+    .wpbridge-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media screen and (max-width: 782px) {
+    .wpbridge-status-bar {
+        flex-wrap: wrap;
+        gap: var(--wpbridge-space-2);
+    }
+
+    .wpbridge-status-bar-actions {
+        width: 100%;
+        margin-left: 0;
+        margin-top: var(--wpbridge-space-2);
+    }
+
+    .wpbridge-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .wpbridge-metric-card {
+        padding: var(--wpbridge-space-4);
+    }
+
+    .wpbridge-metric-value {
+        font-size: 24px;
+    }
+
+    .wpbridge-overview-panels {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ========================================
@@ -2062,23 +2162,8 @@
     resize: vertical;
 }
 
-/* 响应式 - 概览和诊断 */
+/* 响应式 - 诊断页面 */
 @media screen and (max-width: 782px) {
-    .wpbridge-welcome {
-        flex-direction: column;
-        text-align: center;
-        gap: var(--wpbridge-space-4);
-    }
-
-    .wpbridge-welcome-actions {
-        flex-direction: column;
-        width: 100%;
-    }
-
-    .wpbridge-overview-grid {
-        grid-template-columns: 1fr;
-    }
-
     .wpbridge-diagnostics-header {
         flex-direction: column;
         gap: var(--wpbridge-space-4);

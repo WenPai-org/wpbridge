@@ -519,6 +519,11 @@
                 e.preventDefault();
                 self.saveDefaults($(this));
             });
+
+            // P2: 插件类型手动标记
+            $(document).on('change', '.wpbridge-plugin-type-select', function() {
+                self.setPluginType($(this));
+            });
         },
 
         switchSubtab: function(subtab) {
@@ -677,6 +682,60 @@
                 },
                 complete: function() {
                     $button.prop('disabled', false);
+                }
+            });
+        },
+
+        /**
+         * P2: 设置插件类型（手动标记）
+         */
+        setPluginType: function($select) {
+            var pluginSlug = $select.data('plugin-slug');
+            var pluginType = $select.val();
+            var $item = $select.closest('.wpbridge-project-item');
+
+            $select.prop('disabled', true);
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wpbridge_set_plugin_type',
+                    nonce: wpbridge.nonce,
+                    plugin_slug: pluginSlug,
+                    plugin_type: pluginType
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Toast.success(response.data.message || wpbridge.i18n.type_saved);
+
+                        // 更新徽章
+                        var $badge = $item.find('.wpbridge-badge-type-free, .wpbridge-badge-type-commercial, .wpbridge-badge-type-private, .wpbridge-badge-type-unknown');
+                        if ($badge.length && response.data.label) {
+                            $badge.removeClass('wpbridge-badge-type-free wpbridge-badge-type-commercial wpbridge-badge-type-private wpbridge-badge-type-unknown')
+                                  .addClass('wpbridge-badge-type-' + response.data.type);
+                            $badge.find('.dashicons').attr('class', 'dashicons ' + response.data.label.icon);
+                            $badge.contents().filter(function() {
+                                return this.nodeType === 3;
+                            }).last().replaceWith(' ' + response.data.label.label);
+                            $badge.attr('data-source', 'manual');
+                            $badge.attr('title', wpbridge.i18n.manual_mark || '手动标记');
+                        }
+
+                        // 更新帮助文本
+                        var $help = $select.closest('.wpbridge-config-field').find('.wpbridge-form-help');
+                        if ($help.length) {
+                            $help.text(wpbridge.i18n.manual_marked || '当前为手动标记');
+                        }
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                },
+                complete: function() {
+                    $select.prop('disabled', false);
                 }
             });
         }

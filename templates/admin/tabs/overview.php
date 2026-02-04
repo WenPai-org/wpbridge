@@ -20,8 +20,8 @@ $plugins_count = count( get_plugins() );
 $themes_count  = count( wp_get_themes() );
 
 // 获取项目配置统计
-$item_configs = get_option( 'wpbridge_item_sources', array() );
-$custom_count = 0;
+$item_configs   = get_option( 'wpbridge_item_sources', array() );
+$custom_count   = 0;
 $disabled_count = 0;
 foreach ( $item_configs as $config ) {
     if ( isset( $config['mode'] ) ) {
@@ -34,9 +34,9 @@ foreach ( $item_configs as $config ) {
 }
 
 // 健康源统计
-$healthy_count = 0;
+$healthy_count  = 0;
 $degraded_count = 0;
-$failed_count = 0;
+$failed_count   = 0;
 foreach ( $health_status as $status ) {
     if ( isset( $status['status'] ) ) {
         switch ( $status['status'] ) {
@@ -56,202 +56,213 @@ foreach ( $health_status as $status ) {
 // 缓存状态
 $cache_enabled = ! empty( $settings['fallback_enabled'] );
 $debug_mode    = ! empty( $settings['debug_mode'] );
+
+// 计算健康百分比
+$total_checked   = count( $health_status );
+$health_percent  = $total_checked > 0 ? round( ( $healthy_count / $total_checked ) * 100 ) : 0;
+$health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'warning' : 'success' );
 ?>
 
-<!-- 欢迎区域 -->
-<div class="wpbridge-welcome">
-    <div class="wpbridge-welcome-content">
-        <h2><?php esc_html_e( '欢迎使用文派云桥', 'wpbridge' ); ?></h2>
-        <p><?php esc_html_e( '自定义源桥接器 - 让您完全控制 WordPress 的外部连接', 'wpbridge' ); ?></p>
+<!-- 状态摘要栏 -->
+<div class="wpbridge-status-bar">
+    <div class="wpbridge-status-bar-item">
+        <span class="wpbridge-status-indicator <?php echo $stats['enabled'] > 0 ? 'active' : 'inactive'; ?>"></span>
+        <span class="wpbridge-status-text">
+            <?php
+            printf(
+                /* translators: %d: number of enabled sources */
+                esc_html__( '%d 个更新源已启用', 'wpbridge' ),
+                $stats['enabled']
+            );
+            ?>
+        </span>
     </div>
-    <div class="wpbridge-welcome-actions">
-        <a href="#sources" class="wpbridge-btn wpbridge-btn-primary" data-tab-link="sources">
-            <span class="dashicons dashicons-plus-alt2"></span>
-            <?php esc_html_e( '添加更新源', 'wpbridge' ); ?>
-        </a>
-        <a href="#diagnostics" class="wpbridge-btn wpbridge-btn-secondary" data-tab-link="diagnostics">
-            <span class="dashicons dashicons-admin-tools"></span>
-            <?php esc_html_e( '运行诊断', 'wpbridge' ); ?>
-        </a>
+    <?php if ( $debug_mode ) : ?>
+        <div class="wpbridge-status-bar-item wpbridge-status-bar-warning">
+            <span class="dashicons dashicons-warning"></span>
+            <span class="wpbridge-status-text"><?php esc_html_e( '调试模式已开启', 'wpbridge' ); ?></span>
+        </div>
+    <?php endif; ?>
+    <div class="wpbridge-status-bar-actions">
+        <button type="button" class="wpbridge-btn wpbridge-btn-sm wpbridge-btn-secondary wpbridge-clear-cache">
+            <span class="dashicons dashicons-update"></span>
+            <?php esc_html_e( '清除缓存', 'wpbridge' ); ?>
+        </button>
     </div>
 </div>
 
-<!-- 状态概览卡片 -->
-<div class="wpbridge-overview-grid">
-    <!-- 更新源状态 -->
-    <div class="wpbridge-overview-card">
-        <div class="wpbridge-overview-card-header">
+<!-- 核心指标 -->
+<div class="wpbridge-metrics">
+    <!-- 更新源 -->
+    <div class="wpbridge-metric-card">
+        <div class="wpbridge-metric-icon">
             <span class="dashicons dashicons-cloud"></span>
-            <h3><?php esc_html_e( '更新源', 'wpbridge' ); ?></h3>
         </div>
-        <div class="wpbridge-overview-card-body">
-            <div class="wpbridge-overview-stat-main">
-                <span class="wpbridge-overview-number"><?php echo esc_html( $stats['total'] ); ?></span>
-                <span class="wpbridge-overview-label"><?php esc_html_e( '总更新源', 'wpbridge' ); ?></span>
-            </div>
-            <div class="wpbridge-overview-stat-details">
-                <div class="wpbridge-overview-stat-item">
-                    <span class="wpbridge-dot wpbridge-dot-success"></span>
-                    <span><?php echo esc_html( $stats['enabled'] ); ?> <?php esc_html_e( '已启用', 'wpbridge' ); ?></span>
-                </div>
-                <div class="wpbridge-overview-stat-item">
-                    <span class="wpbridge-dot wpbridge-dot-gray"></span>
-                    <span><?php echo esc_html( $stats['total'] - $stats['enabled'] ); ?> <?php esc_html_e( '已禁用', 'wpbridge' ); ?></span>
-                </div>
+        <div class="wpbridge-metric-content">
+            <div class="wpbridge-metric-value"><?php echo esc_html( $stats['total'] ); ?></div>
+            <div class="wpbridge-metric-label"><?php esc_html_e( '更新源', 'wpbridge' ); ?></div>
+            <div class="wpbridge-metric-sub">
+                <span class="wpbridge-metric-highlight"><?php echo esc_html( $stats['enabled'] ); ?></span> <?php esc_html_e( '已启用', 'wpbridge' ); ?>
             </div>
         </div>
-        <div class="wpbridge-overview-card-footer">
-            <a href="#sources" data-tab-link="sources"><?php esc_html_e( '管理更新源', 'wpbridge' ); ?> →</a>
-        </div>
+        <a href="#sources" class="wpbridge-metric-link" data-tab-link="sources" aria-label="<?php esc_attr_e( '管理更新源', 'wpbridge' ); ?>">
+            <span class="dashicons dashicons-arrow-right-alt2"></span>
+        </a>
     </div>
 
-    <!-- 项目状态 -->
-    <div class="wpbridge-overview-card">
-        <div class="wpbridge-overview-card-header">
+    <!-- 项目 -->
+    <div class="wpbridge-metric-card">
+        <div class="wpbridge-metric-icon">
             <span class="dashicons dashicons-admin-plugins"></span>
-            <h3><?php esc_html_e( '项目', 'wpbridge' ); ?></h3>
         </div>
-        <div class="wpbridge-overview-card-body">
-            <div class="wpbridge-overview-stat-main">
-                <span class="wpbridge-overview-number"><?php echo esc_html( $plugins_count + $themes_count ); ?></span>
-                <span class="wpbridge-overview-label"><?php esc_html_e( '总项目', 'wpbridge' ); ?></span>
-            </div>
-            <div class="wpbridge-overview-stat-details">
-                <div class="wpbridge-overview-stat-item">
-                    <span class="dashicons dashicons-admin-plugins"></span>
-                    <span><?php echo esc_html( $plugins_count ); ?> <?php esc_html_e( '插件', 'wpbridge' ); ?></span>
-                </div>
-                <div class="wpbridge-overview-stat-item">
-                    <span class="dashicons dashicons-admin-appearance"></span>
-                    <span><?php echo esc_html( $themes_count ); ?> <?php esc_html_e( '主题', 'wpbridge' ); ?></span>
-                </div>
+        <div class="wpbridge-metric-content">
+            <div class="wpbridge-metric-value"><?php echo esc_html( $plugins_count + $themes_count ); ?></div>
+            <div class="wpbridge-metric-label"><?php esc_html_e( '项目', 'wpbridge' ); ?></div>
+            <div class="wpbridge-metric-sub">
+                <?php echo esc_html( $plugins_count ); ?> <?php esc_html_e( '插件', 'wpbridge' ); ?> / <?php echo esc_html( $themes_count ); ?> <?php esc_html_e( '主题', 'wpbridge' ); ?>
             </div>
         </div>
-        <div class="wpbridge-overview-card-footer">
-            <a href="#projects" data-tab-link="projects"><?php esc_html_e( '管理项目', 'wpbridge' ); ?> →</a>
-        </div>
+        <a href="#projects" class="wpbridge-metric-link" data-tab-link="projects" aria-label="<?php esc_attr_e( '管理项目', 'wpbridge' ); ?>">
+            <span class="dashicons dashicons-arrow-right-alt2"></span>
+        </a>
     </div>
 
-    <!-- 配置状态 -->
-    <div class="wpbridge-overview-card">
-        <div class="wpbridge-overview-card-header">
+    <!-- 自定义配置 -->
+    <div class="wpbridge-metric-card">
+        <div class="wpbridge-metric-icon">
             <span class="dashicons dashicons-admin-settings"></span>
-            <h3><?php esc_html_e( '配置', 'wpbridge' ); ?></h3>
         </div>
-        <div class="wpbridge-overview-card-body">
-            <div class="wpbridge-overview-stat-main">
-                <span class="wpbridge-overview-number"><?php echo esc_html( $custom_count + $disabled_count ); ?></span>
-                <span class="wpbridge-overview-label"><?php esc_html_e( '自定义配置', 'wpbridge' ); ?></span>
+        <div class="wpbridge-metric-content">
+            <div class="wpbridge-metric-value"><?php echo esc_html( $custom_count + $disabled_count ); ?></div>
+            <div class="wpbridge-metric-label"><?php esc_html_e( '自定义配置', 'wpbridge' ); ?></div>
+            <div class="wpbridge-metric-sub">
+                <?php if ( $custom_count > 0 || $disabled_count > 0 ) : ?>
+                    <?php if ( $custom_count > 0 ) : ?>
+                        <span class="wpbridge-metric-highlight"><?php echo esc_html( $custom_count ); ?></span> <?php esc_html_e( '自定义', 'wpbridge' ); ?>
+                    <?php endif; ?>
+                    <?php if ( $disabled_count > 0 ) : ?>
+                        <?php if ( $custom_count > 0 ) : ?> / <?php endif; ?>
+                        <span class="wpbridge-metric-muted"><?php echo esc_html( $disabled_count ); ?></span> <?php esc_html_e( '禁用', 'wpbridge' ); ?>
+                    <?php endif; ?>
+                <?php else : ?>
+                    <?php esc_html_e( '全部使用默认', 'wpbridge' ); ?>
+                <?php endif; ?>
             </div>
-            <div class="wpbridge-overview-stat-details">
-                <div class="wpbridge-overview-stat-item">
-                    <span class="wpbridge-dot wpbridge-dot-info"></span>
-                    <span><?php echo esc_html( $custom_count ); ?> <?php esc_html_e( '自定义源', 'wpbridge' ); ?></span>
-                </div>
-                <div class="wpbridge-overview-stat-item">
-                    <span class="wpbridge-dot wpbridge-dot-warning"></span>
-                    <span><?php echo esc_html( $disabled_count ); ?> <?php esc_html_e( '禁用更新', 'wpbridge' ); ?></span>
-                </div>
-            </div>
         </div>
-        <div class="wpbridge-overview-card-footer">
-            <a href="#projects" data-tab-link="projects"><?php esc_html_e( '查看详情', 'wpbridge' ); ?> →</a>
-        </div>
+        <a href="#projects" class="wpbridge-metric-link" data-tab-link="projects" aria-label="<?php esc_attr_e( '查看配置', 'wpbridge' ); ?>">
+            <span class="dashicons dashicons-arrow-right-alt2"></span>
+        </a>
     </div>
 
     <!-- 健康状态 -->
-    <div class="wpbridge-overview-card">
-        <div class="wpbridge-overview-card-header">
+    <div class="wpbridge-metric-card wpbridge-metric-card-health">
+        <div class="wpbridge-metric-icon wpbridge-metric-icon-<?php echo esc_attr( $health_status_class ); ?>">
             <span class="dashicons dashicons-heart"></span>
-            <h3><?php esc_html_e( '健康状态', 'wpbridge' ); ?></h3>
         </div>
-        <div class="wpbridge-overview-card-body">
-            <?php if ( empty( $health_status ) ) : ?>
-                <div class="wpbridge-overview-empty">
-                    <span class="dashicons dashicons-info-outline"></span>
-                    <p><?php esc_html_e( '暂无健康检查数据', 'wpbridge' ); ?></p>
+        <div class="wpbridge-metric-content">
+            <?php if ( $total_checked > 0 ) : ?>
+                <div class="wpbridge-metric-value wpbridge-metric-value-<?php echo esc_attr( $health_status_class ); ?>">
+                    <?php echo esc_html( $health_percent ); ?>%
+                </div>
+                <div class="wpbridge-metric-label"><?php esc_html_e( '健康度', 'wpbridge' ); ?></div>
+                <div class="wpbridge-metric-sub">
+                    <?php echo esc_html( $healthy_count ); ?>/<?php echo esc_html( $total_checked ); ?> <?php esc_html_e( '源正常', 'wpbridge' ); ?>
                 </div>
             <?php else : ?>
-                <div class="wpbridge-overview-stat-main">
-                    <span class="wpbridge-overview-number <?php echo $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'warning' : 'success' ); ?>">
-                        <?php echo esc_html( $healthy_count ); ?>/<?php echo esc_html( count( $health_status ) ); ?>
-                    </span>
-                    <span class="wpbridge-overview-label"><?php esc_html_e( '源正常', 'wpbridge' ); ?></span>
-                </div>
-                <div class="wpbridge-overview-stat-details">
-                    <?php if ( $healthy_count > 0 ) : ?>
-                        <div class="wpbridge-overview-stat-item">
-                            <span class="wpbridge-dot wpbridge-dot-success"></span>
-                            <span><?php echo esc_html( $healthy_count ); ?> <?php esc_html_e( '正常', 'wpbridge' ); ?></span>
-                        </div>
-                    <?php endif; ?>
-                    <?php if ( $degraded_count > 0 ) : ?>
-                        <div class="wpbridge-overview-stat-item">
-                            <span class="wpbridge-dot wpbridge-dot-warning"></span>
-                            <span><?php echo esc_html( $degraded_count ); ?> <?php esc_html_e( '降级', 'wpbridge' ); ?></span>
-                        </div>
-                    <?php endif; ?>
-                    <?php if ( $failed_count > 0 ) : ?>
-                        <div class="wpbridge-overview-stat-item">
-                            <span class="wpbridge-dot wpbridge-dot-error"></span>
-                            <span><?php echo esc_html( $failed_count ); ?> <?php esc_html_e( '失败', 'wpbridge' ); ?></span>
-                        </div>
-                    <?php endif; ?>
-                </div>
+                <div class="wpbridge-metric-value wpbridge-metric-value-muted">--</div>
+                <div class="wpbridge-metric-label"><?php esc_html_e( '健康度', 'wpbridge' ); ?></div>
+                <div class="wpbridge-metric-sub"><?php esc_html_e( '暂无检查数据', 'wpbridge' ); ?></div>
             <?php endif; ?>
         </div>
-        <div class="wpbridge-overview-card-footer">
-            <a href="#diagnostics" data-tab-link="diagnostics"><?php esc_html_e( '运行诊断', 'wpbridge' ); ?> →</a>
-        </div>
-    </div>
-</div>
-
-<!-- 快速操作 -->
-<div class="wpbridge-quick-actions">
-    <h3><?php esc_html_e( '快速操作', 'wpbridge' ); ?></h3>
-    <div class="wpbridge-quick-actions-grid">
-        <button type="button" class="wpbridge-quick-action wpbridge-clear-cache">
-            <span class="dashicons dashicons-update"></span>
-            <span><?php esc_html_e( '清除缓存', 'wpbridge' ); ?></span>
-        </button>
-        <a href="#diagnostics" class="wpbridge-quick-action" data-tab-link="diagnostics">
-            <span class="dashicons dashicons-admin-tools"></span>
-            <span><?php esc_html_e( '诊断工具', 'wpbridge' ); ?></span>
-        </a>
-        <a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge&action=add' ) ); ?>" class="wpbridge-quick-action">
-            <span class="dashicons dashicons-plus-alt2"></span>
-            <span><?php esc_html_e( '添加更新源', 'wpbridge' ); ?></span>
-        </a>
-        <a href="#settings" class="wpbridge-quick-action" data-tab-link="settings">
-            <span class="dashicons dashicons-admin-generic"></span>
-            <span><?php esc_html_e( '设置', 'wpbridge' ); ?></span>
+        <a href="#diagnostics" class="wpbridge-metric-link" data-tab-link="diagnostics" aria-label="<?php esc_attr_e( '运行诊断', 'wpbridge' ); ?>">
+            <span class="dashicons dashicons-arrow-right-alt2"></span>
         </a>
     </div>
 </div>
 
-<!-- 系统信息 -->
-<div class="wpbridge-system-info">
-    <h3><?php esc_html_e( '系统信息', 'wpbridge' ); ?></h3>
-    <div class="wpbridge-system-info-grid">
-        <div class="wpbridge-system-info-item">
-            <span class="wpbridge-system-info-label"><?php esc_html_e( 'WordPress 版本', 'wpbridge' ); ?></span>
-            <span class="wpbridge-system-info-value"><?php echo esc_html( get_bloginfo( 'version' ) ); ?></span>
+<!-- 快速入口 + 系统信息 -->
+<div class="wpbridge-overview-panels">
+    <!-- 快速入口 -->
+    <div class="wpbridge-panel wpbridge-panel-actions">
+        <div class="wpbridge-panel-header">
+            <h3><?php esc_html_e( '快速入口', 'wpbridge' ); ?></h3>
         </div>
-        <div class="wpbridge-system-info-item">
-            <span class="wpbridge-system-info-label"><?php esc_html_e( 'PHP 版本', 'wpbridge' ); ?></span>
-            <span class="wpbridge-system-info-value"><?php echo esc_html( PHP_VERSION ); ?></span>
+        <div class="wpbridge-panel-body">
+            <div class="wpbridge-action-list">
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge&action=add' ) ); ?>" class="wpbridge-action-item">
+                    <span class="wpbridge-action-icon">
+                        <span class="dashicons dashicons-plus-alt2"></span>
+                    </span>
+                    <span class="wpbridge-action-text">
+                        <span class="wpbridge-action-title"><?php esc_html_e( '添加更新源', 'wpbridge' ); ?></span>
+                        <span class="wpbridge-action-desc"><?php esc_html_e( '配置新的自定义更新源', 'wpbridge' ); ?></span>
+                    </span>
+                </a>
+                <a href="#diagnostics" class="wpbridge-action-item" data-tab-link="diagnostics">
+                    <span class="wpbridge-action-icon">
+                        <span class="dashicons dashicons-admin-tools"></span>
+                    </span>
+                    <span class="wpbridge-action-text">
+                        <span class="wpbridge-action-title"><?php esc_html_e( '诊断工具', 'wpbridge' ); ?></span>
+                        <span class="wpbridge-action-desc"><?php esc_html_e( '检查源连通性和系统环境', 'wpbridge' ); ?></span>
+                    </span>
+                </a>
+                <a href="#api" class="wpbridge-action-item" data-tab-link="api">
+                    <span class="wpbridge-action-icon">
+                        <span class="dashicons dashicons-rest-api"></span>
+                    </span>
+                    <span class="wpbridge-action-text">
+                        <span class="wpbridge-action-title"><?php esc_html_e( 'Cloud API', 'wpbridge' ); ?></span>
+                        <span class="wpbridge-action-desc"><?php esc_html_e( '管理 API 密钥和访问控制', 'wpbridge' ); ?></span>
+                    </span>
+                </a>
+                <a href="#settings" class="wpbridge-action-item" data-tab-link="settings">
+                    <span class="wpbridge-action-icon">
+                        <span class="dashicons dashicons-admin-generic"></span>
+                    </span>
+                    <span class="wpbridge-action-text">
+                        <span class="wpbridge-action-title"><?php esc_html_e( '设置', 'wpbridge' ); ?></span>
+                        <span class="wpbridge-action-desc"><?php esc_html_e( '配置缓存、超时和调试选项', 'wpbridge' ); ?></span>
+                    </span>
+                </a>
+            </div>
         </div>
-        <div class="wpbridge-system-info-item">
-            <span class="wpbridge-system-info-label"><?php esc_html_e( '调试模式', 'wpbridge' ); ?></span>
-            <span class="wpbridge-system-info-value <?php echo $debug_mode ? 'warning' : ''; ?>">
-                <?php echo $debug_mode ? esc_html__( '已启用', 'wpbridge' ) : esc_html__( '已禁用', 'wpbridge' ); ?>
-            </span>
+    </div>
+
+    <!-- 系统信息 -->
+    <div class="wpbridge-panel wpbridge-panel-info">
+        <div class="wpbridge-panel-header">
+            <h3><?php esc_html_e( '系统信息', 'wpbridge' ); ?></h3>
         </div>
-        <div class="wpbridge-system-info-item">
-            <span class="wpbridge-system-info-label"><?php esc_html_e( '缓存降级', 'wpbridge' ); ?></span>
-            <span class="wpbridge-system-info-value <?php echo $cache_enabled ? 'success' : ''; ?>">
-                <?php echo $cache_enabled ? esc_html__( '已启用', 'wpbridge' ) : esc_html__( '已禁用', 'wpbridge' ); ?>
-            </span>
+        <div class="wpbridge-panel-body">
+            <div class="wpbridge-info-list">
+                <div class="wpbridge-info-item">
+                    <span class="wpbridge-info-label"><?php esc_html_e( 'WordPress', 'wpbridge' ); ?></span>
+                    <span class="wpbridge-info-value"><?php echo esc_html( get_bloginfo( 'version' ) ); ?></span>
+                </div>
+                <div class="wpbridge-info-item">
+                    <span class="wpbridge-info-label"><?php esc_html_e( 'PHP', 'wpbridge' ); ?></span>
+                    <span class="wpbridge-info-value"><?php echo esc_html( PHP_VERSION ); ?></span>
+                </div>
+                <div class="wpbridge-info-item">
+                    <span class="wpbridge-info-label"><?php esc_html_e( '插件版本', 'wpbridge' ); ?></span>
+                    <span class="wpbridge-info-value"><?php echo esc_html( WPBRIDGE_VERSION ); ?></span>
+                </div>
+                <div class="wpbridge-info-item">
+                    <span class="wpbridge-info-label"><?php esc_html_e( '缓存 TTL', 'wpbridge' ); ?></span>
+                    <span class="wpbridge-info-value"><?php echo esc_html( ( $settings['cache_ttl'] ?? 43200 ) / 3600 ); ?>h</span>
+                </div>
+                <div class="wpbridge-info-item">
+                    <span class="wpbridge-info-label"><?php esc_html_e( '请求超时', 'wpbridge' ); ?></span>
+                    <span class="wpbridge-info-value"><?php echo esc_html( $settings['request_timeout'] ?? 10 ); ?>s</span>
+                </div>
+                <div class="wpbridge-info-item">
+                    <span class="wpbridge-info-label"><?php esc_html_e( '缓存降级', 'wpbridge' ); ?></span>
+                    <span class="wpbridge-info-value wpbridge-info-value-<?php echo $cache_enabled ? 'success' : 'muted'; ?>">
+                        <?php echo $cache_enabled ? esc_html__( '已启用', 'wpbridge' ) : esc_html__( '已禁用', 'wpbridge' ); ?>
+                    </span>
+                </div>
+            </div>
         </div>
     </div>
 </div>
