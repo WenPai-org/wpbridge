@@ -429,21 +429,29 @@ class AdminPage {
             $key_name = __( '未命名', 'wpbridge' );
         }
 
-        // 生成随机 API Key
-        $api_key = 'wpb_' . bin2hex( random_bytes( 24 ) );
+        try {
+            // 生成随机 API Key
+            $api_key = 'wpb_' . bin2hex( random_bytes( 24 ) );
+        } catch ( \Exception $e ) {
+            wp_send_json_error( [ 'message' => __( '生成随机数失败', 'wpbridge' ) ] );
+        }
+
+        // 生成唯一 ID
+        $key_id = 'key_' . wp_generate_uuid4();
 
         // 获取当前 API 设置
         $settings     = $this->settings->get_all();
         $api_settings = $settings['api'] ?? [];
         $keys         = $api_settings['keys'] ?? [];
 
-        // 添加新 Key（存储哈希值）
+        // 添加新 Key（使用与 ApiKeyManager 一致的字段名）
         $keys[] = [
+            'id'         => $key_id,
             'name'       => $key_name,
-            'hash'       => password_hash( $api_key, PASSWORD_DEFAULT ),
-            'prefix'     => substr( $api_key, 0, 8 ),
-            'created_at' => time(),
-            'last_used'  => 0,
+            'key_hash'   => password_hash( $api_key, PASSWORD_DEFAULT ),
+            'key_prefix' => substr( $api_key, 0, 4 ) . '...' . substr( $api_key, -4 ),
+            'created_at' => current_time( 'mysql' ),
+            'last_used'  => null,
         ];
 
         $api_settings['keys'] = $keys;
@@ -453,6 +461,7 @@ class AdminPage {
             wp_send_json_success( [
                 'message' => __( 'API Key 已生成', 'wpbridge' ),
                 'api_key' => $api_key,
+                'key_id'  => $key_id,
             ] );
         } else {
             wp_send_json_error( [ 'message' => __( '生成失败', 'wpbridge' ) ] );
@@ -469,19 +478,30 @@ class AdminPage {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
         }
 
-        $key_index = intval( $_POST['key_index'] ?? -1 );
+        $key_id = sanitize_text_field( $_POST['key_id'] ?? '' );
+
+        if ( empty( $key_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'Key ID 不能为空', 'wpbridge' ) ] );
+        }
 
         // 获取当前 API 设置
         $settings     = $this->settings->get_all();
         $api_settings = $settings['api'] ?? [];
         $keys         = $api_settings['keys'] ?? [];
 
-        if ( ! isset( $keys[ $key_index ] ) ) {
-            wp_send_json_error( [ 'message' => __( 'Key 不存在', 'wpbridge' ) ] );
+        // 通过 ID 查找并移除 Key
+        $found = false;
+        foreach ( $keys as $index => $key ) {
+            if ( isset( $key['id'] ) && $key['id'] === $key_id ) {
+                array_splice( $keys, $index, 1 );
+                $found = true;
+                break;
+            }
         }
 
-        // 移除 Key
-        array_splice( $keys, $key_index, 1 );
+        if ( ! $found ) {
+            wp_send_json_error( [ 'message' => __( 'Key 不存在', 'wpbridge' ) ] );
+        }
 
         $api_settings['keys'] = $keys;
         $settings['api']      = $api_settings;
