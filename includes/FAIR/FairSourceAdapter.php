@@ -225,6 +225,9 @@ class FairSourceAdapter {
         $response = wp_remote_get( $url, $args );
 
         if ( is_wp_error( $response ) ) {
+            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+                error_log( 'WPBridge FAIR request failed: ' . $response->get_error_message() . ' URL: ' . $url );
+            }
             return null;
         }
 

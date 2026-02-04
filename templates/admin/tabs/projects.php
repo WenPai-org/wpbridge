@@ -34,8 +34,13 @@ $installed_plugins = get_plugins();
 // 获取已安装的主题
 $installed_themes = wp_get_themes();
 
-// 当前子 Tab
-$current_subtab = isset( $_GET['subtab'] ) ? sanitize_text_field( $_GET['subtab'] ) : 'plugins';
+// 当前子 Tab - 白名单验证
+$allowed_subtabs = [ 'plugins', 'themes', 'defaults' ];
+$current_subtab = 'plugins';
+// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- 仅用于 UI 显示
+if ( isset( $_GET['subtab'] ) && in_array( $_GET['subtab'], $allowed_subtabs, true ) ) {
+    $current_subtab = $_GET['subtab'];
+}
 ?>
 
 <!-- 子 Tab 导航 -->

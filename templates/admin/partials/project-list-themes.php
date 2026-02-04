@@ -66,8 +66,13 @@ $current_theme_slug = $current_theme->get_stylesheet();
                 </div>
 
                 <div class="wpbridge-project-thumbnail">
-                    <?php if ( $theme->get_screenshot() ) : ?>
-                        <img src="<?php echo esc_url( $theme->get_screenshot() ); ?>" alt="<?php echo esc_attr( $theme->get( 'Name' ) ); ?>">
+                    <?php
+                    $screenshot = $theme->get_screenshot();
+                    if ( $screenshot ) :
+                        // get_screenshot() 返回相对路径，需要构建完整 URL
+                        $screenshot_url = $theme->get_stylesheet_directory_uri() . '/' . basename( $screenshot );
+                    ?>
+                        <img loading="lazy" src="<?php echo esc_url( $screenshot_url ); ?>" alt="<?php echo esc_attr( $theme->get( 'Name' ) ); ?>">
                     <?php else : ?>
                         <span class="dashicons dashicons-admin-appearance"></span>
                     <?php endif; ?>

@@ -393,6 +393,8 @@
      * 项目管理模块 (方案 B)
      */
     var Projects = {
+        searchTimeout: null,
+
         init: function() {
             this.bindEvents();
         },
@@ -430,13 +432,13 @@
                 self.applyBulkAction('themes');
             });
 
-            // 搜索
+            // 搜索（带防抖）
             $(document).on('input', '#wpbridge-search-plugins', function() {
-                self.filterItems('plugins', $(this).val());
+                self.debouncedFilter('plugins', $(this).val());
             });
 
             $(document).on('input', '#wpbridge-search-themes', function() {
-                self.filterItems('themes', $(this).val());
+                self.debouncedFilter('themes', $(this).val());
             });
 
             // 默认规则覆盖切换
@@ -466,6 +468,10 @@
         setItemSource: function($select) {
             var itemKey = $select.data('item-key');
             var sourceKey = $select.val();
+            var $item = $select.closest('.wpbridge-project-item');
+
+            // 显示加载状态
+            $select.prop('disabled', true);
 
             $.ajax({
                 url: wpbridge.ajax_url,
@@ -479,12 +485,28 @@
                 success: function(response) {
                     if (response.success) {
                         Toast.success(response.data.message);
+                        // 更新 UI 状态
+                        $item.find('.wpbridge-badge-info, .wpbridge-badge-warning').remove();
+                        if (sourceKey === 'disabled') {
+                            $item.find('.wpbridge-project-name').append(
+                                '<span class="wpbridge-badge wpbridge-badge-warning">' +
+                                (wpbridge.i18n.updates_disabled || '更新已禁用') + '</span>'
+                            );
+                        } else if (sourceKey !== 'default') {
+                            $item.find('.wpbridge-project-name').append(
+                                '<span class="wpbridge-badge wpbridge-badge-info">' +
+                                (wpbridge.i18n.custom_source || '自定义源') + '</span>'
+                            );
+                        }
                     } else {
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
                 error: function() {
                     Toast.error(wpbridge.i18n.failed);
+                },
+                complete: function() {
+                    $select.prop('disabled', false);
                 }
             });
         },
@@ -507,6 +529,12 @@
                 return;
             }
 
+            // 确认操作
+            var confirmMsg = wpbridge.i18n.confirm_bulk_action || '确定要对选中的 ' + items.length + ' 个项目执行此操作吗？';
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
             var data = {
                 action: 'wpbridge_batch_set_source',
                 nonce: wpbridge.nonce,
@@ -514,9 +542,14 @@
                 item_keys: items
             };
 
-            // 如果是设置源，需要选择源
+            // 如果是设置源，显示源选择
             if (action === 'set_source') {
-                var sourceKey = prompt(wpbridge.i18n.enter_source_key || '请输入源 Key:');
+                var $sources = $('.wpbridge-source-select:first optgroup option');
+                if ($sources.length === 0) {
+                    Toast.error(wpbridge.i18n.no_sources || '没有可用的更新源');
+                    return;
+                }
+                var sourceKey = prompt(wpbridge.i18n.enter_source_key || '请输入源 Key (如: wporg, wenpai-mirror):');
                 if (!sourceKey) {
                     return;
                 }
@@ -539,6 +572,14 @@
                     Toast.error(wpbridge.i18n.failed);
                 }
             });
+        },
+
+        debouncedFilter: function(type, query) {
+            var self = this;
+            clearTimeout(this.searchTimeout);
+            this.searchTimeout = setTimeout(function() {
+                self.filterItems(type, query);
+            }, 300);
         },
 
         filterItems: function(type, query) {
