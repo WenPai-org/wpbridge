@@ -102,7 +102,6 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--wpbridge-space-6);
     padding: var(--wpbridge-space-4) var(--wpbridge-space-6);
     background: #fff;
     box-shadow: var(--wpbridge-shadow);
@@ -773,8 +772,9 @@
    Notice Notifications - WordPress 原生通知样式
    ======================================== */
 .wpbridge-notice-container {
-    margin: var(--wpbridge-space-4) var(--wpbridge-space-6);
-    max-width: 1200px;
+    position: relative;
+    z-index: 100;
+    margin-bottom: var(--wpbridge-space-4);
 }
 
 .wpbridge-notice {
@@ -816,7 +816,6 @@
 
 .wpbridge-notice-text {
     flex: 1;
-}
 }
 
 /* ========================================

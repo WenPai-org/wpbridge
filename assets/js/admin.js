@@ -18,9 +18,16 @@
 
         init: function() {
             if (!this.container) {
-                // 在 wpbridge-header 下方创建通知容器
+                // 在 wpbridge-content 内部顶部创建通知容器
                 this.container = $('<div class="wpbridge-notice-container"></div>');
-                $('.wpbridge-header').after(this.container);
+                // 优先插入到 .wpbridge-content 内部顶部
+                var $content = $('.wpbridge-content');
+                if ($content.length) {
+                    $content.prepend(this.container);
+                } else {
+                    // 回退：插入到 header 后面
+                    $('.wpbridge-header').after(this.container);
+                }
             }
         },
 
