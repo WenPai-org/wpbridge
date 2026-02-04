@@ -38,7 +38,8 @@ $healthy_count  = 0;
 $degraded_count = 0;
 $failed_count   = 0;
 foreach ( $health_status as $status ) {
-    if ( isset( $status['status'] ) ) {
+    // 确保 $status 是数组
+    if ( is_array( $status ) && isset( $status['status'] ) ) {
         switch ( $status['status'] ) {
             case 'healthy':
                 $healthy_count++;

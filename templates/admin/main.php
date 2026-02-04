@@ -33,7 +33,8 @@ $health_status  = [];
 foreach ( $sources as $source ) {
     if ( $source->enabled ) {
         $cached_status = get_transient( 'wpbridge_health_' . $source->id );
-        if ( $cached_status ) {
+        // 确保缓存的状态是数组，防止 __PHP_Incomplete_Class 错误
+        if ( $cached_status && is_array( $cached_status ) ) {
             $health_status[ $source->id ] = $cached_status;
         }
     }

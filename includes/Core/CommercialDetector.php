@@ -32,14 +32,14 @@ class CommercialDetector {
     const TYPE_UNKNOWN    = 'unknown';
 
     /**
-     * 缓存键名
+     * 缓存选项名（永久存储）
      */
-    const CACHE_KEY = 'wpbridge_commercial_detection_cache';
+    const CACHE_OPTION = 'wpbridge_plugin_type_cache';
 
     /**
-     * 缓存时间（秒）- 默认 24 小时
+     * 远程配置版本选项名
      */
-    const CACHE_TTL = 86400;
+    const CONFIG_VERSION_OPTION = 'wpbridge_remote_config_version';
 
     /**
      * 单例实例
@@ -56,7 +56,7 @@ class CommercialDetector {
     private $user_marks = array();
 
     /**
-     * 检测结果缓存
+     * 检测结果缓存（永久存储）
      *
      * @var array
      */
@@ -86,8 +86,8 @@ class CommercialDetector {
      */
     private function __construct() {
         $this->load_user_marks();
-        $this->load_detection_cache();
         $this->remote_config = RemoteConfig::get_instance();
+        $this->load_detection_cache();
     }
 
     /**
@@ -98,18 +98,29 @@ class CommercialDetector {
     }
 
     /**
-     * 加载检测结果缓存
+     * 加载检测结果缓存（永久存储）
+     * 如果远程配置版本变化，自动清除缓存
      */
     private function load_detection_cache() {
-        $cached = get_transient( self::CACHE_KEY );
+        $cached = get_option( self::CACHE_OPTION, array() );
         $this->detection_cache = is_array( $cached ) ? $cached : array();
+
+        // 检查远程配置版本是否变化
+        $current_version = $this->remote_config->get_version();
+        $cached_version  = get_option( self::CONFIG_VERSION_OPTION, '' );
+
+        if ( $current_version !== $cached_version ) {
+            // 远程配置更新了，清除缓存
+            $this->detection_cache = array();
+            update_option( self::CONFIG_VERSION_OPTION, $current_version );
+        }
     }
 
     /**
-     * 保存检测结果缓存
+     * 保存检测结果缓存（永久存储）
      */
     private function save_detection_cache() {
-        set_transient( self::CACHE_KEY, $this->detection_cache, self::CACHE_TTL );
+        update_option( self::CACHE_OPTION, $this->detection_cache, false );
     }
 
     /**
@@ -608,7 +619,8 @@ class CommercialDetector {
      */
     public function clear_cache() {
         $this->detection_cache = array();
-        return delete_transient( self::CACHE_KEY );
+        delete_option( self::CONFIG_VERSION_OPTION );
+        return delete_option( self::CACHE_OPTION );
     }
 
     /**
@@ -622,6 +634,9 @@ class CommercialDetector {
 
         // 刷新远程配置
         $this->remote_config->refresh();
+
+        // 更新配置版本
+        update_option( self::CONFIG_VERSION_OPTION, $this->remote_config->get_version() );
 
         // 获取所有已安装插件
         if ( ! function_exists( 'get_plugins' ) ) {
@@ -652,10 +667,9 @@ class CommercialDetector {
      */
     public function get_cache_stats() {
         return array(
-            'count'      => count( $this->detection_cache ),
-            'cache_key'  => self::CACHE_KEY,
-            'ttl'        => self::CACHE_TTL,
-            'ttl_human'  => human_time_diff( 0, self::CACHE_TTL ),
+            'count'          => count( $this->detection_cache ),
+            'storage'        => 'wp_options (permanent)',
+            'config_version' => get_option( self::CONFIG_VERSION_OPTION, 'unknown' ),
         );
     }
 }
