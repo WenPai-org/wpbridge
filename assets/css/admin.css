@@ -770,38 +770,53 @@
 }
 
 /* ========================================
-   Toast Notifications - 提示通知
+   Notice Notifications - WordPress 原生通知样式
    ======================================== */
-.wpbridge-toast {
-    position: fixed;
-    bottom: var(--wpbridge-space-6);
-    right: var(--wpbridge-space-6);
-    padding: var(--wpbridge-space-4) var(--wpbridge-space-5);
-    background: var(--wpbridge-gray-800);
-    color: #fff;
-    font-size: var(--wpbridge-text-sm);
-    box-shadow: var(--wpbridge-shadow-md);
-    z-index: 100000;
-    transform: translateY(100px);
-    opacity: 0;
-    transition: all 0.3s ease;
+.wpbridge-notice-container {
+    margin: var(--wpbridge-space-4) var(--wpbridge-space-6);
+    max-width: 1200px;
 }
 
-.wpbridge-toast.show {
-    transform: translateY(0);
-    opacity: 1;
+.wpbridge-notice {
+    margin: 0 0 var(--wpbridge-space-2) 0 !important;
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-4) !important;
+    border-left-width: 4px !important;
 }
 
-.wpbridge-toast.success {
-    background: var(--wpbridge-success);
+.wpbridge-notice p {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
-.wpbridge-toast.error {
-    background: var(--wpbridge-error);
+.wpbridge-notice-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
 }
 
-.wpbridge-toast.warning {
-    background: var(--wpbridge-warning);
+.wpbridge-notice.notice-success .wpbridge-notice-icon {
+    color: #00a32a;
+}
+
+.wpbridge-notice.notice-error .wpbridge-notice-icon {
+    color: #d63638;
+}
+
+.wpbridge-notice.notice-warning .wpbridge-notice-icon {
+    color: #dba617;
+}
+
+.wpbridge-notice.notice-info .wpbridge-notice-icon {
+    color: #72aee6;
+}
+
+.wpbridge-notice-text {
+    flex: 1;
+}
 }
 
 /* ========================================
@@ -1309,7 +1324,6 @@
 
 .wpbridge-config-field .wpbridge-form-input {
     width: 100%;
-    padding: 8px 12px;
     border: 1px solid var(--wpbridge-border);
     border-radius: var(--wpbridge-radius);
     font-size: 14px;

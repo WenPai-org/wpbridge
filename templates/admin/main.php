@@ -117,6 +117,3 @@ foreach ( $sources as $source ) {
         </div>
     </div>
 </div>
-
-<!-- Toast 通知容器 -->
-<div id="wpbridge-toast" class="wpbridge-toast"></div>
