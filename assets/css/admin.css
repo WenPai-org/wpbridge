@@ -1441,3 +1441,669 @@
 .wpbridge-custom-source-row:last-of-type {
     margin-bottom: 0;
 }
+
+/* ========================================
+   Overview Tab - 概览页面 (P3)
+   ======================================== */
+
+/* 欢迎区域 */
+.wpbridge-welcome {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-6);
+    background: linear-gradient(135deg, var(--wpbridge-primary) 0%, var(--wpbridge-primary-dark) 100%);
+    color: #fff;
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-welcome h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 var(--wpbridge-space-2) 0;
+}
+
+.wpbridge-welcome p {
+    margin: 0;
+    opacity: 0.9;
+}
+
+.wpbridge-welcome-actions {
+    display: flex;
+    gap: var(--wpbridge-space-3);
+}
+
+.wpbridge-welcome .wpbridge-btn-primary {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.wpbridge-welcome .wpbridge-btn-primary:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.wpbridge-welcome .wpbridge-btn-secondary {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #fff;
+}
+
+.wpbridge-welcome .wpbridge-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+/* 概览卡片网格 */
+.wpbridge-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--wpbridge-space-4);
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-overview-card {
+    background: #fff;
+    box-shadow: var(--wpbridge-shadow);
+    display: flex;
+    flex-direction: column;
+}
+
+.wpbridge-overview-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    padding: var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+}
+
+.wpbridge-overview-card-header .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-overview-card-header h3 {
+    font-size: var(--wpbridge-text-md);
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0;
+}
+
+.wpbridge-overview-card-body {
+    padding: var(--wpbridge-space-4);
+    flex: 1;
+}
+
+.wpbridge-overview-stat-main {
+    text-align: center;
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-overview-number {
+    display: block;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-900);
+    line-height: 1.2;
+}
+
+.wpbridge-overview-number.success {
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-overview-number.warning {
+    color: var(--wpbridge-warning);
+}
+
+.wpbridge-overview-number.error {
+    color: var(--wpbridge-error);
+}
+
+.wpbridge-overview-label {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-overview-stat-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-overview-stat-item {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-600);
+}
+
+.wpbridge-overview-stat-item .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    color: var(--wpbridge-gray-400);
+}
+
+.wpbridge-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.wpbridge-dot-success {
+    background: var(--wpbridge-success);
+}
+
+.wpbridge-dot-warning {
+    background: var(--wpbridge-warning);
+}
+
+.wpbridge-dot-error {
+    background: var(--wpbridge-error);
+}
+
+.wpbridge-dot-info {
+    background: var(--wpbridge-info);
+}
+
+.wpbridge-dot-gray {
+    background: var(--wpbridge-gray-400);
+}
+
+.wpbridge-overview-card-footer {
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-4);
+    background: var(--wpbridge-gray-50);
+    border-top: 1px solid var(--wpbridge-gray-100);
+}
+
+.wpbridge-overview-card-footer a {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-primary);
+    text-decoration: none;
+}
+
+.wpbridge-overview-card-footer a:hover {
+    text-decoration: underline;
+}
+
+.wpbridge-overview-empty {
+    text-align: center;
+    padding: var(--wpbridge-space-4);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-overview-empty .dashicons {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    color: var(--wpbridge-gray-300);
+    margin-bottom: var(--wpbridge-space-2);
+}
+
+.wpbridge-overview-empty p {
+    margin: 0;
+    font-size: var(--wpbridge-text-sm);
+}
+
+/* 快速操作 */
+.wpbridge-quick-actions {
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-quick-actions h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0 0 var(--wpbridge-space-4) 0;
+}
+
+.wpbridge-quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--wpbridge-space-3);
+}
+
+.wpbridge-quick-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    padding: var(--wpbridge-space-4);
+    background: #fff;
+    border: 1px solid var(--wpbridge-gray-200);
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--wpbridge-gray-700);
+    transition: all var(--wpbridge-transition);
+}
+
+.wpbridge-quick-action:hover {
+    border-color: var(--wpbridge-primary);
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-quick-action .dashicons {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+}
+
+.wpbridge-quick-action span:last-child {
+    font-size: var(--wpbridge-text-sm);
+}
+
+/* 系统信息 */
+.wpbridge-system-info h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0 0 var(--wpbridge-space-4) 0;
+}
+
+.wpbridge-system-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--wpbridge-space-3);
+    background: #fff;
+    padding: var(--wpbridge-space-4);
+    box-shadow: var(--wpbridge-shadow);
+}
+
+.wpbridge-system-info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-2) 0;
+}
+
+.wpbridge-system-info-label {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-system-info-value {
+    font-size: var(--wpbridge-text-sm);
+    font-weight: 500;
+    color: var(--wpbridge-gray-800);
+}
+
+.wpbridge-system-info-value.success {
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-system-info-value.warning {
+    color: var(--wpbridge-warning);
+}
+
+/* ========================================
+   Diagnostics Tab - 诊断工具 (P1)
+   ======================================== */
+
+/* 诊断头部 */
+.wpbridge-diagnostics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-diagnostics-info h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-900);
+    margin: 0 0 var(--wpbridge-space-1) 0;
+}
+
+.wpbridge-diagnostics-info p {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-500);
+    margin: 0;
+}
+
+.wpbridge-diagnostics-actions {
+    display: flex;
+    gap: var(--wpbridge-space-3);
+}
+
+/* 诊断结果概览 */
+.wpbridge-diagnostics-summary {
+    display: flex;
+    gap: var(--wpbridge-space-4);
+    padding: var(--wpbridge-space-4);
+    background: var(--wpbridge-gray-50);
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-diagnostics-summary-item {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    font-size: var(--wpbridge-text-sm);
+}
+
+.wpbridge-diagnostics-passed .dashicons {
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-diagnostics-warnings .dashicons {
+    color: var(--wpbridge-warning);
+}
+
+.wpbridge-diagnostics-failed .dashicons {
+    color: var(--wpbridge-error);
+}
+
+.wpbridge-diagnostics-count {
+    font-weight: 600;
+}
+
+/* 诊断区块 */
+.wpbridge-diagnostics-section {
+    background: #fff;
+    box-shadow: var(--wpbridge-shadow);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-diagnostics-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-gray-200);
+}
+
+.wpbridge-diagnostics-section-header h3 {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0;
+}
+
+.wpbridge-diagnostics-section-header h3 .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-diagnostics-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--wpbridge-space-6);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-diagnostics-empty .dashicons {
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+    color: var(--wpbridge-gray-300);
+    margin-bottom: var(--wpbridge-space-2);
+}
+
+/* 更新源测试列表 */
+.wpbridge-source-tests {
+    padding: var(--wpbridge-space-4);
+}
+
+.wpbridge-source-test-item {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-4);
+    padding: var(--wpbridge-space-3);
+    border: 1px solid var(--wpbridge-gray-200);
+    margin-bottom: var(--wpbridge-space-2);
+    transition: all var(--wpbridge-transition);
+}
+
+.wpbridge-source-test-item:last-child {
+    margin-bottom: 0;
+}
+
+.wpbridge-source-test-item:hover {
+    border-color: var(--wpbridge-primary);
+}
+
+.wpbridge-source-test-item.testing {
+    background: var(--wpbridge-gray-50);
+}
+
+.wpbridge-source-test-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.wpbridge-source-test-name {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    font-weight: 500;
+    color: var(--wpbridge-gray-800);
+    margin-bottom: var(--wpbridge-space-1);
+}
+
+.wpbridge-source-test-url {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    font-family: var(--wpbridge-font-mono);
+    word-break: break-all;
+}
+
+.wpbridge-source-test-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-source-test-status {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-source-test-time {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    font-family: var(--wpbridge-font-mono);
+}
+
+.wpbridge-badge-disabled {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-badge-unknown {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-600);
+}
+
+/* 环境检查列表 */
+.wpbridge-environment-checks,
+.wpbridge-config-checks {
+    padding: var(--wpbridge-space-4);
+}
+
+.wpbridge-check-item {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-3);
+    padding: var(--wpbridge-space-3);
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+}
+
+.wpbridge-check-item:last-child {
+    border-bottom: none;
+}
+
+.wpbridge-check-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.wpbridge-check-item.passed .wpbridge-check-icon {
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-check-item.warning .wpbridge-check-icon {
+    color: var(--wpbridge-warning);
+}
+
+.wpbridge-check-item.failed .wpbridge-check-icon {
+    color: var(--wpbridge-error);
+}
+
+.wpbridge-check-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.wpbridge-check-label {
+    font-size: var(--wpbridge-text-sm);
+    font-weight: 500;
+    color: var(--wpbridge-gray-800);
+}
+
+.wpbridge-check-value {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-600);
+    font-family: var(--wpbridge-font-mono);
+}
+
+.wpbridge-check-requirement {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    white-space: nowrap;
+}
+
+/* 模态框 */
+.wpbridge-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100000;
+}
+
+.wpbridge-modal-content {
+    background: #fff;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.wpbridge-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-gray-200);
+}
+
+.wpbridge-modal-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.wpbridge-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--wpbridge-gray-500);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.wpbridge-modal-close:hover {
+    color: var(--wpbridge-gray-800);
+}
+
+.wpbridge-modal-body {
+    padding: var(--wpbridge-space-4);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.wpbridge-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--wpbridge-space-3);
+    padding: var(--wpbridge-space-4);
+    border-top: 1px solid var(--wpbridge-gray-200);
+}
+
+.wpbridge-diagnostics-textarea {
+    width: 100%;
+    min-height: 300px;
+    font-family: var(--wpbridge-font-mono);
+    font-size: var(--wpbridge-text-xs);
+    padding: var(--wpbridge-space-3);
+    border: 1px solid var(--wpbridge-gray-200);
+    resize: vertical;
+}
+
+/* 响应式 - 概览和诊断 */
+@media screen and (max-width: 782px) {
+    .wpbridge-welcome {
+        flex-direction: column;
+        text-align: center;
+        gap: var(--wpbridge-space-4);
+    }
+
+    .wpbridge-welcome-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .wpbridge-overview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .wpbridge-diagnostics-header {
+        flex-direction: column;
+        gap: var(--wpbridge-space-4);
+    }
+
+    .wpbridge-diagnostics-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .wpbridge-source-test-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .wpbridge-source-test-meta {
+        flex-wrap: wrap;
+    }
+
+    .wpbridge-check-item {
+        flex-wrap: wrap;
+    }
+
+    .wpbridge-check-requirement {
+        width: 100%;
+        margin-top: var(--wpbridge-space-1);
+    }
+}
