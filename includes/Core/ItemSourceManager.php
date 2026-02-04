@@ -290,9 +290,42 @@ class ItemSourceManager {
             return $sources;
         }
 
-        // 使用默认源
-        $item_type = $config['item_type'] ?? self::TYPE_PLUGIN;
+        // 使用默认源 - 从配置或 item_key 前缀推断类型
+        $item_type = $this->resolve_item_type( $item_key, $config );
         return $defaults->get_default_sources( $item_type, $this->source_registry );
+    }
+
+    /**
+     * 解析项目类型
+     *
+     * 优先从配置获取，否则从 item_key 前缀推断
+     *
+     * @param string     $item_key 项目键
+     * @param array|null $config   项目配置（可能为 null）
+     * @return string 项目类型
+     */
+    private function resolve_item_type( string $item_key, ?array $config ): string {
+        // 优先使用配置中的类型
+        if ( $config && ! empty( $config['item_type'] ) ) {
+            return $config['item_type'];
+        }
+
+        // 从 item_key 前缀推断类型
+        // 格式: "type:identifier" 例如 "plugin:hello-dolly/hello.php" 或 "theme:flavor"
+        if ( strpos( $item_key, 'theme:' ) === 0 ) {
+            return self::TYPE_THEME;
+        }
+
+        if ( strpos( $item_key, 'mu-plugin:' ) === 0 ) {
+            return self::TYPE_MUPLUGIN;
+        }
+
+        if ( strpos( $item_key, 'dropin:' ) === 0 ) {
+            return self::TYPE_DROPIN;
+        }
+
+        // 默认为插件类型
+        return self::TYPE_PLUGIN;
     }
 
     /**
