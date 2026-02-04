@@ -46,14 +46,19 @@ class ApiKeyManager {
      * @return array
      */
     public function generate( string $name, ?string $expires_at = null, array $permissions = [] ): array {
+        // 权限检查
+        if ( ! current_user_can( 'manage_options' ) ) {
+            throw new \Exception( __( '权限不足', 'wpbridge' ) );
+        }
+
         $api_key = Encryption::generate_token( 32 );
         $key_id  = 'key_' . wp_generate_uuid4();
 
         $key_data = [
             'id'          => $key_id,
             'name'        => sanitize_text_field( $name ),
-            'key'         => $api_key,
-            'key_prefix'  => substr( $api_key, 0, 8 ) . '...',
+            'key_hash'    => password_hash( $api_key, PASSWORD_DEFAULT ), // 存储哈希而非明文
+            'key_prefix'  => substr( $api_key, 0, 4 ) . '...' . substr( $api_key, -4 ), // 显示前4后4
             'permissions' => $permissions,
             'expires_at'  => $expires_at,
             'created_at'  => current_time( 'mysql' ),

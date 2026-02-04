@@ -134,7 +134,7 @@ class RestController {
         ] );
 
         // 菲码源库 Releases
-        register_rest_route( self::NAMESPACE, '/wenpai-git/(?P<repo>[a-zA-Z0-9_/-]+)/releases', [
+        register_rest_route( self::NAMESPACE, '/wenpai-git/(?P<repo>[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+)/releases', [
             'methods'             => \WP_REST_Server::READABLE,
             'callback'            => [ $this, 'get_wenpai_git_releases' ],
             'permission_callback' => [ $this, 'check_api_permission' ],
@@ -142,6 +142,9 @@ class RestController {
                 'repo' => [
                     'required'          => true,
                     'sanitize_callback' => 'sanitize_text_field',
+                    'validate_callback' => function ( $param ) {
+                        return preg_match( '/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/', $param );
+                    },
                 ],
             ],
         ] );
@@ -221,9 +224,12 @@ class RestController {
             return sanitize_text_field( substr( $auth_header, 7 ) );
         }
 
-        // 从查询参数获取
+        // 从查询参数获取（不推荐，记录警告）
         $api_key = $request->get_param( 'api_key' );
         if ( ! empty( $api_key ) ) {
+            Logger::warning( 'API Key 通过 URL 参数传递，建议使用 Header 方式', [
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            ] );
             return sanitize_text_field( $api_key );
         }
 
@@ -241,7 +247,8 @@ class RestController {
         $valid_keys   = $api_settings['keys'] ?? [];
 
         foreach ( $valid_keys as $key_data ) {
-            if ( hash_equals( $key_data['key'], $api_key ) ) {
+            // 使用 password_verify 验证哈希
+            if ( isset( $key_data['key_hash'] ) && password_verify( $api_key, $key_data['key_hash'] ) ) {
                 // 检查是否过期
                 if ( ! empty( $key_data['expires_at'] ) ) {
                     if ( strtotime( $key_data['expires_at'] ) < time() ) {
@@ -249,8 +256,8 @@ class RestController {
                     }
                 }
 
-                // 记录使用
-                $this->record_api_key_usage( $api_key );
+                // 记录使用（使用缓存批量更新）
+                $this->record_api_key_usage( $key_data['id'] );
 
                 return true;
             }
@@ -262,12 +269,40 @@ class RestController {
     /**
      * 记录 API Key 使用
      *
-     * @param string $api_key API Key
+     * @param string $key_id Key ID
      */
-    private function record_api_key_usage( string $api_key ): void {
-        $usage_key = 'wpbridge_api_usage_' . md5( $api_key );
-        $usage     = get_transient( $usage_key ) ?: 0;
-        set_transient( $usage_key, $usage + 1, DAY_IN_SECONDS );
+    private function record_api_key_usage( string $key_id ): void {
+        // 使用对象缓存记录，避免频繁写入数据库
+        $cache_key = 'api_usage_' . $key_id;
+        $count     = wp_cache_get( $cache_key, 'wpbridge' ) ?: 0;
+        wp_cache_set( $cache_key, $count + 1, 'wpbridge', 300 );
+
+        // 每 50 次批量写入数据库
+        if ( ( $count + 1 ) % 50 === 0 ) {
+            $this->flush_usage_to_db( $key_id, $count + 1 );
+        }
+    }
+
+    /**
+     * 将使用统计写入数据库
+     *
+     * @param string $key_id Key ID
+     * @param int    $count  使用次数
+     */
+    private function flush_usage_to_db( string $key_id, int $count ): void {
+        $api_settings = $this->settings->get( 'api', [] );
+        $keys         = $api_settings['keys'] ?? [];
+
+        foreach ( $keys as $index => $key ) {
+            if ( $key['id'] === $key_id ) {
+                $keys[ $index ]['last_used']   = current_time( 'mysql' );
+                $keys[ $index ]['usage_count'] = ( $key['usage_count'] ?? 0 ) + $count;
+                break;
+            }
+        }
+
+        $api_settings['keys'] = $keys;
+        $this->settings->set( 'api', $api_settings );
     }
 
     /**
@@ -323,16 +358,38 @@ class RestController {
         // 优先使用 API Key
         $api_key = $this->get_api_key_from_request( $request );
         if ( ! empty( $api_key ) ) {
-            return 'key:' . $api_key;
+            return 'key:' . md5( $api_key );
         }
 
         // 使用 IP 地址
-        $ip = $request->get_header( 'X-Forwarded-For' );
-        if ( empty( $ip ) ) {
-            $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        return 'ip:' . $this->get_client_ip( $request );
+    }
+
+    /**
+     * 获取客户端 IP 地址
+     *
+     * @param \WP_REST_Request $request 请求对象
+     * @return string
+     */
+    private function get_client_ip( \WP_REST_Request $request ): string {
+        // 检查是否配置了可信代理
+        $trusted_proxies = apply_filters( 'wpbridge_trusted_proxies', [] );
+
+        if ( ! empty( $trusted_proxies ) ) {
+            $remote_addr = $_SERVER['REMOTE_ADDR'] ?? '';
+
+            // 只有当请求来自可信代理时才信任 X-Forwarded-For
+            if ( in_array( $remote_addr, $trusted_proxies, true ) ) {
+                $forwarded = $request->get_header( 'X-Forwarded-For' );
+                if ( ! empty( $forwarded ) ) {
+                    // 取第一个非代理 IP
+                    $ips = array_map( 'trim', explode( ',', $forwarded ) );
+                    return sanitize_text_field( $ips[0] );
+                }
+            }
         }
 
-        return 'ip:' . sanitize_text_field( $ip );
+        return sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? 'unknown' );
     }
 
     /**
@@ -668,16 +725,11 @@ class RestController {
      * @return \WP_REST_Response
      */
     public function get_status( \WP_REST_Request $request ): \WP_REST_Response {
-        $api_settings = $this->settings->get( 'api', [] );
-
         return new \WP_REST_Response( [
             'success' => true,
             'data'    => [
                 'version'      => WPBRIDGE_VERSION,
                 'api_version'  => 'v1',
-                'enabled'      => ! empty( $api_settings['enabled'] ),
-                'require_auth' => ! empty( $api_settings['require_auth'] ),
-                'rate_limit'   => $api_settings['rate_limit'] ?? 60,
                 'endpoints'    => [
                     'sources'       => rest_url( self::NAMESPACE . '/sources' ),
                     'check'         => rest_url( self::NAMESPACE . '/check/{source_id}' ),
