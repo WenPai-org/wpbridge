@@ -754,30 +754,32 @@
                 self.togglePanel(itemKey, $(this));
             });
 
-            // 取消按钮
-            $(document).on('click', '.wpbridge-cancel-inline', function(e) {
-                e.preventDefault();
-                var itemKey = $(this).data('item-key');
-                self.closePanel(itemKey);
-            });
-
-            // 保存按钮
+            // 保存按钮 - 保存自定义源
             $(document).on('click', '.wpbridge-save-inline', function(e) {
                 e.preventDefault();
                 var itemKey = $(this).data('item-key');
-                self.saveInlineConfig(itemKey, $(this));
+                self.saveCustomSource(itemKey, $(this));
             });
 
-            // 模式切换 - 显示/隐藏自定义源字段
-            $(document).on('change', '.wpbridge-mode-radio', function() {
-                var $panel = $(this).closest('.wpbridge-project-config-panel');
-                var mode = $(this).val();
+            // 重置为默认
+            $(document).on('click', '.wpbridge-reset-default', function(e) {
+                e.preventDefault();
+                var itemKey = $(this).data('item-key');
+                self.setMode(itemKey, 'default', $(this));
+            });
 
-                if (mode === 'custom') {
-                    $panel.find('.wpbridge-custom-source-row').slideDown(200);
-                } else {
-                    $panel.find('.wpbridge-custom-source-row').slideUp(200);
-                }
+            // 禁用更新
+            $(document).on('click', '.wpbridge-disable-update', function(e) {
+                e.preventDefault();
+                var itemKey = $(this).data('item-key');
+                self.setMode(itemKey, 'disabled', $(this));
+            });
+
+            // 启用更新
+            $(document).on('click', '.wpbridge-enable-update', function(e) {
+                e.preventDefault();
+                var itemKey = $(this).data('item-key');
+                self.setMode(itemKey, 'default', $(this));
             });
         },
 
@@ -811,37 +813,53 @@
             $panel.find('input').val('');
         },
 
-        saveInlineConfig: function(itemKey, $button) {
+        // 设置模式（默认/禁用）
+        setMode: function(itemKey, mode, $button) {
+            $button.prop('disabled', true);
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wpbridge_save_item_config',
+                    nonce: wpbridge.nonce,
+                    item_key: itemKey,
+                    mode: mode
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Toast.success(response.data.message);
+                        location.reload();
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                },
+                complete: function() {
+                    $button.prop('disabled', false);
+                }
+            });
+        },
+
+        // 保存自定义源
+        saveCustomSource: function(itemKey, $button) {
             var $item = $button.closest('.wpbridge-project-item');
             var $panel = $item.find('.wpbridge-project-config-panel');
-            var mode = $panel.find('.wpbridge-mode-radio:checked').val();
             var url = $panel.find('.wpbridge-inline-url').val();
             var token = $panel.find('.wpbridge-inline-token').val();
 
-            // 如果是自定义模式，需要 URL
-            if (mode === 'custom' && !url) {
+            if (!url) {
                 Toast.error(wpbridge.i18n.enter_url || '请输入更新地址');
                 return;
             }
 
-            var data = {
-                action: 'wpbridge_save_item_config',
-                nonce: wpbridge.nonce,
-                item_key: itemKey,
-                mode: mode
-            };
-
-            // 如果是自定义模式，添加 URL 和 token
-            if (mode === 'custom') {
-                var inferred = UrlInference.parseUrl(url);
-                if (!inferred) {
-                    Toast.error(wpbridge.i18n.invalid_url || '无效的 URL');
-                    return;
-                }
-                data.url = url;
-                data.type = inferred.type;
-                data.name = inferred.name;
-                data.token = token;
+            // 推断源类型和名称
+            var inferred = UrlInference.parseUrl(url);
+            if (!inferred) {
+                Toast.error(wpbridge.i18n.invalid_url || '无效的 URL');
+                return;
             }
 
             $button.prop('disabled', true);
@@ -849,7 +867,16 @@
             $.ajax({
                 url: wpbridge.ajax_url,
                 type: 'POST',
-                data: data,
+                data: {
+                    action: 'wpbridge_save_item_config',
+                    nonce: wpbridge.nonce,
+                    item_key: itemKey,
+                    mode: 'custom',
+                    url: url,
+                    type: inferred.type,
+                    name: inferred.name,
+                    token: token
+                },
                 success: function(response) {
                     if (response.success) {
                         Toast.success(response.data.message);
