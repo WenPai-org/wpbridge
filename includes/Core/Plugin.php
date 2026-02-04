@@ -14,6 +14,7 @@ use WPBridge\AIBridge\AIGateway;
 use WPBridge\Commercial\CommercialManager;
 use WPBridge\Notification\NotificationManager;
 use WPBridge\SourceGroup\GroupManager;
+use WPBridge\API\RestController;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -82,6 +83,13 @@ class Plugin {
     private ?GroupManager $group_manager = null;
 
     /**
+     * REST API 控制器
+     *
+     * @var RestController|null
+     */
+    private ?RestController $rest_controller = null;
+
+    /**
      * 获取单例实例
      *
      * @return Plugin
@@ -142,6 +150,7 @@ class Plugin {
         $this->commercial_manager   = new CommercialManager( $this->settings );
         $this->notification_manager = new NotificationManager( $this->settings );
         $this->group_manager        = new GroupManager( $this->settings );
+        $this->rest_controller      = new RestController( $this->settings );
 
         // 注册 AI 适配器
         $this->register_ai_adapters();
@@ -270,6 +279,15 @@ class Plugin {
      */
     public function get_group_manager(): ?GroupManager {
         return $this->group_manager;
+    }
+
+    /**
+     * 获取 REST API 控制器
+     *
+     * @return RestController|null
+     */
+    public function get_rest_controller(): ?RestController {
+        return $this->rest_controller;
     }
 
     /**
