@@ -119,9 +119,9 @@ class Plugin {
         // 初始化更新器
         add_action( 'init', [ $this, 'init_updaters' ] );
 
-        // 管理界面
+        // 管理界面 - 在 plugins_loaded 之后立即初始化
         if ( is_admin() ) {
-            add_action( 'admin_menu', [ $this, 'init_admin' ] );
+            $this->init_admin();
             add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
         }
 
@@ -212,10 +212,26 @@ class Plugin {
             'ajax_url' => admin_url( 'admin-ajax.php' ),
             'nonce'    => wp_create_nonce( 'wpbridge_nonce' ),
             'i18n'     => [
-                'confirm_delete' => __( '确定要删除这个更新源吗？', 'wpbridge' ),
-                'testing'        => __( '测试中...', 'wpbridge' ),
-                'success'        => __( '成功', 'wpbridge' ),
-                'failed'         => __( '失败', 'wpbridge' ),
+                'confirm_delete'     => __( '确定要删除这个更新源吗？', 'wpbridge' ),
+                'confirm_revoke'     => __( '确定要撤销此 API Key 吗？', 'wpbridge' ),
+                'confirm_clear_logs' => __( '确定要清除所有日志吗？', 'wpbridge' ),
+                'testing'            => __( '测试中...', 'wpbridge' ),
+                'success'            => __( '成功', 'wpbridge' ),
+                'failed'             => __( '操作失败', 'wpbridge' ),
+                'enabled'            => __( '已启用', 'wpbridge' ),
+                'disabled'           => __( '已禁用', 'wpbridge' ),
+                'healthy'            => __( '正常', 'wpbridge' ),
+                'degraded'           => __( '降级', 'wpbridge' ),
+                'failed_status'      => __( '失败', 'wpbridge' ),
+                'test_success'       => __( '连接成功', 'wpbridge' ),
+                'test_degraded'      => __( '连接异常', 'wpbridge' ),
+                'cache_cleared'      => __( '缓存已清除', 'wpbridge' ),
+                'logs_cleared'       => __( '日志已清除', 'wpbridge' ),
+                'no_logs'            => __( '暂无日志记录', 'wpbridge' ),
+                'enter_key_name'     => __( '请输入 API Key 名称：', 'wpbridge' ),
+                'key_generated'      => __( 'API Key 已生成，请妥善保存：', 'wpbridge' ),
+                'key_warning'        => __( '此 Key 只会显示一次，请立即复制保存。', 'wpbridge' ),
+                'key_revoked'        => __( 'API Key 已撤销', 'wpbridge' ),
             ],
         ] );
     }
