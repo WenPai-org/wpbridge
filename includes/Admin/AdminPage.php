@@ -70,6 +70,10 @@ class AdminPage {
         add_action( 'wp_ajax_wpbridge_clear_logs', [ $this, 'ajax_clear_logs' ] );
         add_action( 'wp_ajax_wpbridge_generate_api_key', [ $this, 'ajax_generate_api_key' ] );
         add_action( 'wp_ajax_wpbridge_revoke_api_key', [ $this, 'ajax_revoke_api_key' ] );
+        // 方案 B: 项目配置 AJAX
+        add_action( 'wp_ajax_wpbridge_set_item_source', [ $this, 'ajax_set_item_source' ] );
+        add_action( 'wp_ajax_wpbridge_batch_set_source', [ $this, 'ajax_batch_set_source' ] );
+        add_action( 'wp_ajax_wpbridge_save_defaults', [ $this, 'ajax_save_defaults' ] );
     }
 
     /**
@@ -521,5 +525,144 @@ class AdminPage {
      */
     private function add_notice( string $type, string $message ): void {
         add_settings_error( 'wpbridge', 'wpbridge_notice', $message, $type );
+    }
+
+    /**
+     * AJAX: 设置项目更新源
+     */
+    public function ajax_set_item_source(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+        }
+
+        $item_key   = sanitize_text_field( $_POST['item_key'] ?? '' );
+        $source_key = sanitize_text_field( $_POST['source_key'] ?? '' );
+
+        if ( empty( $item_key ) ) {
+            wp_send_json_error( [ 'message' => __( '项目键不能为空', 'wpbridge' ) ] );
+        }
+
+        $source_registry = new \WPBridge\Core\SourceRegistry();
+        $item_manager    = new \WPBridge\Core\ItemSourceManager( $source_registry );
+
+        $result = false;
+
+        if ( $source_key === 'default' ) {
+            // 重置为默认
+            $result = $item_manager->delete( $item_key );
+            if ( ! $result ) {
+                // 如果删除失败（可能不存在），也算成功
+                $result = true;
+            }
+        } elseif ( $source_key === 'disabled' ) {
+            // 禁用更新
+            $result = $item_manager->disable_updates( $item_key );
+        } else {
+            // 设置自定义源
+            $result = $item_manager->set_source( $item_key, $source_key );
+        }
+
+        if ( $result ) {
+            wp_send_json_success( [ 'message' => __( '配置已保存', 'wpbridge' ) ] );
+        } else {
+            wp_send_json_error( [ 'message' => __( '保存失败', 'wpbridge' ) ] );
+        }
+    }
+
+    /**
+     * AJAX: 批量设置更新源
+     */
+    public function ajax_batch_set_source(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+        }
+
+        $item_keys  = isset( $_POST['item_keys'] ) ? array_map( 'sanitize_text_field', (array) $_POST['item_keys'] ) : [];
+        $action     = sanitize_text_field( $_POST['bulk_action'] ?? '' );
+        $source_key = sanitize_text_field( $_POST['source_key'] ?? '' );
+
+        if ( empty( $item_keys ) ) {
+            wp_send_json_error( [ 'message' => __( '请选择项目', 'wpbridge' ) ] );
+        }
+
+        $source_registry = new \WPBridge\Core\SourceRegistry();
+        $item_manager    = new \WPBridge\Core\ItemSourceManager( $source_registry );
+
+        $success = 0;
+
+        foreach ( $item_keys as $item_key ) {
+            $result = false;
+
+            switch ( $action ) {
+                case 'set_source':
+                    if ( ! empty( $source_key ) ) {
+                        $result = $item_manager->set_source( $item_key, $source_key );
+                    }
+                    break;
+
+                case 'reset_default':
+                    $result = $item_manager->delete( $item_key );
+                    if ( ! $result ) {
+                        $result = true; // 不存在也算成功
+                    }
+                    break;
+
+                case 'disable':
+                    $result = $item_manager->disable_updates( $item_key );
+                    break;
+            }
+
+            if ( $result ) {
+                $success++;
+            }
+        }
+
+        wp_send_json_success( [
+            'message' => sprintf(
+                /* translators: %d: number of items */
+                __( '已更新 %d 个项目', 'wpbridge' ),
+                $success
+            ),
+            'count'   => $success,
+        ] );
+    }
+
+    /**
+     * AJAX: 保存默认规则
+     */
+    public function ajax_save_defaults(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+        }
+
+        $defaults_manager = new \WPBridge\Core\DefaultsManager();
+
+        // 全局默认
+        $global_sources = isset( $_POST['global_sources'] ) ? array_keys( (array) $_POST['global_sources'] ) : [];
+        $defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_GLOBAL, $global_sources );
+
+        // 插件默认
+        if ( ! empty( $_POST['plugin_override'] ) ) {
+            $plugin_sources = isset( $_POST['plugin_sources'] ) ? array_keys( (array) $_POST['plugin_sources'] ) : [];
+            $defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_PLUGIN, $plugin_sources );
+        } else {
+            $defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_PLUGIN, [] );
+        }
+
+        // 主题默认
+        if ( ! empty( $_POST['theme_override'] ) ) {
+            $theme_sources = isset( $_POST['theme_sources'] ) ? array_keys( (array) $_POST['theme_sources'] ) : [];
+            $defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_THEME, $theme_sources );
+        } else {
+            $defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_THEME, [] );
+        }
+
+        wp_send_json_success( [ 'message' => __( '默认规则已保存', 'wpbridge' ) ] );
     }
 }

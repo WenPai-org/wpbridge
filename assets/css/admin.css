@@ -863,3 +863,333 @@
         gap: var(--wpbridge-space-1);
     }
 }
+}
+
+/* ========================================
+   Project List - 项目列表 (方案 B)
+   ======================================== */
+
+/* 子 Tab 导航 */
+.wpbridge-subtabs {
+    display: flex;
+    gap: var(--wpbridge-space-1);
+    padding: var(--wpbridge-space-4);
+    background: var(--wpbridge-bg-secondary);
+    border-bottom: 1px solid var(--wpbridge-border);
+    margin: calc(var(--wpbridge-space-4) * -1);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-subtab {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    padding: var(--wpbridge-space-2) var(--wpbridge-space-4);
+    color: var(--wpbridge-text-secondary);
+    text-decoration: none;
+    border-radius: var(--wpbridge-radius);
+    transition: all var(--wpbridge-transition);
+}
+
+.wpbridge-subtab:hover {
+    background: var(--wpbridge-bg);
+    color: var(--wpbridge-text);
+}
+
+.wpbridge-subtab-active {
+    background: var(--wpbridge-primary);
+    color: #fff;
+}
+
+.wpbridge-subtab-active:hover {
+    background: var(--wpbridge-primary-hover);
+    color: #fff;
+}
+
+.wpbridge-subtab-count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--wpbridge-text-xs);
+}
+
+.wpbridge-subtab-pane {
+    display: none;
+}
+
+.wpbridge-subtab-pane-active {
+    display: block;
+}
+
+/* 工具栏 */
+.wpbridge-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-3);
+    background: var(--wpbridge-bg-secondary);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-toolbar-left,
+.wpbridge-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-3);
+}
+
+.wpbridge-checkbox-all {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    cursor: pointer;
+}
+
+.wpbridge-select {
+    padding: var(--wpbridge-space-2) var(--wpbridge-space-3);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    background: var(--wpbridge-bg);
+    font-size: var(--wpbridge-text-sm);
+}
+
+.wpbridge-search {
+    padding: var(--wpbridge-space-2) var(--wpbridge-space-3);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    min-width: 200px;
+}
+
+/* 项目列表 */
+.wpbridge-project-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-project-item {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-4);
+    padding: var(--wpbridge-space-4);
+    background: var(--wpbridge-bg);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    transition: all var(--wpbridge-transition);
+}
+
+.wpbridge-project-item:hover {
+    border-color: var(--wpbridge-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.wpbridge-project-checkbox {
+    flex-shrink: 0;
+}
+
+.wpbridge-project-thumbnail {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--wpbridge-radius);
+    overflow: hidden;
+    background: var(--wpbridge-bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.wpbridge-project-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.wpbridge-project-thumbnail .dashicons {
+    font-size: 24px;
+    color: var(--wpbridge-text-secondary);
+}
+
+.wpbridge-project-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.wpbridge-project-name {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    font-weight: 500;
+    margin-bottom: var(--wpbridge-space-1);
+}
+
+.wpbridge-project-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wpbridge-space-3);
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-text-secondary);
+}
+
+.wpbridge-project-version {
+    font-family: monospace;
+}
+
+.wpbridge-project-slug {
+    font-family: monospace;
+    background: var(--wpbridge-bg-secondary);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.wpbridge-project-source {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wpbridge-space-1);
+    min-width: 180px;
+}
+
+.wpbridge-project-source-label {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-text-secondary);
+    text-transform: uppercase;
+}
+
+.wpbridge-source-select {
+    padding: var(--wpbridge-space-2);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    background: var(--wpbridge-bg);
+    font-size: var(--wpbridge-text-sm);
+}
+
+.wpbridge-project-actions {
+    display: flex;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-btn-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: var(--wpbridge-radius);
+}
+
+/* 默认规则配置 */
+.wpbridge-defaults-config {
+    max-width: 800px;
+}
+
+.wpbridge-section {
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    font-size: var(--wpbridge-text-lg);
+    margin-bottom: var(--wpbridge-space-2);
+}
+
+.wpbridge-section-desc {
+    color: var(--wpbridge-text-secondary);
+    margin: 0;
+}
+
+.wpbridge-config-card {
+    background: var(--wpbridge-bg);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-config-card-header {
+    padding: var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-border);
+}
+
+.wpbridge-config-card-header h4 {
+    margin: 0 0 var(--wpbridge-space-1) 0;
+    font-size: var(--wpbridge-text-base);
+}
+
+.wpbridge-config-card-desc {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-text-secondary);
+}
+
+.wpbridge-config-card-body {
+    padding: var(--wpbridge-space-4);
+}
+
+.wpbridge-source-order {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-source-order-item {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-3);
+    padding: var(--wpbridge-space-3);
+    background: var(--wpbridge-bg-secondary);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+}
+
+.wpbridge-drag-handle {
+    cursor: grab;
+    color: var(--wpbridge-text-secondary);
+}
+
+.wpbridge-source-order-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.wpbridge-source-order-type {
+    font-size: var(--wpbridge-text-xs);
+}
+
+.wpbridge-source-order-override {
+    margin-top: var(--wpbridge-space-3);
+}
+
+.wpbridge-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    cursor: pointer;
+}
+
+.wpbridge-form-actions {
+    padding-top: var(--wpbridge-space-4);
+    border-top: 1px solid var(--wpbridge-border);
+    margin-top: var(--wpbridge-space-4);
+}
+
+/* 响应式 - 项目列表 */
+@media screen and (max-width: 782px) {
+    .wpbridge-subtabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .wpbridge-toolbar {
+        flex-direction: column;
+        gap: var(--wpbridge-space-3);
+    }
+
+    .wpbridge-project-item {
+        flex-wrap: wrap;
+    }
+
+    .wpbridge-project-source {
+        width: 100%;
+        margin-top: var(--wpbridge-space-2);
+    }
+}
