@@ -17,16 +17,17 @@ $is_edit = null !== $source;
 $title   = $is_edit ? __( '编辑更新源', 'wpbridge' ) : __( '添加更新源', 'wpbridge' );
 ?>
 
+<!-- 标题栏 -->
+<header class="wpbridge-header">
+    <div class="wpbridge-header-left">
+        <a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge' ) ); ?>" class="wpbridge-back-link">
+            <span class="dashicons dashicons-arrow-left-alt2"></span>
+        </a>
+        <h1 class="wpbridge-title"><?php echo esc_html( $title ); ?></h1>
+    </div>
+</header>
+
 <div class="wrap wpbridge-wrap">
-    <!-- 标题栏 -->
-    <header class="wpbridge-header">
-        <div class="wpbridge-header-left">
-            <a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge' ) ); ?>" class="wpbridge-back-link">
-                <span class="dashicons dashicons-arrow-left-alt2"></span>
-            </a>
-            <h1 class="wpbridge-title"><?php echo esc_html( $title ); ?></h1>
-        </div>
-    </header>
 
     <!-- 主内容区 -->
     <div class="wpbridge-content">

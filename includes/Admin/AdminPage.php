@@ -75,6 +75,7 @@ class AdminPage {
         add_action( 'wp_ajax_wpbridge_batch_set_source', [ $this, 'ajax_batch_set_source' ] );
         add_action( 'wp_ajax_wpbridge_save_defaults', [ $this, 'ajax_save_defaults' ] );
         add_action( 'wp_ajax_wpbridge_quick_setup_source', [ $this, 'ajax_quick_setup_source' ] );
+        add_action( 'wp_ajax_wpbridge_save_item_config', [ $this, 'ajax_save_item_config' ] );
     }
 
     /**
@@ -777,5 +778,131 @@ class AdminPage {
             'message'    => __( '更新源已设置', 'wpbridge' ),
             'source_key' => $source_key,
         ] );
+    }
+
+    /**
+     * AJAX: 保存项目配置 (统一接口)
+     *
+     * 支持三种模式：default, custom, disabled
+     */
+    public function ajax_save_item_config(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+        }
+
+        $item_key = sanitize_text_field( $_POST['item_key'] ?? '' );
+        $mode     = sanitize_text_field( $_POST['mode'] ?? 'default' );
+
+        if ( empty( $item_key ) ) {
+            wp_send_json_error( [ 'message' => __( '缺少必要参数', 'wpbridge' ) ] );
+        }
+
+        // 验证模式白名单
+        $allowed_modes = [ 'default', 'custom', 'disabled' ];
+        if ( ! in_array( $mode, $allowed_modes, true ) ) {
+            wp_send_json_error( [ 'message' => __( '无效的模式', 'wpbridge' ) ] );
+        }
+
+        $source_registry = new \WPBridge\Core\SourceRegistry();
+        $item_manager    = new \WPBridge\Core\ItemSourceManager( $source_registry );
+
+        $result = false;
+
+        switch ( $mode ) {
+            case 'default':
+                // 重置为默认
+                $result = $item_manager->delete( $item_key );
+                if ( ! $result ) {
+                    $result = true; // 如果不存在也算成功
+                }
+                break;
+
+            case 'disabled':
+                // 禁用更新
+                $result = $item_manager->disable_updates( $item_key );
+                break;
+
+            case 'custom':
+                // 自定义源 - 需要 URL
+                $url   = esc_url_raw( $_POST['url'] ?? '' );
+                $type  = sanitize_text_field( $_POST['type'] ?? 'json' );
+                $name  = sanitize_text_field( $_POST['name'] ?? '' );
+                $token = sanitize_text_field( $_POST['token'] ?? '' );
+
+                if ( empty( $url ) ) {
+                    wp_send_json_error( [ 'message' => __( '请输入更新地址', 'wpbridge' ) ] );
+                }
+
+                // 验证 URL 格式
+                if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
+                    wp_send_json_error( [ 'message' => __( '无效的 URL 格式', 'wpbridge' ) ] );
+                }
+
+                // 验证 URL 协议
+                $scheme = wp_parse_url( $url, PHP_URL_SCHEME );
+                if ( ! in_array( $scheme, [ 'http', 'https' ], true ) ) {
+                    wp_send_json_error( [ 'message' => __( 'URL 必须使用 http 或 https 协议', 'wpbridge' ) ] );
+                }
+
+                // 验证源类型白名单
+                $allowed_types = [ 'json', 'github', 'gitlab', 'gitee', 'wenpai_git', 'zip', 'arkpress', 'aspirecloud', 'fair', 'puc' ];
+                if ( ! in_array( $type, $allowed_types, true ) ) {
+                    $type = 'json';
+                }
+
+                // 生成唯一的源 key
+                $source_key = 'inline_' . md5( $item_key . '_' . $url );
+
+                // 如果名称为空，从 URL 生成
+                if ( empty( $name ) ) {
+                    $parsed_url = wp_parse_url( $url );
+                    $name       = $parsed_url['host'] ?? 'Custom Source';
+                }
+
+                // 创建内联源
+                $source = new SourceModel();
+                $source->id        = $source_key;
+                $source->name      = $name;
+                $source->type      = $type;
+                $source->api_url   = $url;
+                $source->enabled   = true;
+                $source->priority  = 10;
+                $source->is_inline = true;
+
+                if ( ! empty( $token ) ) {
+                    $source->auth_token = Encryption::encrypt( $token );
+                }
+
+                // 从 item_key 推断项目类型
+                if ( strpos( $item_key, 'plugin:' ) === 0 ) {
+                    $source->item_type = 'plugin';
+                    $source->slug      = str_replace( 'plugin:', '', $item_key );
+                } elseif ( strpos( $item_key, 'theme:' ) === 0 ) {
+                    $source->item_type = 'theme';
+                    $source->slug      = str_replace( 'theme:', '', $item_key );
+                }
+
+                // 保存源
+                $save_result = $this->source_manager->add( $source );
+
+                if ( ! $save_result ) {
+                    wp_send_json_error( [ 'message' => __( '创建更新源失败', 'wpbridge' ) ] );
+                }
+
+                // 关联到项目
+                $result = $item_manager->set( $item_key, [
+                    'mode'       => \WPBridge\Core\ItemSourceManager::MODE_CUSTOM,
+                    'source_ids' => [ $source_key => 10 ],
+                ] );
+                break;
+        }
+
+        if ( $result ) {
+            wp_send_json_success( [ 'message' => __( '配置已保存', 'wpbridge' ) ] );
+        } else {
+            wp_send_json_error( [ 'message' => __( '保存失败', 'wpbridge' ) ] );
+        }
     }
 }

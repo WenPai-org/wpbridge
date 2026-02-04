@@ -767,6 +767,18 @@
                 var itemKey = $(this).data('item-key');
                 self.saveInlineConfig(itemKey, $(this));
             });
+
+            // 模式切换 - 显示/隐藏自定义源字段
+            $(document).on('change', '.wpbridge-mode-radio', function() {
+                var $panel = $(this).closest('.wpbridge-project-config-panel');
+                var mode = $(this).val();
+
+                if (mode === 'custom') {
+                    $panel.find('.wpbridge-custom-source-row').slideDown(200);
+                } else {
+                    $panel.find('.wpbridge-custom-source-row').slideUp(200);
+                }
+            });
         },
 
         togglePanel: function(itemKey, $button) {
@@ -802,19 +814,34 @@
         saveInlineConfig: function(itemKey, $button) {
             var $item = $button.closest('.wpbridge-project-item');
             var $panel = $item.find('.wpbridge-project-config-panel');
+            var mode = $panel.find('.wpbridge-mode-radio:checked').val();
             var url = $panel.find('.wpbridge-inline-url').val();
             var token = $panel.find('.wpbridge-inline-token').val();
 
-            if (!url) {
+            // 如果是自定义模式，需要 URL
+            if (mode === 'custom' && !url) {
                 Toast.error(wpbridge.i18n.enter_url || '请输入更新地址');
                 return;
             }
 
-            // 推断源类型和名称
-            var inferred = UrlInference.parseUrl(url);
-            if (!inferred) {
-                Toast.error(wpbridge.i18n.invalid_url || '无效的 URL');
-                return;
+            var data = {
+                action: 'wpbridge_save_item_config',
+                nonce: wpbridge.nonce,
+                item_key: itemKey,
+                mode: mode
+            };
+
+            // 如果是自定义模式，添加 URL 和 token
+            if (mode === 'custom') {
+                var inferred = UrlInference.parseUrl(url);
+                if (!inferred) {
+                    Toast.error(wpbridge.i18n.invalid_url || '无效的 URL');
+                    return;
+                }
+                data.url = url;
+                data.type = inferred.type;
+                data.name = inferred.name;
+                data.token = token;
             }
 
             $button.prop('disabled', true);
@@ -822,15 +849,7 @@
             $.ajax({
                 url: wpbridge.ajax_url,
                 type: 'POST',
-                data: {
-                    action: 'wpbridge_quick_setup_source',
-                    nonce: wpbridge.nonce,
-                    item_key: itemKey,
-                    url: url,
-                    type: inferred.type,
-                    name: inferred.name,
-                    token: token
-                },
+                data: data,
                 success: function(response) {
                     if (response.success) {
                         Toast.success(response.data.message);
