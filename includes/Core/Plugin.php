@@ -10,6 +10,10 @@ namespace WPBridge\Core;
 use WPBridge\UpdateSource\PluginUpdater;
 use WPBridge\UpdateSource\ThemeUpdater;
 use WPBridge\Admin\AdminPage;
+use WPBridge\AIBridge\AIGateway;
+use WPBridge\Commercial\CommercialManager;
+use WPBridge\Notification\NotificationManager;
+use WPBridge\SourceGroup\GroupManager;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -48,6 +52,34 @@ class Plugin {
      * @var ThemeUpdater|null
      */
     private ?ThemeUpdater $theme_updater = null;
+
+    /**
+     * AI 网关
+     *
+     * @var AIGateway|null
+     */
+    private ?AIGateway $ai_gateway = null;
+
+    /**
+     * 商业插件管理器
+     *
+     * @var CommercialManager|null
+     */
+    private ?CommercialManager $commercial_manager = null;
+
+    /**
+     * 通知管理器
+     *
+     * @var NotificationManager|null
+     */
+    private ?NotificationManager $notification_manager = null;
+
+    /**
+     * 源分组管理器
+     *
+     * @var GroupManager|null
+     */
+    private ?GroupManager $group_manager = null;
 
     /**
      * 获取单例实例
@@ -104,8 +136,34 @@ class Plugin {
      * 初始化更新器
      */
     public function init_updaters(): void {
-        $this->plugin_updater = new PluginUpdater( $this->settings );
-        $this->theme_updater  = new ThemeUpdater( $this->settings );
+        $this->plugin_updater       = new PluginUpdater( $this->settings );
+        $this->theme_updater        = new ThemeUpdater( $this->settings );
+        $this->ai_gateway           = new AIGateway( $this->settings );
+        $this->commercial_manager   = new CommercialManager( $this->settings );
+        $this->notification_manager = new NotificationManager( $this->settings );
+        $this->group_manager        = new GroupManager( $this->settings );
+
+        // 注册 AI 适配器
+        $this->register_ai_adapters();
+    }
+
+    /**
+     * 注册 AI 适配器
+     */
+    private function register_ai_adapters(): void {
+        if ( null === $this->ai_gateway ) {
+            return;
+        }
+
+        $this->ai_gateway->register_adapter(
+            'yoast',
+            new \WPBridge\AIBridge\Adapters\YoastAdapter( $this->settings )
+        );
+
+        $this->ai_gateway->register_adapter(
+            'rankmath',
+            new \WPBridge\AIBridge\Adapters\RankMathAdapter( $this->settings )
+        );
     }
 
     /**
@@ -176,6 +234,42 @@ class Plugin {
      */
     public function get_settings(): Settings {
         return $this->settings;
+    }
+
+    /**
+     * 获取 AI 网关
+     *
+     * @return AIGateway|null
+     */
+    public function get_ai_gateway(): ?AIGateway {
+        return $this->ai_gateway;
+    }
+
+    /**
+     * 获取商业插件管理器
+     *
+     * @return CommercialManager|null
+     */
+    public function get_commercial_manager(): ?CommercialManager {
+        return $this->commercial_manager;
+    }
+
+    /**
+     * 获取通知管理器
+     *
+     * @return NotificationManager|null
+     */
+    public function get_notification_manager(): ?NotificationManager {
+        return $this->notification_manager;
+    }
+
+    /**
+     * 获取源分组管理器
+     *
+     * @return GroupManager|null
+     */
+    public function get_group_manager(): ?GroupManager {
+        return $this->group_manager;
     }
 
     /**
