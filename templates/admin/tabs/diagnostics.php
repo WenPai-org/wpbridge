@@ -93,7 +93,7 @@ use WPBridge\UpdateSource\SourceType;
                         <span class="wpbridge-source-test-status">
                             <?php if ( ! $source->enabled ) : ?>
                                 <span class="wpbridge-badge wpbridge-badge-disabled"><?php esc_html_e( '已禁用', 'wpbridge' ); ?></span>
-                            <?php elseif ( isset( $health_status[ $source->id ] ) ) : ?>
+                            <?php elseif ( isset( $health_status[ $source->id ] ) && is_array( $health_status[ $source->id ] ) ) : ?>
                                 <?php
                                 $status = $health_status[ $source->id ];
                                 $status_class = $status['status'] ?? 'unknown';

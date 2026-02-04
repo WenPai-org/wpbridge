@@ -112,15 +112,16 @@ use WPBridge\UpdateSource\SourceType;
                         </span>
                     </div>
 
-                    <?php if ( isset( $health_status[ $source->id ] ) ) : ?>
-                        <span class="wpbridge-badge wpbridge-badge-status <?php echo esc_attr( $health_status[ $source->id ]['status'] ); ?>">
+                    <?php if ( isset( $health_status[ $source->id ] ) && is_array( $health_status[ $source->id ] ) ) : ?>
+                        <span class="wpbridge-badge wpbridge-badge-status <?php echo esc_attr( $health_status[ $source->id ]['status'] ?? '' ); ?>">
                             <?php
                             $status_labels = [
                                 'healthy'  => __( '正常', 'wpbridge' ),
                                 'degraded' => __( '降级', 'wpbridge' ),
                                 'failed'   => __( '失败', 'wpbridge' ),
                             ];
-                            echo esc_html( $status_labels[ $health_status[ $source->id ]['status'] ] ?? $health_status[ $source->id ]['status'] );
+                            $current_status = $health_status[ $source->id ]['status'] ?? 'unknown';
+                            echo esc_html( $status_labels[ $current_status ] ?? $current_status );
                             ?>
                         </span>
                     <?php endif; ?>
