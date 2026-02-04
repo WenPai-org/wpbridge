@@ -10,6 +10,8 @@ namespace WPBridge\UpdateSource;
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
 use WPBridge\UpdateSource\Handlers\UpdateInfo;
+use WPBridge\Core\ItemSourceManager;
+use WPBridge\Cache\FallbackStrategy;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -29,11 +31,18 @@ class PluginUpdater {
     private Settings $settings;
 
     /**
-     * 源管理器
+     * 源解析器（方案 B）
      *
-     * @var SourceManager
+     * @var SourceResolver
      */
-    private SourceManager $source_manager;
+    private SourceResolver $source_resolver;
+
+    /**
+     * 降级策略
+     *
+     * @var FallbackStrategy
+     */
+    private FallbackStrategy $fallback_strategy;
 
     /**
      * 缓存键前缀
@@ -49,7 +58,8 @@ class PluginUpdater {
      */
     public function __construct( Settings $settings ) {
         $this->settings       = $settings;
-        $this->source_manager = new SourceManager( $settings );
+        $this->source_resolver = new SourceResolver();
+        $this->fallback_strategy = new FallbackStrategy( $settings );
 
         $this->init_hooks();
     }
@@ -93,28 +103,42 @@ class PluginUpdater {
         }
         $plugins = get_plugins();
 
-        // 获取启用的更新源
-        $sources = $this->source_manager->get_enabled_sorted();
-
-        if ( empty( $sources ) ) {
-            return $transient;
-        }
-
         foreach ( $plugins as $plugin_file => $plugin_data ) {
             $slug = $this->get_plugin_slug( $plugin_file );
 
-            // 检查是否有匹配的更新源
-            $matching_sources = $this->source_manager->get_by_slug( $slug, 'plugin' );
+            $item_key = 'plugin:' . $plugin_file;
+            $resolved = $this->source_resolver->resolve( $item_key, $slug, 'plugin' );
+            $mode     = $resolved['mode'];
+            $matching_sources = $resolved['sources'];
+            $allow_wporg_fallback = ! empty( $resolved['has_wporg'] );
 
-            // 如果没有特定 slug 的源，使用通用源
-            if ( empty( $matching_sources ) ) {
-                $matching_sources = array_filter( $sources, function( SourceModel $source ) {
-                    return empty( $source->slug ) && $source->item_type === 'plugin';
-                } );
+            if ( $mode === ItemSourceManager::MODE_DISABLED ) {
+                unset( $transient->response[ $plugin_file ] );
+                $transient->no_update[ $plugin_file ] = (object) [
+                    'slug'        => $slug,
+                    'plugin'      => $plugin_file,
+                    'new_version' => $plugin_data['Version'],
+                ];
+                continue;
             }
 
             if ( empty( $matching_sources ) ) {
+                if ( $mode === ItemSourceManager::MODE_CUSTOM ) {
+                    unset( $transient->response[ $plugin_file ] );
+                    $transient->no_update[ $plugin_file ] = (object) [
+                        'slug'        => $slug,
+                        'plugin'      => $plugin_file,
+                        'new_version' => $plugin_data['Version'],
+                    ];
+                }
                 continue;
+            }
+
+            $take_over = ( $mode === ItemSourceManager::MODE_CUSTOM ) || ! $allow_wporg_fallback;
+
+            if ( $take_over ) {
+                // 接管更新检查，清除默认响应
+                unset( $transient->response[ $plugin_file ] );
             }
 
             // 尝试从缓存获取（使用 md5 哈希防止缓存污染）
@@ -124,12 +148,15 @@ class PluginUpdater {
             if ( false !== $cached ) {
                 if ( ! empty( $cached['update'] ) ) {
                     $transient->response[ $plugin_file ] = (object) $cached['update'];
+                    unset( $transient->no_update[ $plugin_file ] );
                 } else {
-                    $transient->no_update[ $plugin_file ] = (object) [
-                        'slug'        => $slug,
-                        'plugin'      => $plugin_file,
-                        'new_version' => $plugin_data['Version'],
-                    ];
+                    if ( $take_over ) {
+                        $transient->no_update[ $plugin_file ] = (object) [
+                            'slug'        => $slug,
+                            'plugin'      => $plugin_file,
+                            'new_version' => $plugin_data['Version'],
+                        ];
+                    }
                 }
                 continue;
             }
@@ -142,6 +169,7 @@ class PluginUpdater {
                 $update_object->plugin = $plugin_file;
 
                 $transient->response[ $plugin_file ] = $update_object;
+                unset( $transient->no_update[ $plugin_file ] );
 
                 // 缓存结果
                 set_transient( $cache_key, [
@@ -154,11 +182,13 @@ class PluginUpdater {
                     'new'     => $update_info->version,
                 ] );
             } else {
-                $transient->no_update[ $plugin_file ] = (object) [
-                    'slug'        => $slug,
-                    'plugin'      => $plugin_file,
-                    'new_version' => $plugin_data['Version'],
-                ];
+                if ( $take_over ) {
+                    $transient->no_update[ $plugin_file ] = (object) [
+                        'slug'        => $slug,
+                        'plugin'      => $plugin_file,
+                        'new_version' => $plugin_data['Version'],
+                    ];
+                }
 
                 // 缓存无更新结果
                 set_transient( $cache_key, [
@@ -179,36 +209,36 @@ class PluginUpdater {
      * @return UpdateInfo|null
      */
     private function check_plugin_update( string $slug, string $version, array $sources ): ?UpdateInfo {
-        foreach ( $sources as $source ) {
-            $handler = $source->get_handler();
+        $cache_key = 'update_info_plugin_' . md5( $slug . get_site_url() );
 
-            if ( null === $handler ) {
-                Logger::warning( '无法获取处理器', [
-                    'source' => $source->id,
-                    'type'   => $source->type,
-                ] );
-                continue;
-            }
+        $result = $this->fallback_strategy->execute_with_fallback(
+            $sources,
+            function( SourceModel $source ) use ( $slug, $version ) {
+                $handler = $source->get_handler();
 
-            try {
-                $update_info = $handler->check_update( $slug, $version );
-
-                if ( null !== $update_info ) {
-                    return $update_info;
+                if ( null === $handler ) {
+                    Logger::warning( '无法获取处理器', [
+                        'source' => $source->id,
+                        'type'   => $source->type,
+                    ] );
+                    return null;
                 }
-            } catch ( \Exception $e ) {
-                Logger::error( '检查更新时发生错误', [
-                    'source' => $source->id,
-                    'slug'   => $slug,
-                    'error'  => $e->getMessage(),
-                ] );
 
-                // 继续尝试下一个源
-                continue;
-            }
-        }
+                try {
+                    return $handler->check_update( $slug, $version );
+                } catch ( \Exception $e ) {
+                    Logger::error( '检查更新时发生错误', [
+                        'source' => $source->id,
+                        'slug'   => $slug,
+                        'error'  => $e->getMessage(),
+                    ] );
+                    throw $e;
+                }
+            },
+            $cache_key
+        );
 
-        return null;
+        return $result instanceof UpdateInfo ? $result : null;
     }
 
     /**
@@ -230,10 +260,12 @@ class PluginUpdater {
             return $result;
         }
 
-        // 检查是否有匹配的更新源
-        $sources = $this->source_manager->get_by_slug( $slug, 'plugin' );
+        $item_key = $this->get_item_key_from_slug( $slug );
+        $resolved = $this->source_resolver->resolve( $item_key, $slug, 'plugin' );
+        $mode     = $resolved['mode'];
+        $sources  = $resolved['sources'];
 
-        if ( empty( $sources ) ) {
+        if ( $mode === ItemSourceManager::MODE_DISABLED || empty( $sources ) ) {
             return $result;
         }
 
@@ -254,6 +286,28 @@ class PluginUpdater {
         // 转换为 plugins_api 响应格式
         $update_info = Handlers\UpdateInfo::from_array( $info );
         return $update_info->to_plugins_api_response( $info['name'] ?? $slug );
+    }
+
+    /**
+     * 从 slug 推断项目键
+     *
+     * @param string $slug 插件 slug
+     * @return string
+     */
+    private function get_item_key_from_slug( string $slug ): string {
+        if ( ! function_exists( 'get_plugins' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        $plugins = get_plugins();
+        foreach ( $plugins as $plugin_file => $plugin_data ) {
+            $plugin_slug = $this->get_plugin_slug( $plugin_file );
+            if ( $plugin_slug === $slug ) {
+                return 'plugin:' . $plugin_file;
+            }
+        }
+
+        return 'plugin:' . $slug;
     }
 
     /**

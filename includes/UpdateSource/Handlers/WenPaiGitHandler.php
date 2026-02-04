@@ -61,7 +61,7 @@ class WenPaiGitHandler extends AbstractHandler {
         if ( empty( $repo ) ) {
             return $this->source->api_url;
         }
-        return self::API_BASE . '/repos/' . $repo . '/releases';
+        return $this->get_api_base() . '/repos/' . $repo . '/releases';
     }
 
     /**
@@ -79,7 +79,7 @@ class WenPaiGitHandler extends AbstractHandler {
             return null;
         }
 
-        $url  = self::API_BASE . '/repos/' . $repo . '/releases';
+        $url  = $this->get_api_base() . '/repos/' . $repo . '/releases';
         $data = $this->request( $url );
 
         if ( null === $data || empty( $data ) ) {
@@ -130,9 +130,9 @@ class WenPaiGitHandler extends AbstractHandler {
             return null;
         }
 
-        $repo_url     = self::API_BASE . '/repos/' . $repo;
+        $repo_url     = $this->get_api_base() . '/repos/' . $repo;
         $repo_data    = $this->request( $repo_url );
-        $releases_url = self::API_BASE . '/repos/' . $repo . '/releases';
+        $releases_url = $this->get_api_base() . '/repos/' . $repo . '/releases';
         $release_data = $this->request( $releases_url );
 
         if ( null === $repo_data ) {
@@ -165,12 +165,63 @@ class WenPaiGitHandler extends AbstractHandler {
     private function parse_repo_url( string $url ): ?string {
         $url = trim( $url );
 
-        $url = preg_replace( '#^https?://#', '', $url );
-        $url = preg_replace( '#^git\.wenpai\.org/#', '', $url );
-        $url = preg_replace( '#\.git$#', '', $url );
+        $parts = wp_parse_url( $url );
+        if ( ! empty( $parts['host'] ) ) {
+            $path = trim( $parts['path'] ?? '', '/' );
+            $path = preg_replace( '#\.git$#', '', $path );
 
-        if ( preg_match( '#^[\w.-]+/[\w.-]+$#', $url ) ) {
-            return $url;
+            if ( preg_match( '#^api/v1/repos/([\w.-]+/[\w.-]+)#', $path, $matches ) ) {
+                return $matches[1];
+            }
+
+            if ( preg_match( '#^repos/([\w.-]+/[\w.-]+)#', $path, $matches ) ) {
+                return $matches[1];
+            }
+
+            if (
+                ( preg_match( '#^api/v1(?:/|$)#', $path ) && ! preg_match( '#^api/v1/repos/[\w.-]+/[\w.-]+#', $path ) )
+                || ( preg_match( '#^repos(?:/|$)#', $path ) && ! preg_match( '#^repos/[\w.-]+/[\w.-]+#', $path ) )
+            ) {
+                return null;
+            }
+
+            $segments = array_values( array_filter( explode( '/', $path ) ) );
+            if ( count( $segments ) >= 2 ) {
+                $repo = $segments[0] . '/' . $segments[1];
+                if ( preg_match( '#^[\w.-]+/[\w.-]+$#', $repo ) ) {
+                    return $repo;
+                }
+            }
+
+            return null;
+        }
+
+        $path = preg_replace( '#^https?://#', '', $url );
+        $path = preg_replace( '#^[^/]+/#', '', $path );
+        $path = trim( $path, '/' );
+        $path = preg_replace( '#\.git$#', '', $path );
+
+        if ( preg_match( '#^api/v1/repos/([\w.-]+/[\w.-]+)#', $path, $matches ) ) {
+            return $matches[1];
+        }
+
+        if ( preg_match( '#^repos/([\w.-]+/[\w.-]+)#', $path, $matches ) ) {
+            return $matches[1];
+        }
+
+        if (
+            ( preg_match( '#^api/v1(?:/|$)#', $path ) && ! preg_match( '#^api/v1/repos/[\w.-]+/[\w.-]+#', $path ) )
+            || ( preg_match( '#^repos(?:/|$)#', $path ) && ! preg_match( '#^repos/[\w.-]+/[\w.-]+#', $path ) )
+        ) {
+            return null;
+        }
+
+        $segments = array_values( array_filter( explode( '/', $path ) ) );
+        if ( count( $segments ) >= 2 ) {
+            $repo = $segments[0] . '/' . $segments[1];
+            if ( preg_match( '#^[\w.-]+/[\w.-]+$#', $repo ) ) {
+                return $repo;
+            }
         }
 
         return null;
@@ -209,9 +260,41 @@ class WenPaiGitHandler extends AbstractHandler {
 
         $tag = $release['tag_name'] ?? '';
         if ( ! empty( $tag ) ) {
-            return self::API_BASE . '/repos/' . $repo . '/archive/' . $tag . '.zip';
+            return $this->get_api_base() . '/repos/' . $repo . '/archive/' . $tag . '.zip';
         }
 
         return null;
+    }
+
+    /**
+     * 获取 API 基础地址
+     *
+     * @return string
+     */
+    private function get_api_base(): string {
+        $parts = wp_parse_url( $this->source->api_url );
+        if ( ! empty( $parts['host'] ) ) {
+            $scheme = $parts['scheme'] ?? 'https';
+            $port   = isset( $parts['port'] ) ? ':' . $parts['port'] : '';
+            $path   = $parts['path'] ?? '';
+            $base_path = '';
+
+            if ( preg_match( '#^(.*?)/api/v1#', $path, $matches ) ) {
+                $base_path = rtrim( $matches[1], '/' );
+            } else {
+                $repo = $this->parse_repo_url( $this->source->api_url );
+                if ( ! empty( $repo ) ) {
+                    $repo_path = '/' . trim( $repo, '/' );
+                    $pos = strpos( $path, $repo_path );
+                    if ( false !== $pos ) {
+                        $base_path = rtrim( substr( $path, 0, $pos ), '/' );
+                    }
+                }
+            }
+
+            return $scheme . '://' . $parts['host'] . $port . $base_path . '/api/v1';
+        }
+
+        return self::API_BASE;
     }
 }

@@ -10,6 +10,8 @@ namespace WPBridge\UpdateSource;
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
 use WPBridge\UpdateSource\Handlers\UpdateInfo;
+use WPBridge\Core\ItemSourceManager;
+use WPBridge\Cache\FallbackStrategy;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -29,11 +31,18 @@ class ThemeUpdater {
     private Settings $settings;
 
     /**
-     * 源管理器
+     * 源解析器（方案 B）
      *
-     * @var SourceManager
+     * @var SourceResolver
      */
-    private SourceManager $source_manager;
+    private SourceResolver $source_resolver;
+
+    /**
+     * 降级策略
+     *
+     * @var FallbackStrategy
+     */
+    private FallbackStrategy $fallback_strategy;
 
     /**
      * 缓存键前缀
@@ -49,7 +58,8 @@ class ThemeUpdater {
      */
     public function __construct( Settings $settings ) {
         $this->settings       = $settings;
-        $this->source_manager = new SourceManager( $settings );
+        $this->source_resolver = new SourceResolver();
+        $this->fallback_strategy = new FallbackStrategy( $settings );
 
         $this->init_hooks();
     }
@@ -87,26 +97,38 @@ class ThemeUpdater {
         // 获取已安装的主题
         $themes = wp_get_themes();
 
-        // 获取启用的更新源
-        $sources = $this->source_manager->get_enabled_sorted();
-
-        if ( empty( $sources ) ) {
-            return $transient;
-        }
-
         foreach ( $themes as $slug => $theme ) {
-            // 检查是否有匹配的更新源
-            $matching_sources = $this->source_manager->get_by_slug( $slug, 'theme' );
+            $item_key = 'theme:' . $slug;
+            $resolved = $this->source_resolver->resolve( $item_key, $slug, 'theme' );
+            $mode     = $resolved['mode'];
+            $matching_sources = $resolved['sources'];
+            $allow_wporg_fallback = ! empty( $resolved['has_wporg'] );
 
-            // 如果没有特定 slug 的源，使用通用源
-            if ( empty( $matching_sources ) ) {
-                $matching_sources = array_filter( $sources, function( SourceModel $source ) {
-                    return empty( $source->slug ) && $source->item_type === 'theme';
-                } );
+            if ( $mode === ItemSourceManager::MODE_DISABLED ) {
+                unset( $transient->response[ $slug ] );
+                $transient->no_update[ $slug ] = [
+                    'theme'       => $slug,
+                    'new_version' => $theme->get( 'Version' ),
+                ];
+                continue;
             }
 
             if ( empty( $matching_sources ) ) {
+                if ( $mode === ItemSourceManager::MODE_CUSTOM ) {
+                    unset( $transient->response[ $slug ] );
+                    $transient->no_update[ $slug ] = [
+                        'theme'       => $slug,
+                        'new_version' => $theme->get( 'Version' ),
+                    ];
+                }
                 continue;
+            }
+
+            $take_over = ( $mode === ItemSourceManager::MODE_CUSTOM ) || ! $allow_wporg_fallback;
+
+            if ( $take_over ) {
+                // 接管更新检查，清除默认响应
+                unset( $transient->response[ $slug ] );
             }
 
             $version = $theme->get( 'Version' );
@@ -118,11 +140,14 @@ class ThemeUpdater {
             if ( false !== $cached ) {
                 if ( ! empty( $cached['update'] ) ) {
                     $transient->response[ $slug ] = $cached['update'];
+                    unset( $transient->no_update[ $slug ] );
                 } else {
-                    $transient->no_update[ $slug ] = [
-                        'theme'       => $slug,
-                        'new_version' => $version,
-                    ];
+                    if ( $take_over ) {
+                        $transient->no_update[ $slug ] = [
+                            'theme'       => $slug,
+                            'new_version' => $version,
+                        ];
+                    }
                 }
                 continue;
             }
@@ -141,6 +166,7 @@ class ThemeUpdater {
                 ];
 
                 $transient->response[ $slug ] = $update_data;
+                unset( $transient->no_update[ $slug ] );
 
                 // 缓存结果
                 set_transient( $cache_key, [
@@ -153,10 +179,12 @@ class ThemeUpdater {
                     'new'     => $update_info->version,
                 ] );
             } else {
-                $transient->no_update[ $slug ] = [
-                    'theme'       => $slug,
-                    'new_version' => $version,
-                ];
+                if ( $take_over ) {
+                    $transient->no_update[ $slug ] = [
+                        'theme'       => $slug,
+                        'new_version' => $version,
+                    ];
+                }
 
                 // 缓存无更新结果
                 set_transient( $cache_key, [
@@ -177,36 +205,36 @@ class ThemeUpdater {
      * @return UpdateInfo|null
      */
     private function check_theme_update( string $slug, string $version, array $sources ): ?UpdateInfo {
-        foreach ( $sources as $source ) {
-            $handler = $source->get_handler();
+        $cache_key = 'update_info_theme_' . md5( $slug . get_site_url() );
 
-            if ( null === $handler ) {
-                Logger::warning( '无法获取处理器', [
-                    'source' => $source->id,
-                    'type'   => $source->type,
-                ] );
-                continue;
-            }
+        $result = $this->fallback_strategy->execute_with_fallback(
+            $sources,
+            function( SourceModel $source ) use ( $slug, $version ) {
+                $handler = $source->get_handler();
 
-            try {
-                $update_info = $handler->check_update( $slug, $version );
-
-                if ( null !== $update_info ) {
-                    return $update_info;
+                if ( null === $handler ) {
+                    Logger::warning( '无法获取处理器', [
+                        'source' => $source->id,
+                        'type'   => $source->type,
+                    ] );
+                    return null;
                 }
-            } catch ( \Exception $e ) {
-                Logger::error( '检查主题更新时发生错误', [
-                    'source' => $source->id,
-                    'slug'   => $slug,
-                    'error'  => $e->getMessage(),
-                ] );
 
-                // 继续尝试下一个源
-                continue;
-            }
-        }
+                try {
+                    return $handler->check_update( $slug, $version );
+                } catch ( \Exception $e ) {
+                    Logger::error( '检查主题更新时发生错误', [
+                        'source' => $source->id,
+                        'slug'   => $slug,
+                        'error'  => $e->getMessage(),
+                    ] );
+                    throw $e;
+                }
+            },
+            $cache_key
+        );
 
-        return null;
+        return $result instanceof UpdateInfo ? $result : null;
     }
 
     /**
@@ -228,10 +256,12 @@ class ThemeUpdater {
             return $result;
         }
 
-        // 检查是否有匹配的更新源
-        $sources = $this->source_manager->get_by_slug( $slug, 'theme' );
+        $item_key = 'theme:' . $slug;
+        $resolved = $this->source_resolver->resolve( $item_key, $slug, 'theme' );
+        $mode     = $resolved['mode'];
+        $sources  = $resolved['sources'];
 
-        if ( empty( $sources ) ) {
+        if ( $mode === ItemSourceManager::MODE_DISABLED || empty( $sources ) ) {
             return $result;
         }
 
