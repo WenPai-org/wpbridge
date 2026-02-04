@@ -44,7 +44,7 @@ use WPBridge\Core\ItemSourceManager;
         </button>
     </div>
     <div class="wpbridge-toolbar-right">
-        <input type="search" class="wpbridge-search" id="wpbridge-search-plugins" placeholder="<?php esc_attr_e( '搜索插件...', 'wpbridge' ); ?>">
+        <input type="search" class="wpbridge-search" id="wpbridge-search-plugins" placeholder="<?php esc_attr_e( '搜索插件...', 'wpbridge' ); ?>" autocomplete="off">
     </div>
 </div>
 
@@ -75,6 +75,12 @@ use WPBridge\Core\ItemSourceManager;
                 <div class="wpbridge-project-checkbox">
                     <input type="checkbox" class="wpbridge-project-select" value="<?php echo esc_attr( $item_key ); ?>">
                 </div>
+
+                <button type="button" class="wpbridge-btn wpbridge-btn-icon wpbridge-project-expand"
+                        data-item-key="<?php echo esc_attr( $item_key ); ?>"
+                        title="<?php esc_attr_e( '展开配置', 'wpbridge' ); ?>">
+                    <span class="dashicons dashicons-arrow-down-alt2"></span>
+                </button>
 
                 <div class="wpbridge-project-info">
                     <div class="wpbridge-project-name">
@@ -121,12 +127,6 @@ use WPBridge\Core\ItemSourceManager;
                     </select>
                 </div>
 
-                <div class="wpbridge-project-actions">
-                    <button type="button" class="wpbridge-btn wpbridge-btn-icon wpbridge-project-expand"
-                            data-item-key="<?php echo esc_attr( $item_key ); ?>"
-                            title="<?php esc_attr_e( '展开配置', 'wpbridge' ); ?>">
-                        <span class="dashicons dashicons-arrow-down-alt2"></span>
-                    </button>
                 </div>
 
                 <!-- 内联配置面板（默认折叠） -->
