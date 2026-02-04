@@ -312,6 +312,10 @@ class ItemSourceManager {
 
         // 从 item_key 前缀推断类型
         // 格式: "type:identifier" 例如 "plugin:hello-dolly/hello.php" 或 "theme:flavor"
+        if ( strpos( $item_key, 'plugin:' ) === 0 ) {
+            return self::TYPE_PLUGIN;
+        }
+
         if ( strpos( $item_key, 'theme:' ) === 0 ) {
             return self::TYPE_THEME;
         }
@@ -324,7 +328,7 @@ class ItemSourceManager {
             return self::TYPE_DROPIN;
         }
 
-        // 默认为插件类型
+        // 无前缀时默认为插件类型（向后兼容）
         return self::TYPE_PLUGIN;
     }
 
