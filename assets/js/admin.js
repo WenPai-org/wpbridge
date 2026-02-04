@@ -390,6 +390,198 @@
     };
 
     /**
+     * 项目管理模块 (方案 B)
+     */
+    var Projects = {
+        init: function() {
+            this.bindEvents();
+        },
+
+        bindEvents: function() {
+            var self = this;
+
+            // 子 Tab 切换
+            $(document).on('click', '.wpbridge-subtab', function(e) {
+                e.preventDefault();
+                var subtab = $(this).data('subtab');
+                self.switchSubtab(subtab);
+            });
+
+            // 更新源选择
+            $(document).on('change', '.wpbridge-source-select', function() {
+                self.setItemSource($(this));
+            });
+
+            // 全选
+            $(document).on('change', '#wpbridge-select-all-plugins', function() {
+                $('#wpbridge-plugins-list .wpbridge-project-select').prop('checked', $(this).is(':checked'));
+            });
+
+            $(document).on('change', '#wpbridge-select-all-themes', function() {
+                $('#wpbridge-themes-list .wpbridge-project-select').prop('checked', $(this).is(':checked'));
+            });
+
+            // 批量操作
+            $(document).on('click', '#wpbridge-apply-bulk-plugins', function() {
+                self.applyBulkAction('plugins');
+            });
+
+            $(document).on('click', '#wpbridge-apply-bulk-themes', function() {
+                self.applyBulkAction('themes');
+            });
+
+            // 搜索
+            $(document).on('input', '#wpbridge-search-plugins', function() {
+                self.filterItems('plugins', $(this).val());
+            });
+
+            $(document).on('input', '#wpbridge-search-themes', function() {
+                self.filterItems('themes', $(this).val());
+            });
+
+            // 默认规则覆盖切换
+            $(document).on('change', '#plugin_override', function() {
+                $('#wpbridge-plugin-sources').toggle($(this).is(':checked'));
+            });
+
+            $(document).on('change', '#theme_override', function() {
+                $('#wpbridge-theme-sources').toggle($(this).is(':checked'));
+            });
+
+            // 默认规则表单提交
+            $(document).on('submit', '#wpbridge-defaults-form', function(e) {
+                e.preventDefault();
+                self.saveDefaults($(this));
+            });
+        },
+
+        switchSubtab: function(subtab) {
+            $('.wpbridge-subtab').removeClass('wpbridge-subtab-active');
+            $('.wpbridge-subtab[data-subtab="' + subtab + '"]').addClass('wpbridge-subtab-active');
+
+            $('.wpbridge-subtab-pane').removeClass('wpbridge-subtab-pane-active');
+            $('#subtab-' + subtab).addClass('wpbridge-subtab-pane-active');
+        },
+
+        setItemSource: function($select) {
+            var itemKey = $select.data('item-key');
+            var sourceKey = $select.val();
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wpbridge_set_item_source',
+                    nonce: wpbridge.nonce,
+                    item_key: itemKey,
+                    source_key: sourceKey
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Toast.success(response.data.message);
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                }
+            });
+        },
+
+        applyBulkAction: function(type) {
+            var action = $('#wpbridge-bulk-action-' + type).val();
+            var items = [];
+
+            $('#wpbridge-' + type + '-list .wpbridge-project-select:checked').each(function() {
+                items.push($(this).val());
+            });
+
+            if (!action) {
+                Toast.error(wpbridge.i18n.select_action || '请选择操作');
+                return;
+            }
+
+            if (items.length === 0) {
+                Toast.error(wpbridge.i18n.select_items || '请选择项目');
+                return;
+            }
+
+            var data = {
+                action: 'wpbridge_batch_set_source',
+                nonce: wpbridge.nonce,
+                bulk_action: action,
+                item_keys: items
+            };
+
+            // 如果是设置源，需要选择源
+            if (action === 'set_source') {
+                var sourceKey = prompt(wpbridge.i18n.enter_source_key || '请输入源 Key:');
+                if (!sourceKey) {
+                    return;
+                }
+                data.source_key = sourceKey;
+            }
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: data,
+                success: function(response) {
+                    if (response.success) {
+                        Toast.success(response.data.message);
+                        location.reload();
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                }
+            });
+        },
+
+        filterItems: function(type, query) {
+            query = query.toLowerCase();
+            $('#wpbridge-' + type + '-list .wpbridge-project-item').each(function() {
+                var $item = $(this);
+                var name = $item.find('.wpbridge-project-name').text().toLowerCase();
+                var slug = $item.find('.wpbridge-project-slug').text().toLowerCase();
+
+                if (name.indexOf(query) > -1 || slug.indexOf(query) > -1) {
+                    $item.show();
+                } else {
+                    $item.hide();
+                }
+            });
+        },
+
+        saveDefaults: function($form) {
+            var $button = $form.find('button[type="submit"]');
+            $button.prop('disabled', true);
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: $form.serialize() + '&action=wpbridge_save_defaults&nonce=' + wpbridge.nonce,
+                success: function(response) {
+                    if (response.success) {
+                        Toast.success(response.data.message);
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                },
+                complete: function() {
+                    $button.prop('disabled', false);
+                }
+            });
+        }
+    };
+
+    /**
      * 初始化
      */
     $(document).ready(function() {
@@ -398,6 +590,7 @@
         Sources.init();
         ApiKeys.init();
         Logs.init();
+        Projects.init();
     });
 
     // 添加旋转动画样式
