@@ -279,8 +279,15 @@ class MigrationManager {
                 continue;
             }
 
-            // 使用映射后的源 key
+            // 检查源 ID 是否有效
             $old_source_id = $old_source['id'] ?? '';
+            if ( empty( $old_source_id ) ) {
+                $this->log( 'warning', "跳过项目 {$item_key}: 源 ID 为空" );
+                $skipped++;
+                continue;
+            }
+
+            // 使用映射后的源 key
             $new_source_key = $this->source_id_map[ $old_source_id ] ?? $old_source_id;
 
             // 验证新源存在
@@ -494,11 +501,11 @@ class MigrationManager {
      * 完全清理（包括备份）
      *
      * 在确认迁移稳定后调用
+     * 注意：旧数据已在 migrate() 中清理，此方法主要清理备份
      *
      * @return bool
      */
     public function full_cleanup(): bool {
-        $this->cleanup_old_data();
         $this->cleanup_backup();
         return true;
     }
