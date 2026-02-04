@@ -1,6 +1,6 @@
 <?php
 /**
- * Cloud API Tab 内容
+ * Bridge API Tab 内容
  *
  * @package WPBridge
  * @since 0.5.0
@@ -40,7 +40,7 @@ $api_keys     = $api_settings['keys'] ?? [];
                 <?php esc_html_e( 'API 端点', 'wpbridge' ); ?>
             </div>
             <div style="font-size: 12px; font-family: var(--wpbridge-font-mono); color: var(--wpbridge-gray-600); word-break: break-all;">
-                <?php echo esc_html( rest_url( 'wpbridge/v1/' ) ); ?>
+                <?php echo esc_html( rest_url( 'bridge/v1/' ) ); ?>
             </div>
         </div>
         <div class="wpbridge-stat-card">
@@ -56,7 +56,7 @@ $api_keys     = $api_settings['keys'] ?? [];
         <!-- 启用 API -->
         <div class="wpbridge-settings-row">
             <div class="wpbridge-settings-info">
-                <h3 class="wpbridge-settings-title"><?php esc_html_e( '启用 Cloud API', 'wpbridge' ); ?></h3>
+                <h3 class="wpbridge-settings-title"><?php esc_html_e( '启用 Bridge API', 'wpbridge' ); ?></h3>
                 <p class="wpbridge-settings-desc"><?php esc_html_e( '允许通过 REST API 远程访问 WPBridge 功能。', 'wpbridge' ); ?></p>
             </div>
             <label class="wpbridge-toggle">
@@ -180,11 +180,11 @@ $api_keys     = $api_settings['keys'] ?? [];
 
         <p style="margin-top: 16px;"><strong><?php esc_html_e( '可用端点', 'wpbridge' ); ?></strong></p>
         <ul style="margin: 8px 0; padding-left: 20px;">
-            <li><code>GET /wp-json/wpbridge/v1/status</code> - <?php esc_html_e( 'API 状态', 'wpbridge' ); ?></li>
-            <li><code>GET /wp-json/wpbridge/v1/sources</code> - <?php esc_html_e( '获取更新源列表', 'wpbridge' ); ?></li>
-            <li><code>GET /wp-json/wpbridge/v1/check/{source_id}</code> - <?php esc_html_e( '检查更新源状态', 'wpbridge' ); ?></li>
-            <li><code>GET /wp-json/wpbridge/v1/plugins/{slug}/info</code> - <?php esc_html_e( '获取插件信息', 'wpbridge' ); ?></li>
-            <li><code>GET /wp-json/wpbridge/v1/themes/{slug}/info</code> - <?php esc_html_e( '获取主题信息', 'wpbridge' ); ?></li>
+            <li><code>GET /wp-json/bridge/v1/status</code> - <?php esc_html_e( 'API 状态', 'wpbridge' ); ?></li>
+            <li><code>GET /wp-json/bridge/v1/sources</code> - <?php esc_html_e( '获取更新源列表', 'wpbridge' ); ?></li>
+            <li><code>GET /wp-json/bridge/v1/check/{source_id}</code> - <?php esc_html_e( '检查更新源状态', 'wpbridge' ); ?></li>
+            <li><code>GET /wp-json/bridge/v1/plugins/{slug}/info</code> - <?php esc_html_e( '获取插件信息', 'wpbridge' ); ?></li>
+            <li><code>GET /wp-json/bridge/v1/themes/{slug}/info</code> - <?php esc_html_e( '获取主题信息', 'wpbridge' ); ?></li>
         </ul>
     </div>
 </div>

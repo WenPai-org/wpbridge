@@ -89,7 +89,7 @@ foreach ( $sources as $source ) {
                     <?php esc_html_e( '设置', 'wpbridge' ); ?>
                 </a>
                 <a href="#api" class="wpbridge-tab" data-tab="api">
-                    <?php esc_html_e( 'Cloud API', 'wpbridge' ); ?>
+                    <?php esc_html_e( 'Bridge API', 'wpbridge' ); ?>
                 </a>
                 <a href="#logs" class="wpbridge-tab" data-tab="logs">
                     <?php esc_html_e( '日志', 'wpbridge' ); ?>
@@ -121,7 +121,7 @@ foreach ( $sources as $source ) {
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/settings.php'; ?>
             </div>
 
-            <!-- Tab: Cloud API -->
+            <!-- Tab: Bridge API -->
             <div id="api" class="wpbridge-tab-pane">
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/api.php'; ?>
             </div>

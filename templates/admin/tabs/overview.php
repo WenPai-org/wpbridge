@@ -212,7 +212,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
                         <span class="dashicons dashicons-rest-api"></span>
                     </span>
                     <span class="wpbridge-action-text">
-                        <span class="wpbridge-action-title"><?php esc_html_e( 'Cloud API', 'wpbridge' ); ?></span>
+                        <span class="wpbridge-action-title"><?php esc_html_e( 'Bridge API', 'wpbridge' ); ?></span>
                         <span class="wpbridge-action-desc"><?php esc_html_e( '管理 API 密钥和访问控制', 'wpbridge' ); ?></span>
                     </span>
                 </a>
