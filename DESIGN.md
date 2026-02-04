@@ -1089,4 +1089,165 @@ WPBridge 架构
 
 ---
 
+### A.2 详细数据模型草案 (2026-02-04)
+
+> 由 Codex 生成，考虑 FAIR DID 标准兼容性
+
+#### FAIR 项目参考
+
+[FAIR](https://fair.pm/) (Federated And Independent Repositories) 是 Linux Foundation 支持的去中心化 WordPress 包管理项目：
+- 使用 [W3C DID](https://www.w3.org/TR/did-1.1/) (Decentralized Identifier) 标准唯一标识插件/主题
+- 支持 ED25519 加密签名验证
+- 支持从多个独立源安装和更新
+
+#### 表结构设计
+
+##### 1. `wpbridge_sources`（源注册表）
+
+注册可用更新源（WP.org、FAIR 源、私有仓库等），描述其能力与安全策略。
+
+| 字段 | 类型 | 说明 | 约束/索引 |
+|------|------|------|-----------|
+| id | BIGINT UNSIGNED | 主键 | PK, auto_increment |
+| source_key | VARCHAR(64) | 源唯一键（slug） | UNIQUE |
+| name | VARCHAR(191) | 显示名 | |
+| type | ENUM('wporg','fair','custom','git','s3','file','mirror') | 源类型 | INDEX |
+| base_url | VARCHAR(512) | 源基础 URL | |
+| api_url | VARCHAR(512) | API 地址 | |
+| did | VARCHAR(191) | 源 DID（FAIR 兼容） | INDEX |
+| public_key | TEXT | ED25519 公钥（Base64/Multibase） | |
+| signature_scheme | ENUM('none','ed25519') | 签名方案 | |
+| signature_required | TINYINT(1) | 是否强制签名 | |
+| trust_level | SMALLINT UNSIGNED | 信任等级 0-100 | INDEX |
+| enabled | TINYINT(1) | 是否启用 | INDEX |
+| default_priority | INT | 默认优先级 | INDEX |
+| auth_type | ENUM('none','basic','bearer','token','oauth2') | 认证类型 | |
+| auth_secret_ref | VARCHAR(191) | 密钥引用（不存明文） | |
+| headers_json | LONGTEXT | 附加请求头 JSON | |
+| capabilities_json | LONGTEXT | 能力描述 JSON | |
+| rate_limit_json | LONGTEXT | 限流策略 JSON | |
+| cache_ttl | INT UNSIGNED | 缓存秒数 | |
+| last_checked_at | DATETIME | 最后检测 | |
+| created_at | DATETIME | 创建时间 | |
+| updated_at | DATETIME | 更新时间 | |
+
+##### 2. `wpbridge_item_sources`（项目配置表）
+
+为每个项目配置其来源列表、优先级、签名策略与锁定规则。
+
+| 字段 | 类型 | 说明 | 约束/索引 |
+|------|------|------|-----------|
+| id | BIGINT UNSIGNED | 主键 | PK |
+| item_id | BIGINT UNSIGNED | 项目 ID | INDEX |
+| item_slug | VARCHAR(191) | 项目标识（plugin_basename） | INDEX |
+| item_type | ENUM('plugin','theme','mu-plugin','dropin') | 类型 | INDEX |
+| item_did | VARCHAR(191) | 项目 DID（FAIR 兼容） | INDEX |
+| source_id | BIGINT UNSIGNED | 关联源 | INDEX |
+| source_priority | INT | 源优先级（越小越优先） | INDEX |
+| pinned | TINYINT(1) | 是否固定该源 | |
+| signature_required | TINYINT(1) | 对此项目是否强制签名 | |
+| allow_unsigned | TINYINT(1) | 是否允许无签名 | |
+| allow_prerelease | TINYINT(1) | 是否允许预发布 | |
+| min_version | VARCHAR(32) | 允许最小版本 | |
+| max_version | VARCHAR(32) | 允许最大版本 | |
+| last_good_version | VARCHAR(32) | 最近成功版本 | |
+| policy_json | LONGTEXT | 项目级策略 JSON | |
+| created_at | DATETIME | 创建时间 | |
+| updated_at | DATETIME | 更新时间 | |
+
+约束：`UNIQUE (item_slug, source_id)`
+
+##### 3. `wpbridge_defaults`（默认规则）
+
+当项目无特定配置时的全局策略。
+
+| 字段 | 类型 | 说明 | 约束/索引 |
+|------|------|------|-----------|
+| id | BIGINT UNSIGNED | 主键 | PK |
+| scope | ENUM('global','plugin','theme') | 作用范围 | UNIQUE |
+| default_source_order | LONGTEXT | 默认源优先序 JSON | |
+| signature_required | TINYINT(1) | 默认签名要求 | |
+| allow_unsigned | TINYINT(1) | 默认是否允许无签名 | |
+| allow_prerelease | TINYINT(1) | 默认是否允许预发布 | |
+| trust_floor | SMALLINT UNSIGNED | 最低信任阈值 | |
+| fallback_to_wporg | TINYINT(1) | 未命中时回退 WP.org | |
+| policy_json | LONGTEXT | 其他默认策略 JSON | |
+| updated_at | DATETIME | 更新时间 | |
+
+#### 迁移算法伪代码
+
+```pseudo
+function migrate_A_to_B():
+  begin_transaction()
+
+  // 1) 备份与版本标记
+  backup_old_tables()
+  create_new_tables_if_not_exists()
+
+  // 2) 迁移 source 注册表
+  for each old_source in A.sources:
+      new_source = map_source(old_source)
+      upsert wpbridge_sources(new_source)
+
+  // 3) 构建项目索引（按 slug / DID）
+  project_index = {}
+  for each source_item in A.source_items:
+      key = resolve_item_key(source_item)  // prefer DID, fallback slug
+      if not project_index[key]:
+          project_index[key] = new_project_record(source_item)
+      project_index[key].sources.append(source_item.source_id)
+
+  // 4) 写入 item_sources
+  for each project in project_index:
+      priorities = compute_priorities(project.sources, A.rules)
+      for each src in project.sources:
+          record = build_item_source(project, src, priorities[src])
+          upsert wpbridge_item_sources(record)
+
+  // 5) 迁移默认规则
+  defaults = map_defaults(A.global_settings)
+  upsert wpbridge_defaults(defaults)
+
+  // 6) 校验
+  if not validate_migration():
+      rollback()
+      return error
+
+  commit()
+  return ok
+```
+
+#### 冲突处理规则（按优先顺序）
+
+1. **用户显式固定（pinned）优先**
+2. **DID 匹配优先于 slug**
+3. **签名验证成功优先**
+4. **信任等级高优先**（trust_level）
+5. **版本号高且非 prerelease 优先**
+6. 若仍冲突，保留多个源并记录冲突标记
+
+#### 回滚机制
+
+- 迁移全程使用事务
+- 迁移前备份旧表为 `_backup` 表
+- 若校验失败：ROLLBACK + 删除新表 + 恢复旧表
+- 使用 `migration_version`/`migration_state` 标记状态
+
+#### 数据验证
+
+- **数量校验**：item_sources 项目数 ≥ 旧方案唯一项目数
+- **引用校验**：source_id 必须存在于 wpbridge_sources
+- **配置校验**：每个项目至少有一个可用源
+- **签名校验**：抽样验证带签名包的元数据
+
+#### FAIR 兼容性建议
+
+| 问题 | 建议 |
+|------|------|
+| 是否支持 DID？ | **是**，便于签名验证、可信溯源、多源协作 |
+| 如何与 FAIR 互操作？ | 将 FAIR 视为 `type='fair'` 的源，支持 DID 解析 |
+| 加密签名验证？ | **默认支持**，可配置为强制/推荐/可选 |
+
+---
+
 *最后更新: 2026-02-04*
