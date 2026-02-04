@@ -770,35 +770,38 @@
         },
 
         togglePanel: function(itemKey, $button) {
-            var $panel = $('.wpbridge-project-config-panel[data-item-key="' + itemKey + '"]');
-            var $icon = $button.find('.dashicons');
+            var $item = $button.closest('.wpbridge-project-item');
+            var $panel = $item.find('.wpbridge-project-config-panel');
 
             if ($panel.is(':visible')) {
                 $panel.slideUp(200);
-                $icon.removeClass('dashicons-arrow-up-alt2').addClass('dashicons-arrow-down-alt2');
+                $item.removeClass('is-expanded');
             } else {
                 // 关闭其他打开的面板
-                $('.wpbridge-project-config-panel:visible').slideUp(200);
-                $('.wpbridge-project-expand .dashicons').removeClass('dashicons-arrow-up-alt2').addClass('dashicons-arrow-down-alt2');
+                $('.wpbridge-project-item.is-expanded').each(function() {
+                    $(this).find('.wpbridge-project-config-panel').slideUp(200);
+                    $(this).removeClass('is-expanded');
+                });
 
                 $panel.slideDown(200);
-                $icon.removeClass('dashicons-arrow-down-alt2').addClass('dashicons-arrow-up-alt2');
+                $item.addClass('is-expanded');
             }
         },
 
         closePanel: function(itemKey) {
-            var $panel = $('.wpbridge-project-config-panel[data-item-key="' + itemKey + '"]');
-            var $button = $('.wpbridge-project-expand[data-item-key="' + itemKey + '"]');
+            var $item = $('.wpbridge-project-item').has('[data-item-key="' + itemKey + '"]').first();
+            var $panel = $item.find('.wpbridge-project-config-panel');
 
             $panel.slideUp(200);
-            $button.find('.dashicons').removeClass('dashicons-arrow-up-alt2').addClass('dashicons-arrow-down-alt2');
+            $item.removeClass('is-expanded');
 
             // 清空输入
             $panel.find('input').val('');
         },
 
         saveInlineConfig: function(itemKey, $button) {
-            var $panel = $('.wpbridge-project-config-panel[data-item-key="' + itemKey + '"]');
+            var $item = $button.closest('.wpbridge-project-item');
+            var $panel = $item.find('.wpbridge-project-config-panel');
             var url = $panel.find('.wpbridge-inline-url').val();
             var token = $panel.find('.wpbridge-inline-token').val();
 

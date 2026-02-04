@@ -1197,62 +1197,139 @@
    Inline Config Panel - 内联配置面板 (P1)
    参考 WPMind 折叠卡片设计
    ======================================== */
+
+/* 项目卡片容器 */
 .wpbridge-project-item {
     flex-wrap: wrap;
+    position: relative;
 }
 
+/* 项目行作为可点击的头部 */
+.wpbridge-project-item > .wpbridge-project-checkbox,
+.wpbridge-project-item > .wpbridge-project-thumbnail,
+.wpbridge-project-item > .wpbridge-project-info,
+.wpbridge-project-item > .wpbridge-project-source,
+.wpbridge-project-item > .wpbridge-project-actions {
+    /* 保持原有布局 */
+}
+
+/* 展开按钮 */
+.wpbridge-project-expand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.wpbridge-project-expand:hover {
+    background: var(--wpbridge-gray-100);
+    border-color: var(--wpbridge-gray-300);
+}
+
+.wpbridge-project-expand .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--wpbridge-gray-500);
+    transition: transform 0.2s ease;
+}
+
+/* 展开状态 */
+.wpbridge-project-item.is-expanded {
+    border-color: var(--wpbridge-primary);
+}
+
+.wpbridge-project-item.is-expanded .wpbridge-project-expand {
+    background: var(--wpbridge-primary-light);
+    border-color: var(--wpbridge-primary);
+}
+
+.wpbridge-project-item.is-expanded .wpbridge-project-expand .dashicons {
+    color: var(--wpbridge-primary);
+    transform: rotate(180deg);
+}
+
+/* 内联配置面板 */
 .wpbridge-project-config-panel {
     width: 100%;
     background: var(--wpbridge-gray-50);
     border-top: 1px solid var(--wpbridge-border);
-    padding: var(--wpbridge-space-4) var(--wpbridge-space-5);
-    margin-top: var(--wpbridge-space-3);
+    padding: var(--wpbridge-space-5);
+    margin-top: var(--wpbridge-space-4);
 }
 
+/* 配置行 - 参考 WPMind form-table 样式 */
 .wpbridge-config-row {
     display: flex;
     align-items: flex-start;
     gap: var(--wpbridge-space-4);
-    margin-bottom: var(--wpbridge-space-3);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-config-row:last-of-type {
+    margin-bottom: 0;
 }
 
 .wpbridge-config-label {
-    width: 80px;
+    width: 100px;
     flex-shrink: 0;
     font-size: 13px;
     font-weight: 500;
-    color: var(--wpbridge-gray-600);
+    color: var(--wpbridge-gray-700);
     padding-top: 8px;
 }
 
 .wpbridge-config-field {
     flex: 1;
+    max-width: 500px;
 }
 
 .wpbridge-config-field .wpbridge-form-input {
     width: 100%;
-    max-width: 400px;
+    padding: 8px 12px;
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    font-size: 14px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wpbridge-config-field .wpbridge-form-input:focus {
+    outline: none;
+    border-color: var(--wpbridge-primary);
+    box-shadow: 0 0 0 2px var(--wpbridge-primary-light);
 }
 
 .wpbridge-config-field .wpbridge-form-help {
-    margin-top: 4px;
+    margin-top: 6px;
     font-size: 12px;
     color: var(--wpbridge-gray-500);
+    line-height: 1.4;
 }
 
+/* 配置操作按钮 */
 .wpbridge-config-actions {
     display: flex;
-    gap: var(--wpbridge-space-2);
-    margin-top: var(--wpbridge-space-4);
-    padding-top: var(--wpbridge-space-3);
+    gap: var(--wpbridge-space-3);
+    margin-top: var(--wpbridge-space-5);
+    padding-top: var(--wpbridge-space-4);
     border-top: 1px solid var(--wpbridge-border);
 }
 
-/* 展开按钮动画 */
-.wpbridge-project-expand .dashicons {
-    transition: transform 0.2s ease;
+.wpbridge-config-actions .wpbridge-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
 }
 
-.wpbridge-project-item.is-expanded .wpbridge-project-expand .dashicons {
-    transform: rotate(180deg);
+.wpbridge-config-actions .wpbridge-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
 }
