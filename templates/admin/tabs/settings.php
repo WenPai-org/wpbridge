@@ -90,3 +90,46 @@ if ( ! defined( 'ABSPATH' ) ) {
         </button>
     </div>
 </form>
+
+<!-- 配置导入导出 -->
+<div class="wpbridge-settings-panel" style="margin-top: 32px;">
+    <h2 class="wpbridge-section-title" style="margin-bottom: 16px;">
+        <span class="dashicons dashicons-database-export"></span>
+        <?php esc_html_e( '配置导入导出', 'wpbridge' ); ?>
+    </h2>
+
+    <div class="wpbridge-settings-row">
+        <div class="wpbridge-settings-info">
+            <h3 class="wpbridge-settings-title"><?php esc_html_e( '导出配置', 'wpbridge' ); ?></h3>
+            <p class="wpbridge-settings-desc"><?php esc_html_e( '将当前配置导出为 JSON 文件，用于备份或迁移到其他站点。', 'wpbridge' ); ?></p>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--wpbridge-gray-600);">
+                <input type="checkbox" id="wpbridge-export-secrets">
+                <?php esc_html_e( '包含敏感信息', 'wpbridge' ); ?>
+            </label>
+            <button type="button" class="wpbridge-btn wpbridge-btn-secondary" id="wpbridge-export-config">
+                <span class="dashicons dashicons-download"></span>
+                <?php esc_html_e( '导出', 'wpbridge' ); ?>
+            </button>
+        </div>
+    </div>
+
+    <div class="wpbridge-settings-row">
+        <div class="wpbridge-settings-info">
+            <h3 class="wpbridge-settings-title"><?php esc_html_e( '导入配置', 'wpbridge' ); ?></h3>
+            <p class="wpbridge-settings-desc"><?php esc_html_e( '从 JSON 文件导入配置。可选择合并或覆盖现有配置。', 'wpbridge' ); ?></p>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--wpbridge-gray-600);">
+                <input type="checkbox" id="wpbridge-import-merge" checked>
+                <?php esc_html_e( '合并配置', 'wpbridge' ); ?>
+            </label>
+            <input type="file" id="wpbridge-import-file" accept=".json" style="display: none;">
+            <button type="button" class="wpbridge-btn wpbridge-btn-secondary" id="wpbridge-import-config">
+                <span class="dashicons dashicons-upload"></span>
+                <?php esc_html_e( '导入', 'wpbridge' ); ?>
+            </button>
+        </div>
+    </div>
+</div>

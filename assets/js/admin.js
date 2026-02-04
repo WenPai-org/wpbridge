@@ -1429,6 +1429,142 @@
     };
 
     /**
+     * 配置导入导出管理
+     */
+    var ConfigManager = {
+        init: function() {
+            var self = this;
+
+            // 导出配置
+            $('#wpbridge-export-config').on('click', function() {
+                self.exportConfig();
+            });
+
+            // 导入配置 - 触发文件选择
+            $('#wpbridge-import-config').on('click', function() {
+                $('#wpbridge-import-file').click();
+            });
+
+            // 文件选择后导入
+            $('#wpbridge-import-file').on('change', function(e) {
+                var file = e.target.files[0];
+                if (file) {
+                    self.importConfig(file);
+                }
+                // 重置文件输入，允许重复选择同一文件
+                $(this).val('');
+            });
+        },
+
+        exportConfig: function() {
+            var $btn = $('#wpbridge-export-config');
+            var originalHtml = $btn.html();
+            var includeSecrets = $('#wpbridge-export-secrets').is(':checked');
+
+            $btn.prop('disabled', true).html('<span class="dashicons dashicons-update wpbridge-spin"></span>');
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wpbridge_export_config',
+                    nonce: wpbridge.nonce,
+                    include_secrets: includeSecrets ? 'true' : 'false'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // 下载 JSON 文件
+                        var json = JSON.stringify(response.data.config, null, 2);
+                        var blob = new Blob([json], { type: 'application/json' });
+                        var url = URL.createObjectURL(blob);
+                        var a = document.createElement('a');
+                        a.href = url;
+                        a.download = response.data.filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+
+                        Toast.success(wpbridge.i18n.config_exported || '配置已导出');
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                },
+                complete: function() {
+                    $btn.prop('disabled', false).html(originalHtml);
+                }
+            });
+        },
+
+        importConfig: function(file) {
+            var self = this;
+            var $btn = $('#wpbridge-import-config');
+            var originalHtml = $btn.html();
+
+            // 验证文件类型
+            if (!file.name.endsWith('.json')) {
+                Toast.error(wpbridge.i18n.invalid_file || '无效的配置文件');
+                return;
+            }
+
+            // 确认导入
+            if (!confirm(wpbridge.i18n.confirm_import || '确定要导入配置吗？这将覆盖当前设置。')) {
+                return;
+            }
+
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var content = e.target.result;
+
+                // 验证 JSON 格式
+                try {
+                    JSON.parse(content);
+                } catch (err) {
+                    Toast.error(wpbridge.i18n.invalid_file || '无效的配置文件');
+                    return;
+                }
+
+                $btn.prop('disabled', true).html('<span class="dashicons dashicons-update wpbridge-spin"></span>');
+
+                var merge = $('#wpbridge-import-merge').is(':checked');
+
+                $.ajax({
+                    url: wpbridge.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'wpbridge_import_config',
+                        nonce: wpbridge.nonce,
+                        config: content,
+                        merge: merge ? 'true' : 'false'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            Toast.success(response.data.message || wpbridge.i18n.config_imported);
+                            // 刷新页面以显示新配置
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1500);
+                        } else {
+                            Toast.error(response.data.message || wpbridge.i18n.import_failed);
+                        }
+                    },
+                    error: function() {
+                        Toast.error(wpbridge.i18n.import_failed || '导入失败');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).html(originalHtml);
+                    }
+                });
+            };
+
+            reader.readAsText(file);
+        }
+    };
+
+    /**
      * 初始化
      */
     $(document).ready(function() {
@@ -1441,6 +1577,7 @@
         UrlInference.init();
         QuickSetup.init();
         Diagnostics.init();
+        ConfigManager.init();
     });
 
     // 添加旋转动画样式

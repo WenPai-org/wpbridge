@@ -183,6 +183,8 @@ class Plugin {
             // AJAX 处理
             add_action( 'wp_ajax_wpbridge_set_plugin_type', [ $this, 'ajax_set_plugin_type' ] );
             add_action( 'wp_ajax_wpbridge_refresh_commercial_detection', [ $this, 'ajax_refresh_commercial_detection' ] );
+            add_action( 'wp_ajax_wpbridge_export_config', [ $this, 'ajax_export_config' ] );
+            add_action( 'wp_ajax_wpbridge_import_config', [ $this, 'ajax_import_config' ] );
         }
 
         // 插件链接
@@ -316,6 +318,12 @@ class Plugin {
                 'type_saved'           => __( '插件类型已保存', 'wpbridge' ),
                 'manual_mark'          => __( '手动标记', 'wpbridge' ),
                 'manual_marked'        => __( '当前为手动标记', 'wpbridge' ),
+                // 配置导入导出
+                'config_exported'      => __( '配置已导出', 'wpbridge' ),
+                'config_imported'      => __( '配置已导入', 'wpbridge' ),
+                'import_failed'        => __( '导入失败', 'wpbridge' ),
+                'invalid_file'         => __( '无效的配置文件', 'wpbridge' ),
+                'confirm_import'       => __( '确定要导入配置吗？这将覆盖当前设置。', 'wpbridge' ),
             ],
         ] );
     }
@@ -471,6 +479,72 @@ class Plugin {
             ),
             'stats'   => $stats,
         ) );
+    }
+
+    /**
+     * AJAX: 导出配置
+     */
+    public function ajax_export_config(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+        }
+
+        $include_secrets = isset( $_POST['include_secrets'] ) && 'true' === $_POST['include_secrets'];
+
+        $config_manager = new ConfigManager();
+        $config         = $config_manager->export( $include_secrets );
+
+        wp_send_json_success( array(
+            'config'   => $config,
+            'filename' => 'wpbridge-config-' . gmdate( 'Y-m-d' ) . '.json',
+        ) );
+    }
+
+    /**
+     * AJAX: 导入配置
+     */
+    public function ajax_import_config(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+        }
+
+        if ( empty( $_POST['config'] ) ) {
+            wp_send_json_error( array( 'message' => __( '配置数据为空', 'wpbridge' ) ) );
+        }
+
+        $config = json_decode( wp_unslash( $_POST['config'] ), true );
+
+        if ( json_last_error() !== JSON_ERROR_NONE ) {
+            wp_send_json_error( array( 'message' => __( 'JSON 格式无效', 'wpbridge' ) ) );
+        }
+
+        $merge = isset( $_POST['merge'] ) && 'true' === $_POST['merge'];
+
+        $config_manager = new ConfigManager();
+        $result         = $config_manager->import( $config, $merge );
+
+        if ( $result['success'] ) {
+            // 清除设置缓存
+            $this->settings->clear_cache();
+
+            wp_send_json_success( array(
+                'message'  => sprintf(
+                    __( '成功导入 %d 项配置', 'wpbridge' ),
+                    count( $result['imported'] )
+                ),
+                'imported' => $result['imported'],
+                'skipped'  => $result['skipped'],
+            ) );
+        } else {
+            wp_send_json_error( array(
+                'message' => implode( ', ', $result['errors'] ),
+                'errors'  => $result['errors'],
+            ) );
+        }
     }
 
     /**
