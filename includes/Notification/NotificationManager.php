@@ -49,8 +49,17 @@ class NotificationManager {
      * 初始化处理器
      */
     private function init_handlers(): void {
-        $this->handlers['email']   = new EmailHandler( $this->settings );
-        $this->handlers['webhook'] = new WebhookHandler( $this->settings );
+        $this->handlers = [
+            'email'   => new EmailHandler( $this->settings ),
+            'webhook' => new WebhookHandler( $this->settings ),
+        ];
+
+        // 允许第三方扩展通知处理器
+        $this->handlers = apply_filters(
+            'wpbridge_notification_handlers',
+            $this->handlers,
+            $this->settings
+        );
     }
 
     /**
@@ -71,7 +80,15 @@ class NotificationManager {
      * @param array  $data    附加数据
      */
     public function send( string $type, string $subject, string $message, array $data = [] ): void {
-        $notification_settings = $this->settings->get( 'notifications', [] );
+        // 速率限制检查：防止通知轰炸
+        $rate_limit_key = 'wpbridge_notification_' . md5( $type . $subject );
+        if ( get_transient( $rate_limit_key ) ) {
+            Logger::debug( '通知被速率限制', [ 'type' => $type, 'subject' => $subject ] );
+            return;
+        }
+
+        // 设置 5 分钟冷却时间
+        set_transient( $rate_limit_key, true, 5 * MINUTE_IN_SECONDS );
 
         foreach ( $this->handlers as $name => $handler ) {
             if ( $handler->is_enabled() && $handler->supports_type( $type ) ) {

@@ -91,15 +91,24 @@ class EmailHandler implements HandlerInterface {
             $recipients = [ get_option( 'admin_email' ) ];
         }
 
+        // 验证收件人邮箱格式
+        $valid_recipients = array_filter( $recipients, function ( $email ) {
+            return is_email( $email );
+        } );
+
+        if ( empty( $valid_recipients ) ) {
+            throw new \Exception( __( '没有有效的收件人邮箱', 'wpbridge' ) );
+        }
+
         // 构建 HTML 邮件
         $html_message = $this->build_html_message( $subject, $message, $data );
 
+        // 使用 WordPress 默认发件人，避免 SPF/DKIM 问题
         $headers = [
             'Content-Type: text/html; charset=UTF-8',
-            'From: WPBridge <' . get_option( 'admin_email' ) . '>',
         ];
 
-        $sent = wp_mail( $recipients, $subject, $html_message, $headers );
+        $sent = wp_mail( $valid_recipients, $subject, $html_message, $headers );
 
         if ( ! $sent ) {
             throw new \Exception( __( '邮件发送失败', 'wpbridge' ) );
