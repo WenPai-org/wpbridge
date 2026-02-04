@@ -73,11 +73,17 @@ foreach ( $sources as $source ) {
         <div class="wpbridge-tabs-card">
             <!-- Tab 导航 -->
             <nav class="wpbridge-tab-list">
-                <a href="#projects" class="wpbridge-tab wpbridge-tab-active" data-tab="projects">
+                <a href="#overview" class="wpbridge-tab wpbridge-tab-active" data-tab="overview">
+                    <?php esc_html_e( '概览', 'wpbridge' ); ?>
+                </a>
+                <a href="#projects" class="wpbridge-tab" data-tab="projects">
                     <?php esc_html_e( '项目', 'wpbridge' ); ?>
                 </a>
                 <a href="#sources" class="wpbridge-tab" data-tab="sources">
                     <?php esc_html_e( '更新源', 'wpbridge' ); ?>
+                </a>
+                <a href="#diagnostics" class="wpbridge-tab" data-tab="diagnostics">
+                    <?php esc_html_e( '诊断', 'wpbridge' ); ?>
                 </a>
                 <a href="#settings" class="wpbridge-tab" data-tab="settings">
                     <?php esc_html_e( '设置', 'wpbridge' ); ?>
@@ -90,14 +96,24 @@ foreach ( $sources as $source ) {
                 </a>
             </nav>
 
+            <!-- Tab: 概览 -->
+            <div id="overview" class="wpbridge-tab-pane wpbridge-tab-pane-active">
+                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/overview.php'; ?>
+            </div>
+
             <!-- Tab: 项目 -->
-            <div id="projects" class="wpbridge-tab-pane wpbridge-tab-pane-active">
+            <div id="projects" class="wpbridge-tab-pane">
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/projects.php'; ?>
             </div>
 
             <!-- Tab: 更新源 -->
             <div id="sources" class="wpbridge-tab-pane">
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/sources.php'; ?>
+            </div>
+
+            <!-- Tab: 诊断 -->
+            <div id="diagnostics" class="wpbridge-tab-pane">
+                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/diagnostics.php'; ?>
             </div>
 
             <!-- Tab: 设置 -->

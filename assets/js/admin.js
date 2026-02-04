@@ -62,7 +62,7 @@
             this.container.append($notice);
 
             // 添加 WordPress 原生关闭按钮
-            $notice.append('<button type="button" class="notice-dismiss"><span class="screen-reader-text">关闭此通知</span></button>');
+            $notice.append('<button type="button" class="notice-dismiss"><span class="screen-reader-text">' + (wpbridge.i18n.close_notice || '关闭此通知') + '</span></button>');
 
             // 动画显示
             $notice.hide().slideDown(200);
@@ -949,6 +949,383 @@
     };
 
     /**
+     * 诊断工具模块 (P1)
+     */
+    var Diagnostics = {
+        init: function() {
+            this.bindEvents();
+        },
+
+        bindEvents: function() {
+            var self = this;
+
+            // Tab 链接跳转
+            $(document).on('click', '[data-tab-link]', function(e) {
+                e.preventDefault();
+                var tabId = $(this).data('tab-link');
+                Tabs.switchTo(tabId);
+            });
+
+            // 运行全部诊断
+            $(document).on('click', '.wpbridge-run-all-diagnostics', function() {
+                self.runAllDiagnostics($(this));
+            });
+
+            // 测试全部更新源
+            $(document).on('click', '.wpbridge-test-all-sources', function() {
+                self.testAllSources($(this));
+            });
+
+            // 测试单个更新源
+            $(document).on('click', '.wpbridge-test-single-source', function() {
+                self.testSingleSource($(this));
+            });
+
+            // 检查环境
+            $(document).on('click', '.wpbridge-check-environment', function() {
+                Toast.info(wpbridge.i18n.environment_ok || '环境检查已完成');
+            });
+
+            // 导出诊断报告
+            $(document).on('click', '.wpbridge-export-diagnostics', function() {
+                self.exportDiagnostics();
+            });
+
+            // 关闭模态框
+            $(document).on('click', '.wpbridge-modal-close', function() {
+                $(this).closest('.wpbridge-modal').hide();
+                $(document).off('keydown.wpbridge-modal');
+            });
+
+            // 点击模态框背景关闭
+            $(document).on('click', '.wpbridge-modal', function(e) {
+                if ($(e.target).hasClass('wpbridge-modal')) {
+                    $(this).hide();
+                    $(document).off('keydown.wpbridge-modal');
+                }
+            });
+
+            // 复制报告
+            $(document).on('click', '.wpbridge-copy-report', function() {
+                self.copyReport();
+            });
+
+            // 下载报告
+            $(document).on('click', '.wpbridge-download-report', function() {
+                self.downloadReport();
+            });
+        },
+
+        runAllDiagnostics: function($button) {
+            var self = this;
+            $button.prop('disabled', true);
+            $button.find('.dashicons').removeClass('dashicons-controls-play').addClass('dashicons-update wpbridge-spin');
+
+            // 显示概览
+            $('.wpbridge-diagnostics-summary').show();
+
+            // 测试所有源
+            this.testAllSources($('.wpbridge-test-all-sources'), function() {
+                $button.prop('disabled', false);
+                $button.find('.dashicons').removeClass('dashicons-update wpbridge-spin').addClass('dashicons-controls-play');
+                Toast.success(wpbridge.i18n.diagnostics_complete || '诊断完成');
+            });
+        },
+
+        testAllSources: function($button, callback) {
+            var self = this;
+            var $items = $('.wpbridge-source-test-item');
+            var total = $items.length;
+            var completed = 0;
+            var passed = 0;
+            var warnings = 0;
+            var failed = 0;
+
+            if (total === 0) {
+                if (callback) callback();
+                return;
+            }
+
+            $button.prop('disabled', true);
+            $button.find('.dashicons').removeClass('dashicons-update').addClass('dashicons-update wpbridge-spin');
+
+            $items.each(function() {
+                var $item = $(this);
+                var sourceId = $item.data('source-id');
+                var $testBtn = $item.find('.wpbridge-test-single-source');
+
+                // 跳过已禁用的源
+                if ($testBtn.prop('disabled')) {
+                    completed++;
+                    if (completed === total) {
+                        self.updateSummary(passed, warnings, failed);
+                        $button.prop('disabled', false);
+                        $button.find('.dashicons').removeClass('wpbridge-spin');
+                        if (callback) callback();
+                    }
+                    return;
+                }
+
+                $item.addClass('testing');
+
+                $.ajax({
+                    url: wpbridge.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'wpbridge_test_source',
+                        nonce: wpbridge.nonce,
+                        source_id: sourceId
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var status = response.data.status;
+                            var time = response.data.response_time;
+
+                            // 更新状态显示
+                            var $status = $item.find('.wpbridge-source-test-status');
+                            $status.find('.wpbridge-badge-status, .wpbridge-badge-unknown').remove();
+
+                            var statusLabels = {
+                                healthy: wpbridge.i18n.healthy || '正常',
+                                degraded: wpbridge.i18n.degraded || '降级',
+                                failed: wpbridge.i18n.failed_status || '失败'
+                            };
+
+                            $status.prepend(
+                                '<span class="wpbridge-badge wpbridge-badge-status ' + status + '">' +
+                                statusLabels[status] + '</span>'
+                            );
+
+                            // 更新响应时间
+                            $status.find('.wpbridge-source-test-time').remove();
+                            if (time) {
+                                $status.append('<span class="wpbridge-source-test-time">' + time + 'ms</span>');
+                            }
+
+                            // 统计
+                            if (status === 'healthy') {
+                                passed++;
+                            } else if (status === 'degraded') {
+                                warnings++;
+                            } else {
+                                failed++;
+                            }
+                        } else {
+                            failed++;
+                        }
+                    },
+                    error: function() {
+                        failed++;
+                    },
+                    complete: function() {
+                        $item.removeClass('testing');
+                        completed++;
+
+                        if (completed === total) {
+                            self.updateSummary(passed, warnings, failed);
+                            $button.prop('disabled', false);
+                            $button.find('.dashicons').removeClass('wpbridge-spin');
+                            if (callback) callback();
+                        }
+                    }
+                });
+            });
+        },
+
+        testSingleSource: function($button) {
+            var sourceId = $button.data('source-id');
+            var $item = $button.closest('.wpbridge-source-test-item');
+
+            $button.prop('disabled', true);
+            $button.find('.dashicons').removeClass('dashicons-admin-site-alt3').addClass('dashicons-update wpbridge-spin');
+            $item.addClass('testing');
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wpbridge_test_source',
+                    nonce: wpbridge.nonce,
+                    source_id: sourceId
+                },
+                success: function(response) {
+                    if (response.success) {
+                        var status = response.data.status;
+                        var time = response.data.response_time;
+
+                        // 更新状态显示
+                        var $status = $item.find('.wpbridge-source-test-status');
+                        $status.find('.wpbridge-badge-status, .wpbridge-badge-unknown').remove();
+
+                        var statusLabels = {
+                            healthy: wpbridge.i18n.healthy || '正常',
+                            degraded: wpbridge.i18n.degraded || '降级',
+                            failed: wpbridge.i18n.failed_status || '失败'
+                        };
+
+                        $status.prepend(
+                            '<span class="wpbridge-badge wpbridge-badge-status ' + status + '">' +
+                            statusLabels[status] + '</span>'
+                        );
+
+                        // 更新响应时间
+                        $status.find('.wpbridge-source-test-time').remove();
+                        if (time) {
+                            $status.append('<span class="wpbridge-source-test-time">' + time + 'ms</span>');
+                        }
+
+                        if (status === 'healthy') {
+                            Toast.success(wpbridge.i18n.test_success + ' (' + time + 'ms)');
+                        } else {
+                            Toast.warning(response.data.error || wpbridge.i18n.test_degraded);
+                        }
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                },
+                complete: function() {
+                    $button.prop('disabled', false);
+                    $button.find('.dashicons').removeClass('dashicons-update wpbridge-spin').addClass('dashicons-admin-site-alt3');
+                    $item.removeClass('testing');
+                }
+            });
+        },
+
+        updateSummary: function(passed, warnings, failed) {
+            $('.wpbridge-diagnostics-passed .wpbridge-diagnostics-count').text(passed);
+            $('.wpbridge-diagnostics-warnings .wpbridge-diagnostics-count').text(warnings);
+            $('.wpbridge-diagnostics-failed .wpbridge-diagnostics-count').text(failed);
+        },
+
+        exportDiagnostics: function() {
+            var self = this;
+            var report = this.generateReport();
+            var $modal = $('#wpbridge-export-modal');
+            $('#wpbridge-diagnostics-report').val(report);
+            $modal.show();
+
+            // 焦点管理
+            $modal.find('.wpbridge-modal-close').focus();
+
+            // ESC 键关闭
+            $(document).on('keydown.wpbridge-modal', function(e) {
+                if (e.key === 'Escape') {
+                    $modal.hide();
+                    $(document).off('keydown.wpbridge-modal');
+                }
+            });
+        },
+
+        generateReport: function() {
+            var i18n = wpbridge.i18n || {};
+            var lines = [];
+            lines.push('=== ' + (i18n.diagnostics_report || 'WPBridge Diagnostics Report') + ' ===');
+            lines.push((i18n.generated_at || 'Generated at') + ': ' + new Date().toLocaleString());
+            lines.push('');
+
+            // 系统信息
+            var $sysInfo = $('.wpbridge-system-info-item');
+            if ($sysInfo.length) {
+                lines.push('--- ' + (i18n.system_info || 'System Information') + ' ---');
+                $sysInfo.each(function() {
+                    var label = $(this).find('.wpbridge-system-info-label').text();
+                    var value = $(this).find('.wpbridge-system-info-value').text();
+                    lines.push(label + ': ' + value);
+                });
+                lines.push('');
+            }
+
+            // 环境检查
+            var $envChecks = $('.wpbridge-environment-checks .wpbridge-check-item');
+            if ($envChecks.length) {
+                lines.push('--- ' + (i18n.environment_check || 'Environment Check') + ' ---');
+                $envChecks.each(function() {
+                    var $item = $(this);
+                    var status = $item.hasClass('passed') ? '[' + (i18n.passed || 'PASS') + ']' :
+                                 ($item.hasClass('warning') ? '[' + (i18n.warning || 'WARN') + ']' :
+                                 '[' + (i18n.failed || 'FAIL') + ']');
+                    var label = $item.find('.wpbridge-check-label').text();
+                    var value = $item.find('.wpbridge-check-value').text();
+                    lines.push(status + ' ' + label + ': ' + value);
+                });
+                lines.push('');
+            }
+
+            // 配置检查
+            var $configChecks = $('.wpbridge-config-checks .wpbridge-check-item');
+            if ($configChecks.length) {
+                lines.push('--- ' + (i18n.config_check || 'Configuration Check') + ' ---');
+                $configChecks.each(function() {
+                    var $item = $(this);
+                    var status = $item.hasClass('passed') ? '[' + (i18n.passed || 'PASS') + ']' :
+                                 ($item.hasClass('warning') ? '[' + (i18n.warning || 'WARN') + ']' :
+                                 '[' + (i18n.failed || 'FAIL') + ']');
+                    var label = $item.find('.wpbridge-check-label').text();
+                    var value = $item.find('.wpbridge-check-value').text();
+                    lines.push(status + ' ' + label + ': ' + value);
+                });
+                lines.push('');
+            }
+
+            // 更新源状态
+            var $sourceTests = $('.wpbridge-source-test-item');
+            if ($sourceTests.length) {
+                lines.push('--- ' + (i18n.source_status || 'Update Source Status') + ' ---');
+                $sourceTests.each(function() {
+                    var $item = $(this);
+                    var name = $item.find('.wpbridge-source-test-name').text().trim();
+                    var url = $item.find('.wpbridge-source-test-url').text().trim();
+                    var status = $item.find('.wpbridge-badge-status').text().trim() || (i18n.not_tested || 'Not Tested');
+                    var time = $item.find('.wpbridge-source-test-time').text().trim();
+                    lines.push(name);
+                    lines.push('  URL: ' + url);
+                    lines.push('  ' + (i18n.status || 'Status') + ': ' + status + (time ? ' (' + time + ')' : ''));
+                });
+            }
+
+            return lines.join('\n');
+        },
+
+        copyReport: function() {
+            var text = $('#wpbridge-diagnostics-report').val();
+            var self = this;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    Toast.success(wpbridge.i18n.copied || '已复制到剪贴板');
+                }).catch(function() {
+                    self.fallbackCopy();
+                });
+            } else {
+                this.fallbackCopy();
+            }
+        },
+
+        fallbackCopy: function() {
+            var $textarea = $('#wpbridge-diagnostics-report');
+            $textarea.select();
+            document.execCommand('copy');
+            Toast.success(wpbridge.i18n.copied || '已复制到剪贴板');
+        },
+
+        downloadReport: function() {
+            var report = $('#wpbridge-diagnostics-report').val();
+            var blob = new Blob([report], { type: 'text/plain' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'wpbridge-diagnostics-' + new Date().toISOString().slice(0, 10) + '.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    };
+
+    /**
      * 初始化
      */
     $(document).ready(function() {
@@ -960,6 +1337,7 @@
         Projects.init();
         UrlInference.init();
         QuickSetup.init();
+        Diagnostics.init();
     });
 
     // 添加旋转动画样式
