@@ -1446,6 +1446,11 @@
 }
 
 .wpbridge-status-disabled {
+    background: var(--wpbridge-error-light);
+    color: var(--wpbridge-error);
+}
+
+.wpbridge-status-locked {
     background: var(--wpbridge-warning-light);
     color: var(--wpbridge-warning);
 }
