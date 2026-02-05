@@ -624,8 +624,9 @@ class CommercialDetector {
     }
 
     /**
-     * 重新检测所有插件
+     * 重新检测所有插件（同步方式，已废弃）
      *
+     * @deprecated 使用 prepare_refresh() + refresh_batch() 代替
      * @return array 检测结果
      */
     public function refresh_all() {
@@ -651,7 +652,69 @@ class CommercialDetector {
             if ( $plugin_slug === '.' ) {
                 $plugin_slug = basename( $plugin_file, '.php' );
             }
-            $results[ $plugin_slug ] = $this->detect( $plugin_slug, $plugin_file, true, false );
+            $results[ $plugin_slug ] = $this->detect( $plugin_slug, $plugin_file, false, false );
+        }
+
+        // 保存缓存
+        $this->save_detection_cache();
+
+        return $results;
+    }
+
+    /**
+     * 准备刷新检测（清除缓存，返回插件列表）
+     *
+     * @return array 包含 plugins 列表和 total 数量
+     */
+    public function prepare_refresh() {
+        // 清除缓存
+        $this->clear_cache();
+
+        // 刷新远程配置
+        $this->remote_config->refresh();
+
+        // 更新配置版本
+        update_option( self::CONFIG_VERSION_OPTION, $this->remote_config->get_version() );
+
+        // 获取所有已安装插件
+        if ( ! function_exists( 'get_plugins' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        $all_plugins = get_plugins();
+
+        // 构建插件列表
+        $plugins = array();
+        foreach ( $all_plugins as $plugin_file => $plugin_data ) {
+            $plugin_slug = dirname( $plugin_file );
+            if ( $plugin_slug === '.' ) {
+                $plugin_slug = basename( $plugin_file, '.php' );
+            }
+            $plugins[] = array(
+                'slug' => $plugin_slug,
+                'file' => $plugin_file,
+                'name' => $plugin_data['Name'],
+            );
+        }
+
+        return array(
+            'plugins' => $plugins,
+            'total'   => count( $plugins ),
+        );
+    }
+
+    /**
+     * 批量检测插件（异步方式）
+     *
+     * @param array $plugins 插件列表，每项包含 slug 和 file
+     * @return array 检测结果
+     */
+    public function refresh_batch( $plugins ) {
+        $results = array();
+
+        foreach ( $plugins as $plugin ) {
+            $slug = $plugin['slug'];
+            $file = $plugin['file'];
+            $results[ $slug ] = $this->detect( $slug, $file, false, false );
         }
 
         // 保存缓存
