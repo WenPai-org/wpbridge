@@ -357,6 +357,36 @@ class Plugin {
                 'last_updated'         => __( '最后更新', 'wpbridge' ),
                 'recent_versions'      => __( '最近版本', 'wpbridge' ),
                 'no_changelog'         => __( '暂无更新日志', 'wpbridge' ),
+                // 模态框通用
+                'confirm_title'        => __( '确认操作', 'wpbridge' ),
+                'confirm_btn'          => __( '确定', 'wpbridge' ),
+                'cancel_btn'           => __( '取消', 'wpbridge' ),
+                'delete_btn'           => __( '删除', 'wpbridge' ),
+                'copy'                 => __( '复制', 'wpbridge' ),
+                // 删除更新源
+                'confirm_delete_title' => __( '删除更新源', 'wpbridge' ),
+                // API Key
+                'generate_api_key'     => __( '生成 API Key', 'wpbridge' ),
+                'key_name_placeholder' => __( '例如：我的应用', 'wpbridge' ),
+                'key_name_required'    => __( '请输入名称', 'wpbridge' ),
+                'key_generated_title'  => __( 'API Key 已生成', 'wpbridge' ),
+                'revoke_key_title'     => __( '撤销 API Key', 'wpbridge' ),
+                'revoke_btn'           => __( '撤销', 'wpbridge' ),
+                // 清除日志
+                'clear_logs_title'     => __( '清除日志', 'wpbridge' ),
+                'clear_btn'            => __( '清除', 'wpbridge' ),
+                // 批量操作
+                'bulk_action_title'    => __( '批量操作', 'wpbridge' ),
+                'confirm_bulk_action'  => __( '确定要对选中的 {count} 个项目执行"{action}"操作吗？', 'wpbridge' ),
+                'action_set_source'    => __( '设置更新源', 'wpbridge' ),
+                'action_reset'         => __( '重置为默认', 'wpbridge' ),
+                'action_disable'       => __( '禁用更新', 'wpbridge' ),
+                // 导入配置
+                'import_config_title'  => __( '导入配置', 'wpbridge' ),
+                'import_btn'           => __( '导入', 'wpbridge' ),
+                // 解锁版本
+                'unlock_version_title' => __( '解锁版本', 'wpbridge' ),
+                'unlock_btn'           => __( '解锁', 'wpbridge' ),
             ],
         ] );
     }
