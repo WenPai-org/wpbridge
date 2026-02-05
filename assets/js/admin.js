@@ -1153,7 +1153,7 @@
                             $btn.prop('disabled', false);
                             $icon.attr('class', originalClass);
                             updateBtnText(originalText);
-                        }, updateBtnText, total);
+                        }, updateBtnText);
                     } else {
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                         $btn.prop('disabled', false);

@@ -587,8 +587,24 @@ class Plugin {
             wp_send_json_error( array( 'message' => __( '插件列表格式无效', 'wpbridge' ) ) );
         }
 
+        // 验证并清理每个插件数据
+        $sanitized_plugins = array();
+        foreach ( $plugins as $plugin ) {
+            if ( ! isset( $plugin['slug'] ) || ! isset( $plugin['file'] ) ) {
+                continue;
+            }
+            $sanitized_plugins[] = array(
+                'slug' => sanitize_text_field( $plugin['slug'] ),
+                'file' => sanitize_text_field( $plugin['file'] ),
+            );
+        }
+
+        if ( empty( $sanitized_plugins ) ) {
+            wp_send_json_error( array( 'message' => __( '没有有效的插件数据', 'wpbridge' ) ) );
+        }
+
         $detector = CommercialDetector::get_instance();
-        $results  = $detector->refresh_batch( $plugins );
+        $results  = $detector->refresh_batch( $sanitized_plugins );
 
         wp_send_json_success( array( 'results' => $results ) );
     }

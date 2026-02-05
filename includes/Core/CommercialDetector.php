@@ -712,8 +712,16 @@ class CommercialDetector {
         $results = array();
 
         foreach ( $plugins as $plugin ) {
-            $slug = $plugin['slug'];
-            $file = $plugin['file'];
+            if ( ! is_array( $plugin ) ) {
+                continue;
+            }
+            $slug = isset( $plugin['slug'] ) ? $plugin['slug'] : '';
+            $file = isset( $plugin['file'] ) ? $plugin['file'] : '';
+
+            if ( empty( $slug ) ) {
+                continue;
+            }
+
             $results[ $slug ] = $this->detect( $slug, $file, false, false );
         }
 
