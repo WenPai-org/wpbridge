@@ -225,6 +225,9 @@ class Plugin {
         // 初始化备份管理器
         BackupManager::get_instance();
 
+        // 初始化 Site Health 集成
+        new SiteHealth( $this->settings );
+
         // 注册 AI 适配器
         $this->register_ai_adapters();
     }
