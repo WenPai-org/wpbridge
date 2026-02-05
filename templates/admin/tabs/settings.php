@@ -81,6 +81,18 @@ if ( ! defined( 'ABSPATH' ) ) {
                 <span class="wpbridge-toggle-track"></span>
             </label>
         </div>
+
+        <!-- 更新前备份 -->
+        <div class="wpbridge-settings-row">
+            <div class="wpbridge-settings-info">
+                <h3 class="wpbridge-settings-title"><?php esc_html_e( '更新前备份', 'wpbridge' ); ?></h3>
+                <p class="wpbridge-settings-desc"><?php esc_html_e( '在更新插件/主题前自动创建备份，支持一键回滚。', 'wpbridge' ); ?></p>
+            </div>
+            <label class="wpbridge-toggle">
+                <input type="checkbox" name="backup_enabled" value="1" <?php checked( $settings['backup_enabled'] ?? true ); ?>>
+                <span class="wpbridge-toggle-track"></span>
+            </label>
+        </div>
     </div>
 
     <div class="wpbridge-form-actions" style="margin-top: 24px;">
