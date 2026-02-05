@@ -185,6 +185,8 @@ class Plugin {
             add_action( 'wp_ajax_wpbridge_refresh_commercial_detection', [ $this, 'ajax_refresh_commercial_detection' ] );
             add_action( 'wp_ajax_wpbridge_export_config', [ $this, 'ajax_export_config' ] );
             add_action( 'wp_ajax_wpbridge_import_config', [ $this, 'ajax_import_config' ] );
+            add_action( 'wp_ajax_wpbridge_lock_version', [ $this, 'ajax_lock_version' ] );
+            add_action( 'wp_ajax_wpbridge_unlock_version', [ $this, 'ajax_unlock_version' ] );
         }
 
         // 插件链接
@@ -214,6 +216,9 @@ class Plugin {
         $this->group_manager        = new GroupManager( $this->settings );
         $this->rest_controller      = new RestController( $this->settings );
         $this->commercial_detector  = CommercialDetector::get_instance();
+
+        // 初始化版本锁定
+        VersionLock::get_instance();
 
         // 注册 AI 适配器
         $this->register_ai_adapters();
@@ -324,6 +329,13 @@ class Plugin {
                 'import_failed'        => __( '导入失败', 'wpbridge' ),
                 'invalid_file'         => __( '无效的配置文件', 'wpbridge' ),
                 'confirm_import'       => __( '确定要导入配置吗？这将覆盖当前设置。', 'wpbridge' ),
+                // 版本锁定
+                'version_locked'       => __( '版本已锁定', 'wpbridge' ),
+                'version_unlocked'     => __( '版本已解锁', 'wpbridge' ),
+                'lock_current'         => __( '锁定当前版本', 'wpbridge' ),
+                'lock_specific'        => __( '锁定指定版本', 'wpbridge' ),
+                'lock_ignore'          => __( '忽略特定版本', 'wpbridge' ),
+                'confirm_unlock'       => __( '确定要解锁此版本吗？', 'wpbridge' ),
             ],
         ] );
     }
@@ -544,6 +556,71 @@ class Plugin {
                 'message' => implode( ', ', $result['errors'] ),
                 'errors'  => $result['errors'],
             ) );
+        }
+    }
+
+    /**
+     * AJAX: 锁定版本
+     */
+    public function ajax_lock_version(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+        }
+
+        $item_key  = isset( $_POST['item_key'] ) ? sanitize_text_field( wp_unslash( $_POST['item_key'] ) ) : '';
+        $lock_type = isset( $_POST['lock_type'] ) ? sanitize_text_field( wp_unslash( $_POST['lock_type'] ) ) : '';
+        $version   = isset( $_POST['version'] ) ? sanitize_text_field( wp_unslash( $_POST['version'] ) ) : '';
+
+        if ( empty( $item_key ) || empty( $lock_type ) ) {
+            wp_send_json_error( array( 'message' => __( '参数不完整', 'wpbridge' ) ) );
+        }
+
+        $version_lock = VersionLock::get_instance();
+
+        if ( $version_lock->lock( $item_key, $lock_type, $version ) ) {
+            // 清除更新缓存
+            delete_site_transient( 'update_plugins' );
+            delete_site_transient( 'update_themes' );
+
+            wp_send_json_success( array(
+                'message' => __( '版本已锁定', 'wpbridge' ),
+                'lock'    => $version_lock->get( $item_key ),
+            ) );
+        } else {
+            wp_send_json_error( array( 'message' => __( '锁定失败', 'wpbridge' ) ) );
+        }
+    }
+
+    /**
+     * AJAX: 解锁版本
+     */
+    public function ajax_unlock_version(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+        }
+
+        $item_key = isset( $_POST['item_key'] ) ? sanitize_text_field( wp_unslash( $_POST['item_key'] ) ) : '';
+
+        if ( empty( $item_key ) ) {
+            wp_send_json_error( array( 'message' => __( '参数不完整', 'wpbridge' ) ) );
+        }
+
+        $version_lock = VersionLock::get_instance();
+
+        if ( $version_lock->unlock( $item_key ) ) {
+            // 清除更新缓存
+            delete_site_transient( 'update_plugins' );
+            delete_site_transient( 'update_themes' );
+
+            wp_send_json_success( array(
+                'message' => __( '版本已解锁', 'wpbridge' ),
+            ) );
+        } else {
+            wp_send_json_error( array( 'message' => __( '解锁失败', 'wpbridge' ) ) );
         }
     }
 

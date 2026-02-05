@@ -1565,6 +1565,118 @@
     };
 
     /**
+     * 版本锁定管理
+     */
+    var VersionLock = {
+        init: function() {
+            var self = this;
+
+            // 锁定类型选择变化
+            $(document).on('change', '.wpbridge-lock-type-select', function() {
+                var $select = $(this);
+                var $btn = $select.siblings('.wpbridge-lock-version');
+
+                if ($select.val()) {
+                    $btn.show();
+                } else {
+                    $btn.hide();
+                }
+            });
+
+            // 锁定版本
+            $(document).on('click', '.wpbridge-lock-version', function() {
+                var $btn = $(this);
+                var $controls = $btn.closest('.wpbridge-version-lock-controls');
+                var itemKey = $controls.data('item-key');
+                var currentVersion = $controls.data('current-version');
+                var lockType = $controls.find('.wpbridge-lock-type-select').val();
+
+                if (!lockType) {
+                    return;
+                }
+
+                self.lockVersion($btn, itemKey, lockType, currentVersion);
+            });
+
+            // 解锁版本
+            $(document).on('click', '.wpbridge-unlock-version', function() {
+                var $btn = $(this);
+                var itemKey = $btn.data('item-key');
+
+                if (!confirm(wpbridge.i18n.confirm_unlock || '确定要解锁此版本吗？')) {
+                    return;
+                }
+
+                self.unlockVersion($btn, itemKey);
+            });
+        },
+
+        lockVersion: function($btn, itemKey, lockType, version) {
+            var originalHtml = $btn.html();
+
+            $btn.prop('disabled', true).html('<span class="dashicons dashicons-update wpbridge-spin"></span>');
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wpbridge_lock_version',
+                    nonce: wpbridge.nonce,
+                    item_key: itemKey,
+                    lock_type: lockType,
+                    version: version
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Toast.success(response.data.message || wpbridge.i18n.version_locked);
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                        $btn.prop('disabled', false).html(originalHtml);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                    $btn.prop('disabled', false).html(originalHtml);
+                }
+            });
+        },
+
+        unlockVersion: function($btn, itemKey) {
+            var originalHtml = $btn.html();
+
+            $btn.prop('disabled', true).html('<span class="dashicons dashicons-update wpbridge-spin"></span>');
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wpbridge_unlock_version',
+                    nonce: wpbridge.nonce,
+                    item_key: itemKey
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Toast.success(response.data.message || wpbridge.i18n.version_unlocked);
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                        $btn.prop('disabled', false).html(originalHtml);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                    $btn.prop('disabled', false).html(originalHtml);
+                }
+            });
+        }
+    };
+
+    /**
      * 初始化
      */
     $(document).ready(function() {
@@ -1578,6 +1690,7 @@
         QuickSetup.init();
         Diagnostics.init();
         ConfigManager.init();
+        VersionLock.init();
     });
 
     // 添加旋转动画样式
