@@ -2441,14 +2441,6 @@
     max-width: 450px;
 }
 
-.wpbridge-modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--wpbridge-space-2);
-    padding: var(--wpbridge-space-4);
-    border-top: 1px solid var(--wpbridge-gray-200);
-}
-
 .wpbridge-modal-message {
     margin: 0;
     line-height: 1.6;
