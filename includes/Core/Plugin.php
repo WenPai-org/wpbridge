@@ -187,6 +187,8 @@ class Plugin {
             add_action( 'wp_ajax_wpbridge_import_config', [ $this, 'ajax_import_config' ] );
             add_action( 'wp_ajax_wpbridge_lock_version', [ $this, 'ajax_lock_version' ] );
             add_action( 'wp_ajax_wpbridge_unlock_version', [ $this, 'ajax_unlock_version' ] );
+            add_action( 'wp_ajax_wpbridge_rollback', [ $this, 'ajax_rollback' ] );
+            add_action( 'wp_ajax_wpbridge_get_backups', [ $this, 'ajax_get_backups' ] );
         }
 
         // 插件链接
@@ -219,6 +221,9 @@ class Plugin {
 
         // 初始化版本锁定
         VersionLock::get_instance();
+
+        // 初始化备份管理器
+        BackupManager::get_instance();
 
         // 注册 AI 适配器
         $this->register_ai_adapters();
@@ -336,6 +341,11 @@ class Plugin {
                 'lock_specific'        => __( '锁定指定版本', 'wpbridge' ),
                 'lock_ignore'          => __( '忽略特定版本', 'wpbridge' ),
                 'confirm_unlock'       => __( '确定要解锁此版本吗？', 'wpbridge' ),
+                // 备份回滚
+                'rollback_success'     => __( '回滚成功', 'wpbridge' ),
+                'rollback_failed'      => __( '回滚失败', 'wpbridge' ),
+                'confirm_rollback'     => __( '确定要回滚到此版本吗？当前版本将被覆盖。', 'wpbridge' ),
+                'no_backups'           => __( '暂无备份', 'wpbridge' ),
             ],
         ] );
     }
@@ -622,6 +632,59 @@ class Plugin {
         } else {
             wp_send_json_error( array( 'message' => __( '解锁失败', 'wpbridge' ) ) );
         }
+    }
+
+    /**
+     * AJAX: 回滚到备份
+     */
+    public function ajax_rollback(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+        }
+
+        $item_key  = isset( $_POST['item_key'] ) ? sanitize_text_field( wp_unslash( $_POST['item_key'] ) ) : '';
+        $backup_id = isset( $_POST['backup_id'] ) ? sanitize_text_field( wp_unslash( $_POST['backup_id'] ) ) : '';
+
+        if ( empty( $item_key ) || empty( $backup_id ) ) {
+            wp_send_json_error( array( 'message' => __( '参数不完整', 'wpbridge' ) ) );
+        }
+
+        $backup_manager = BackupManager::get_instance();
+        $result = $backup_manager->rollback( $item_key, $backup_id );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+        }
+
+        wp_send_json_success( array(
+            'message' => __( '回滚成功', 'wpbridge' ),
+        ) );
+    }
+
+    /**
+     * AJAX: 获取备份列表
+     */
+    public function ajax_get_backups(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+        }
+
+        $item_key = isset( $_POST['item_key'] ) ? sanitize_text_field( wp_unslash( $_POST['item_key'] ) ) : '';
+
+        if ( empty( $item_key ) ) {
+            wp_send_json_error( array( 'message' => __( '参数不完整', 'wpbridge' ) ) );
+        }
+
+        $backup_manager = BackupManager::get_instance();
+        $backups = $backup_manager->get_item_backups( $item_key );
+
+        wp_send_json_success( array(
+            'backups' => $backups,
+        ) );
     }
 
     /**
