@@ -189,6 +189,7 @@ class Plugin {
             add_action( 'wp_ajax_wpbridge_unlock_version', [ $this, 'ajax_unlock_version' ] );
             add_action( 'wp_ajax_wpbridge_rollback', [ $this, 'ajax_rollback' ] );
             add_action( 'wp_ajax_wpbridge_get_backups', [ $this, 'ajax_get_backups' ] );
+            add_action( 'wp_ajax_wpbridge_get_changelog', [ $this, 'ajax_get_changelog' ] );
         }
 
         // 插件链接
@@ -349,6 +350,13 @@ class Plugin {
                 'rollback_failed'      => __( '回滚失败', 'wpbridge' ),
                 'confirm_rollback'     => __( '确定要回滚到此版本吗？当前版本将被覆盖。', 'wpbridge' ),
                 'no_backups'           => __( '暂无备份', 'wpbridge' ),
+                // 更新日志
+                'changelog_title'      => __( '更新日志', 'wpbridge' ),
+                'changelog_error'      => __( '获取更新日志失败', 'wpbridge' ),
+                'loading'              => __( '加载中...', 'wpbridge' ),
+                'last_updated'         => __( '最后更新', 'wpbridge' ),
+                'recent_versions'      => __( '最近版本', 'wpbridge' ),
+                'no_changelog'         => __( '暂无更新日志', 'wpbridge' ),
             ],
         ] );
     }
@@ -688,6 +696,40 @@ class Plugin {
         wp_send_json_success( array(
             'backups' => $backups,
         ) );
+    }
+
+    /**
+     * AJAX: 获取更新日志
+     */
+    public function ajax_get_changelog(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+        }
+
+        $slug        = isset( $_POST['slug'] ) ? sanitize_text_field( wp_unslash( $_POST['slug'] ) ) : '';
+        $type        = isset( $_POST['type'] ) ? sanitize_text_field( wp_unslash( $_POST['type'] ) ) : 'plugin';
+        $source_type = isset( $_POST['source_type'] ) ? sanitize_text_field( wp_unslash( $_POST['source_type'] ) ) : 'wporg';
+        $source_url  = isset( $_POST['source_url'] ) ? esc_url_raw( wp_unslash( $_POST['source_url'] ) ) : '';
+
+        if ( empty( $slug ) ) {
+            wp_send_json_error( array( 'message' => __( '参数不完整', 'wpbridge' ) ) );
+        }
+
+        $changelog_manager = ChangelogManager::get_instance();
+
+        if ( 'theme' === $type ) {
+            $changelog = $changelog_manager->get_theme_changelog( $slug, $source_type, $source_url );
+        } else {
+            $changelog = $changelog_manager->get_plugin_changelog( $slug, $source_type, $source_url );
+        }
+
+        if ( ! $changelog['success'] ) {
+            wp_send_json_error( array( 'message' => $changelog['error'] ?? __( '获取更新日志失败', 'wpbridge' ) ) );
+        }
+
+        wp_send_json_success( $changelog );
     }
 
     /**

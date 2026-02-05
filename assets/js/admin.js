@@ -1677,6 +1677,177 @@
     };
 
     /**
+     * 更新日志模块
+     */
+    var Changelog = {
+        modal: null,
+
+        init: function() {
+            var self = this;
+
+            // 查看更新日志按钮
+            $(document).on('click', '.wpbridge-view-changelog', function(e) {
+                e.preventDefault();
+                var $btn = $(this);
+                var slug = $btn.data('slug');
+                var type = $btn.data('type') || 'plugin';
+                var sourceType = $btn.data('source-type') || 'wporg';
+                var sourceUrl = $btn.data('source-url') || '';
+
+                self.showChangelog(slug, type, sourceType, sourceUrl);
+            });
+
+            // 关闭模态框
+            $(document).on('click', '.wpbridge-modal-close, .wpbridge-modal-overlay', function() {
+                self.closeModal();
+            });
+
+            // ESC 关闭
+            $(document).on('keydown', function(e) {
+                if (e.key === 'Escape' && self.modal) {
+                    self.closeModal();
+                }
+            });
+        },
+
+        showChangelog: function(slug, type, sourceType, sourceUrl) {
+            var self = this;
+
+            // 创建模态框
+            this.createModal(slug);
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wpbridge_get_changelog',
+                    nonce: wpbridge.nonce,
+                    slug: slug,
+                    type: type,
+                    source_type: sourceType,
+                    source_url: sourceUrl
+                },
+                success: function(response) {
+                    if (response.success) {
+                        self.renderChangelog(response.data);
+                    } else {
+                        self.renderError(response.data.message || wpbridge.i18n.changelog_error);
+                    }
+                },
+                error: function() {
+                    self.renderError(wpbridge.i18n.changelog_error || '获取更新日志失败');
+                }
+            });
+        },
+
+        createModal: function(slug) {
+            // 移除已有模态框
+            this.closeModal();
+
+            var html = '<div class="wpbridge-modal-overlay"></div>' +
+                '<div class="wpbridge-modal wpbridge-changelog-modal">' +
+                    '<div class="wpbridge-modal-header">' +
+                        '<h3 class="wpbridge-modal-title">' +
+                            '<span class="dashicons dashicons-list-view"></span> ' +
+                            (wpbridge.i18n.changelog_title || '更新日志') +
+                            ' - <span class="wpbridge-changelog-slug">' + slug + '</span>' +
+                        '</h3>' +
+                        '<button type="button" class="wpbridge-modal-close">' +
+                            '<span class="dashicons dashicons-no-alt"></span>' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="wpbridge-modal-body">' +
+                        '<div class="wpbridge-changelog-loading">' +
+                            '<span class="dashicons dashicons-update wpbridge-spin"></span> ' +
+                            (wpbridge.i18n.loading || '加载中...') +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+
+            this.modal = $(html).appendTo('body');
+            $('body').addClass('wpbridge-modal-open');
+        },
+
+        renderChangelog: function(data) {
+            if (!this.modal) return;
+
+            var html = '<div class="wpbridge-changelog-content">';
+
+            // 头部信息
+            html += '<div class="wpbridge-changelog-header">';
+            html += '<div class="wpbridge-changelog-meta">';
+            if (data.name) {
+                html += '<span class="wpbridge-changelog-name">' + this.escapeHtml(data.name) + '</span>';
+            }
+            if (data.version) {
+                html += '<span class="wpbridge-badge wpbridge-badge-info">v' + this.escapeHtml(data.version) + '</span>';
+            }
+            if (data.source) {
+                html += '<span class="wpbridge-badge wpbridge-badge-secondary">' + this.escapeHtml(data.source) + '</span>';
+            }
+            html += '</div>';
+            if (data.last_updated) {
+                html += '<div class="wpbridge-changelog-updated">' +
+                    (wpbridge.i18n.last_updated || '最后更新') + ': ' +
+                    this.escapeHtml(data.last_updated) +
+                '</div>';
+            }
+            html += '</div>';
+
+            // 版本列表（如果有）
+            if (data.versions && data.versions.length > 0) {
+                html += '<div class="wpbridge-changelog-versions">';
+                html += '<strong>' + (wpbridge.i18n.recent_versions || '最近版本') + ':</strong> ';
+                html += data.versions.slice(0, 5).map(function(v) {
+                    return '<span class="wpbridge-version-tag">' + this.escapeHtml(v) + '</span>';
+                }, this).join(' ');
+                html += '</div>';
+            }
+
+            // 更新日志内容
+            html += '<div class="wpbridge-changelog-body">';
+            if (data.changelog_html) {
+                html += data.changelog_html;
+            } else {
+                html += '<p class="wpbridge-changelog-empty">' +
+                    (wpbridge.i18n.no_changelog || '暂无更新日志') +
+                '</p>';
+            }
+            html += '</div>';
+
+            html += '</div>';
+
+            this.modal.find('.wpbridge-modal-body').html(html);
+        },
+
+        renderError: function(message) {
+            if (!this.modal) return;
+
+            var html = '<div class="wpbridge-changelog-error">' +
+                '<span class="dashicons dashicons-warning"></span> ' +
+                this.escapeHtml(message) +
+            '</div>';
+
+            this.modal.find('.wpbridge-modal-body').html(html);
+        },
+
+        closeModal: function() {
+            if (this.modal) {
+                this.modal.remove();
+                this.modal = null;
+                $('body').removeClass('wpbridge-modal-open');
+            }
+            $('.wpbridge-modal-overlay').remove();
+        },
+
+        escapeHtml: function(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    };
+
+    /**
      * 初始化
      */
     $(document).ready(function() {
@@ -1691,6 +1862,7 @@
         Diagnostics.init();
         ConfigManager.init();
         VersionLock.init();
+        Changelog.init();
     });
 
     // 添加旋转动画样式

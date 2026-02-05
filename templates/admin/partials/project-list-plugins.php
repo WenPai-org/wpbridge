@@ -127,6 +127,13 @@ $version_lock = VersionLock::get_instance();
                     <div class="wpbridge-project-meta">
                         <span class="wpbridge-project-version">v<?php echo esc_html( $plugin_data['Version'] ); ?></span>
                         <span class="wpbridge-project-slug"><?php echo esc_html( $plugin_slug ); ?></span>
+                        <a href="#" class="wpbridge-view-changelog"
+                           data-slug="<?php echo esc_attr( $plugin_slug ); ?>"
+                           data-type="plugin"
+                           data-source-type="wporg"
+                           title="<?php esc_attr_e( '查看更新日志', 'wpbridge' ); ?>">
+                            <span class="dashicons dashicons-list-view"></span>
+                        </a>
                         <?php if ( ! empty( $plugin_data['Author'] ) ) : ?>
                             <span class="wpbridge-project-author"><?php echo esc_html( $plugin_data['Author'] ); ?></span>
                         <?php endif; ?>
