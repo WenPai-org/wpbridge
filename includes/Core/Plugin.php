@@ -183,6 +183,8 @@ class Plugin {
             // AJAX 处理
             add_action( 'wp_ajax_wpbridge_set_plugin_type', [ $this, 'ajax_set_plugin_type' ] );
             add_action( 'wp_ajax_wpbridge_refresh_commercial_detection', [ $this, 'ajax_refresh_commercial_detection' ] );
+            add_action( 'wp_ajax_wpbridge_prepare_refresh', [ $this, 'ajax_prepare_refresh' ] );
+            add_action( 'wp_ajax_wpbridge_refresh_batch', [ $this, 'ajax_refresh_batch' ] );
             add_action( 'wp_ajax_wpbridge_export_config', [ $this, 'ajax_export_config' ] );
             add_action( 'wp_ajax_wpbridge_import_config', [ $this, 'ajax_import_config' ] );
             add_action( 'wp_ajax_wpbridge_lock_version', [ $this, 'ajax_lock_version' ] );
@@ -387,6 +389,11 @@ class Plugin {
                 // 解锁版本
                 'unlock_version_title' => __( '解锁版本', 'wpbridge' ),
                 'unlock_btn'           => __( '解锁', 'wpbridge' ),
+                // 异步检测
+                'no_plugins'           => __( '没有插件需要检测', 'wpbridge' ),
+                'detecting'            => __( '正在检测插件...', 'wpbridge' ),
+                'detection_complete'   => __( '检测完成', 'wpbridge' ),
+                'progress'             => __( '检测进度', 'wpbridge' ),
             ],
         ] );
     }
@@ -542,6 +549,48 @@ class Plugin {
             ),
             'stats'   => $stats,
         ) );
+    }
+
+    /**
+     * AJAX: 准备刷新检测（返回插件列表）
+     */
+    public function ajax_prepare_refresh(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+        }
+
+        $detector = CommercialDetector::get_instance();
+        $data     = $detector->prepare_refresh();
+
+        wp_send_json_success( $data );
+    }
+
+    /**
+     * AJAX: 批量检测插件
+     */
+    public function ajax_refresh_batch(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+        }
+
+        if ( empty( $_POST['plugins'] ) ) {
+            wp_send_json_error( array( 'message' => __( '插件列表为空', 'wpbridge' ) ) );
+        }
+
+        $plugins = json_decode( wp_unslash( $_POST['plugins'] ), true );
+
+        if ( ! is_array( $plugins ) ) {
+            wp_send_json_error( array( 'message' => __( '插件列表格式无效', 'wpbridge' ) ) );
+        }
+
+        $detector = CommercialDetector::get_instance();
+        $results  = $detector->refresh_batch( $plugins );
+
+        wp_send_json_success( array( 'results' => $results ) );
     }
 
     /**

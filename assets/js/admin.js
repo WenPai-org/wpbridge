@@ -1089,40 +1089,131 @@
         },
 
         /**
-         * 刷新商业插件检测
+         * 刷新商业插件检测（异步批量处理）
          */
         refreshCommercialDetection: function($btn) {
+            var self = this;
             var $icon = $btn.find('.dashicons');
             var originalClass = $icon.attr('class');
+            var originalText = $btn.text().trim();
+            var batchSize = 5; // 每批处理 5 个插件
 
             // 显示加载状态
             $btn.prop('disabled', true);
             $icon.attr('class', 'dashicons dashicons-update wpbridge-spin');
 
+            // 更新按钮文本的辅助函数
+            var updateBtnText = function(text) {
+                $btn.contents().filter(function() {
+                    return this.nodeType === 3; // 文本节点
+                }).first().replaceWith(' ' + text);
+            };
+
+            // 第一步：准备刷新，获取插件列表
             $.ajax({
                 url: wpbridge.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'wpbridge_refresh_commercial_detection',
+                    action: 'wpbridge_prepare_refresh',
                     nonce: wpbridge.nonce
                 },
                 success: function(response) {
                     if (response.success) {
-                        Toast.success(response.data.message);
-                        // 刷新页面以显示新的检测结果
-                        setTimeout(function() {
-                            location.reload();
-                        }, 1500);
+                        var plugins = response.data.plugins;
+                        var total = response.data.total;
+
+                        if (total === 0) {
+                            Toast.info(wpbridge.i18n.no_plugins || '没有插件需要检测');
+                            $btn.prop('disabled', false);
+                            $icon.attr('class', originalClass);
+                            updateBtnText(originalText);
+                            return;
+                        }
+
+                        // 更新按钮显示进度
+                        updateBtnText('0/' + total);
+
+                        // 分批处理
+                        self.processBatches(plugins, batchSize, 0, total, {
+                            free: 0,
+                            commercial: 0,
+                            private: 0,
+                            unknown: 0
+                        }, function(stats) {
+                            // 完成
+                            var msg = '已检测 ' + total + ' 个插件：' + stats.free + ' 免费，' +
+                                stats.commercial + ' 商业，' + (stats.unknown + stats.private) + ' 第三方';
+                            Toast.success(msg);
+
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1500);
+                        }, function() {
+                            // 恢复按钮状态
+                            $btn.prop('disabled', false);
+                            $icon.attr('class', originalClass);
+                            updateBtnText(originalText);
+                        }, updateBtnText, total);
                     } else {
                         Toast.error(response.data.message || wpbridge.i18n.failed);
+                        $btn.prop('disabled', false);
+                        $icon.attr('class', originalClass);
                     }
                 },
                 error: function() {
                     Toast.error(wpbridge.i18n.failed);
-                },
-                complete: function() {
                     $btn.prop('disabled', false);
                     $icon.attr('class', originalClass);
+                }
+            });
+        },
+
+        /**
+         * 批量处理插件检测
+         */
+        processBatches: function(plugins, batchSize, processed, total, stats, onComplete, onFinally, updateBtnText) {
+            var self = this;
+            var batch = plugins.slice(processed, processed + batchSize);
+
+            if (batch.length === 0) {
+                onComplete(stats);
+                onFinally();
+                return;
+            }
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wpbridge_refresh_batch',
+                    nonce: wpbridge.nonce,
+                    plugins: JSON.stringify(batch)
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // 统计结果
+                        var results = response.data.results;
+                        for (var slug in results) {
+                            var type = results[slug].type;
+                            if (stats.hasOwnProperty(type)) {
+                                stats[type]++;
+                            }
+                        }
+
+                        processed += batch.length;
+                        // 更新按钮文本显示进度
+                        updateBtnText(processed + '/' + total);
+
+                        // 继续下一批
+                        self.processBatches(plugins, batchSize, processed, total, stats, onComplete, onFinally, updateBtnText);
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                        onFinally();
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                    onFinally();
                 }
             });
         }
