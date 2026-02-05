@@ -1455,6 +1455,27 @@
     color: var(--wpbridge-warning);
 }
 
+/* 插件类型状态徽章 */
+.wpbridge-status-type-free {
+    background: var(--wpbridge-success-light);
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-status-type-commercial {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.wpbridge-status-type-private {
+    background: var(--wpbridge-info-light);
+    color: var(--wpbridge-info);
+}
+
+.wpbridge-status-type-unknown {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-600);
+}
+
 /* ========================================
    Radio Group - 单选按钮组
    ======================================== */
