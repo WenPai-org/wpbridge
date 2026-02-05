@@ -17,9 +17,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use WPBridge\Core\ItemSourceManager;
 use WPBridge\Core\CommercialDetector;
+use WPBridge\Core\VersionLock;
 
 // 获取商业插件检测器
 $commercial_detector = CommercialDetector::get_instance();
+// 获取版本锁定管理器
+$version_lock = VersionLock::get_instance();
 ?>
 
 <!-- 批量操作工具栏 -->
@@ -79,6 +82,10 @@ $commercial_detector = CommercialDetector::get_instance();
             // 判断是否激活
             $is_active = is_plugin_active( $plugin_file );
 
+            // 获取版本锁定信息
+            $lock_info = $version_lock->get( $item_key );
+            $is_locked = null !== $lock_info;
+
             // 检测插件类型
             $type_info = $commercial_detector->detect( $plugin_slug, $plugin_file );
             $type_label = CommercialDetector::get_type_label( $type_info['type'] );
@@ -99,6 +106,14 @@ $commercial_detector = CommercialDetector::get_instance();
                         <?php echo esc_html( $plugin_data['Name'] ); ?>
                         <?php if ( $is_active ) : ?>
                             <span class="wpbridge-badge wpbridge-badge-success"><?php esc_html_e( '已激活', 'wpbridge' ); ?></span>
+                        <?php endif; ?>
+                        <?php if ( $is_locked ) : ?>
+                            <span class="wpbridge-badge wpbridge-badge-warning wpbridge-version-lock-badge"
+                                  data-item-key="<?php echo esc_attr( $item_key ); ?>"
+                                  title="<?php echo esc_attr( VersionLock::get_type_label( $lock_info['type'] ) ); ?>">
+                                <span class="dashicons dashicons-lock"></span>
+                                <?php esc_html_e( '已锁定', 'wpbridge' ); ?>
+                            </span>
                         <?php endif; ?>
                         <!-- 插件类型徽章 -->
                         <span class="wpbridge-badge wpbridge-badge-type-<?php echo esc_attr( $type_info['type'] ); ?>"
@@ -194,6 +209,39 @@ $commercial_detector = CommercialDetector::get_instance();
                                    data-item-key="<?php echo esc_attr( $item_key ); ?>"
                                    placeholder="<?php esc_attr_e( '可选，用于私有仓库', 'wpbridge' ); ?>"
                                    autocomplete="new-password">
+                        </div>
+                    </div>
+                    <!-- 版本锁定 -->
+                    <div class="wpbridge-config-row">
+                        <label class="wpbridge-config-label"><?php esc_html_e( '版本锁定', 'wpbridge' ); ?></label>
+                        <div class="wpbridge-config-field">
+                            <div class="wpbridge-version-lock-controls" data-item-key="<?php echo esc_attr( $item_key ); ?>" data-current-version="<?php echo esc_attr( $plugin_data['Version'] ); ?>">
+                                <?php if ( $is_locked ) : ?>
+                                    <span class="wpbridge-lock-status">
+                                        <span class="dashicons dashicons-lock"></span>
+                                        <?php echo esc_html( VersionLock::get_type_label( $lock_info['type'] ) ); ?>
+                                        <?php if ( ! empty( $lock_info['version'] ) ) : ?>
+                                            (v<?php echo esc_html( $lock_info['version'] ); ?>)
+                                        <?php endif; ?>
+                                    </span>
+                                    <button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-unlock-version"
+                                            data-item-key="<?php echo esc_attr( $item_key ); ?>">
+                                        <span class="dashicons dashicons-unlock"></span>
+                                        <?php esc_html_e( '解锁', 'wpbridge' ); ?>
+                                    </button>
+                                <?php else : ?>
+                                    <select class="wpbridge-form-input wpbridge-lock-type-select" style="max-width: 150px;">
+                                        <option value=""><?php esc_html_e( '不锁定', 'wpbridge' ); ?></option>
+                                        <option value="current"><?php esc_html_e( '锁定当前版本', 'wpbridge' ); ?></option>
+                                    </select>
+                                    <button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-lock-version"
+                                            data-item-key="<?php echo esc_attr( $item_key ); ?>" style="display: none;">
+                                        <span class="dashicons dashicons-lock"></span>
+                                        <?php esc_html_e( '锁定', 'wpbridge' ); ?>
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                            <p class="wpbridge-form-help"><?php esc_html_e( '锁定后将阻止此插件的自动更新', 'wpbridge' ); ?></p>
                         </div>
                     </div>
                     <div class="wpbridge-config-actions">
