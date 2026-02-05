@@ -2192,3 +2192,227 @@
         margin-top: var(--wpbridge-space-1);
     }
 }
+
+/* ========================================
+   更新日志模态框
+   ======================================== */
+
+.wpbridge-modal-open {
+    overflow: hidden;
+}
+
+.wpbridge-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 100000;
+}
+
+.wpbridge-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--wpbridge-white);
+    border-radius: var(--wpbridge-radius-lg);
+    box-shadow: var(--wpbridge-shadow-xl);
+    z-index: 100001;
+    max-width: 700px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.wpbridge-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-gray-200);
+}
+
+.wpbridge-modal-title {
+    margin: 0;
+    font-size: var(--wpbridge-text-lg);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-modal-title .dashicons {
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: var(--wpbridge-space-1);
+    color: var(--wpbridge-gray-500);
+    transition: color 0.2s;
+}
+
+.wpbridge-modal-close:hover {
+    color: var(--wpbridge-gray-700);
+}
+
+.wpbridge-modal-body {
+    padding: var(--wpbridge-space-4);
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* 更新日志内容 */
+.wpbridge-changelog-loading {
+    text-align: center;
+    padding: var(--wpbridge-space-8);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-changelog-error {
+    text-align: center;
+    padding: var(--wpbridge-space-8);
+    color: var(--wpbridge-danger);
+}
+
+.wpbridge-changelog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--wpbridge-space-4);
+    padding-bottom: var(--wpbridge-space-3);
+    border-bottom: 1px solid var(--wpbridge-gray-200);
+}
+
+.wpbridge-changelog-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-changelog-name {
+    font-weight: 600;
+    font-size: var(--wpbridge-text-base);
+}
+
+.wpbridge-changelog-updated {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-changelog-versions {
+    margin-bottom: var(--wpbridge-space-4);
+    font-size: var(--wpbridge-text-sm);
+}
+
+.wpbridge-version-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--wpbridge-gray-100);
+    border-radius: var(--wpbridge-radius-sm);
+    font-family: var(--wpbridge-font-mono);
+    font-size: var(--wpbridge-text-xs);
+    margin-right: var(--wpbridge-space-1);
+}
+
+.wpbridge-changelog-body {
+    font-size: var(--wpbridge-text-sm);
+    line-height: 1.6;
+}
+
+.wpbridge-changelog-body h3,
+.wpbridge-changelog-body h4,
+.wpbridge-changelog-body h5 {
+    margin-top: var(--wpbridge-space-4);
+    margin-bottom: var(--wpbridge-space-2);
+}
+
+.wpbridge-changelog-body ul {
+    margin: var(--wpbridge-space-2) 0;
+    padding-left: var(--wpbridge-space-5);
+}
+
+.wpbridge-changelog-body li {
+    margin-bottom: var(--wpbridge-space-1);
+}
+
+.wpbridge-changelog-body code {
+    background: var(--wpbridge-gray-100);
+    padding: 2px 6px;
+    border-radius: var(--wpbridge-radius-sm);
+    font-family: var(--wpbridge-font-mono);
+    font-size: 0.9em;
+}
+
+.wpbridge-changelog-empty {
+    text-align: center;
+    color: var(--wpbridge-gray-500);
+    padding: var(--wpbridge-space-8);
+}
+
+/* Git Releases 样式 */
+.wpbridge-changelog-releases {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wpbridge-space-4);
+}
+
+.wpbridge-release-item {
+    padding: var(--wpbridge-space-4);
+    background: var(--wpbridge-gray-50);
+    border-radius: var(--wpbridge-radius-md);
+    border-left: 3px solid var(--wpbridge-primary);
+}
+
+.wpbridge-release-title {
+    margin: 0 0 var(--wpbridge-space-2) 0;
+    font-size: var(--wpbridge-text-base);
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-release-date {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    margin: 0 0 var(--wpbridge-space-2) 0;
+}
+
+.wpbridge-release-body {
+    font-size: var(--wpbridge-text-sm);
+}
+
+/* 查看更新日志按钮 */
+.wpbridge-view-changelog {
+    cursor: pointer;
+    color: var(--wpbridge-primary);
+    text-decoration: none;
+}
+
+.wpbridge-view-changelog:hover {
+    text-decoration: underline;
+}
+
+/* 响应式 - 模态框 */
+@media screen and (max-width: 782px) {
+    .wpbridge-modal {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .wpbridge-changelog-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--wpbridge-space-2);
+    }
+
+    .wpbridge-changelog-slug {
+        display: block;
+        font-size: var(--wpbridge-text-sm);
+    }
+}
