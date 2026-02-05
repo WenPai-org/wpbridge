@@ -107,14 +107,6 @@ $version_lock = VersionLock::get_instance();
                         <?php if ( $is_active ) : ?>
                             <span class="wpbridge-badge wpbridge-badge-success"><?php esc_html_e( '已激活', 'wpbridge' ); ?></span>
                         <?php endif; ?>
-                        <?php if ( $is_locked ) : ?>
-                            <span class="wpbridge-badge wpbridge-badge-warning wpbridge-version-lock-badge"
-                                  data-item-key="<?php echo esc_attr( $item_key ); ?>"
-                                  title="<?php echo esc_attr( VersionLock::get_type_label( $lock_info['type'] ) ); ?>">
-                                <span class="dashicons dashicons-lock"></span>
-                                <?php esc_html_e( '已锁定', 'wpbridge' ); ?>
-                            </span>
-                        <?php endif; ?>
                         <!-- 插件类型徽章 -->
                         <span class="wpbridge-badge wpbridge-badge-type-<?php echo esc_attr( $type_info['type'] ); ?>"
                               data-plugin-slug="<?php echo esc_attr( $plugin_slug ); ?>"
@@ -141,6 +133,14 @@ $version_lock = VersionLock::get_instance();
                 </div>
 
                 <div class="wpbridge-project-status">
+                    <?php if ( $is_locked ) : ?>
+                        <span class="wpbridge-badge wpbridge-badge-warning wpbridge-version-lock-badge"
+                              data-item-key="<?php echo esc_attr( $item_key ); ?>"
+                              title="<?php echo esc_attr( VersionLock::get_type_label( $lock_info['type'] ) ); ?>">
+                            <span class="dashicons dashicons-lock"></span>
+                            <?php esc_html_e( '已锁定', 'wpbridge' ); ?>
+                        </span>
+                    <?php endif; ?>
                     <?php if ( $mode === ItemSourceManager::MODE_DISABLED ) : ?>
                         <span class="wpbridge-status-badge wpbridge-status-disabled">
                             <span class="dashicons dashicons-dismiss"></span>
