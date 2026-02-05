@@ -134,7 +134,7 @@ $version_lock = VersionLock::get_instance();
 
                 <div class="wpbridge-project-status">
                     <?php if ( $is_locked ) : ?>
-                        <span class="wpbridge-badge wpbridge-badge-warning wpbridge-version-lock-badge"
+                        <span class="wpbridge-status-badge wpbridge-status-locked wpbridge-version-lock-badge"
                               data-item-key="<?php echo esc_attr( $item_key ); ?>"
                               title="<?php echo esc_attr( VersionLock::get_type_label( $lock_info['type'] ) ); ?>">
                             <span class="dashicons dashicons-lock"></span>
