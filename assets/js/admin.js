@@ -106,6 +106,303 @@
     };
 
     /**
+     * 模态框系统 - 替代浏览器原生 confirm/prompt/alert
+     */
+    var Modal = {
+        /**
+         * 显示确认对话框
+         * @param {Object} options 配置选项
+         * @param {string} options.title 标题
+         * @param {string} options.message 消息内容
+         * @param {string} options.confirmText 确认按钮文字
+         * @param {string} options.cancelText 取消按钮文字
+         * @param {string} options.type 类型 (info/warning/danger)
+         * @param {Function} options.onConfirm 确认回调
+         * @param {Function} options.onCancel 取消回调
+         */
+        confirm: function(options) {
+            var defaults = {
+                title: wpbridge.i18n.confirm_title || '确认操作',
+                message: '',
+                confirmText: wpbridge.i18n.confirm_btn || '确定',
+                cancelText: wpbridge.i18n.cancel_btn || '取消',
+                type: 'warning',
+                onConfirm: function() {},
+                onCancel: function() {}
+            };
+            options = $.extend({}, defaults, options);
+
+            var iconClass = {
+                info: 'dashicons-info',
+                warning: 'dashicons-warning',
+                danger: 'dashicons-dismiss'
+            };
+
+            var html = '<div class="wpbridge-modal-overlay wpbridge-modal-confirm-overlay"></div>' +
+                '<div class="wpbridge-modal wpbridge-modal-confirm wpbridge-modal-' + options.type + '">' +
+                    '<div class="wpbridge-modal-header">' +
+                        '<h3 class="wpbridge-modal-title">' +
+                            '<span class="dashicons ' + (iconClass[options.type] || iconClass.warning) + '"></span> ' +
+                            this.escapeHtml(options.title) +
+                        '</h3>' +
+                    '</div>' +
+                    '<div class="wpbridge-modal-body">' +
+                        '<p class="wpbridge-modal-message">' + this.escapeHtml(options.message) + '</p>' +
+                    '</div>' +
+                    '<div class="wpbridge-modal-footer">' +
+                        '<button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-modal-cancel">' +
+                            this.escapeHtml(options.cancelText) +
+                        '</button>' +
+                        '<button type="button" class="wpbridge-btn wpbridge-btn-' + (options.type === 'danger' ? 'danger' : 'primary') + ' wpbridge-modal-confirm-btn">' +
+                            this.escapeHtml(options.confirmText) +
+                        '</button>' +
+                    '</div>' +
+                '</div>';
+
+            var $modal = $(html).appendTo('body');
+            $('body').addClass('wpbridge-modal-open');
+
+            // 绑定事件
+            $modal.filter('.wpbridge-modal').find('.wpbridge-modal-confirm-btn').on('click', function() {
+                Modal.close($modal);
+                options.onConfirm();
+            });
+
+            $modal.filter('.wpbridge-modal').find('.wpbridge-modal-cancel').on('click', function() {
+                Modal.close($modal);
+                options.onCancel();
+            });
+
+            $modal.filter('.wpbridge-modal-overlay').on('click', function() {
+                Modal.close($modal);
+                options.onCancel();
+            });
+
+            // ESC 关闭
+            $(document).one('keydown.wpbridge-modal', function(e) {
+                if (e.key === 'Escape') {
+                    Modal.close($modal);
+                    options.onCancel();
+                }
+            });
+
+            // 聚焦确认按钮
+            $modal.filter('.wpbridge-modal').find('.wpbridge-modal-confirm-btn').focus();
+
+            return $modal;
+        },
+
+        /**
+         * 显示输入对话框
+         * @param {Object} options 配置选项
+         * @param {string} options.title 标题
+         * @param {string} options.message 提示消息
+         * @param {string} options.placeholder 输入框占位符
+         * @param {string} options.defaultValue 默认值
+         * @param {string} options.inputType 输入类型 (text/password)
+         * @param {string} options.confirmText 确认按钮文字
+         * @param {string} options.cancelText 取消按钮文字
+         * @param {Function} options.onConfirm 确认回调，参数为输入值
+         * @param {Function} options.onCancel 取消回调
+         * @param {Function} options.validate 验证函数，返回 true 或错误消息
+         */
+        prompt: function(options) {
+            var defaults = {
+                title: wpbridge.i18n.input_title || '请输入',
+                message: '',
+                placeholder: '',
+                defaultValue: '',
+                inputType: 'text',
+                confirmText: wpbridge.i18n.confirm_btn || '确定',
+                cancelText: wpbridge.i18n.cancel_btn || '取消',
+                onConfirm: function() {},
+                onCancel: function() {},
+                validate: function() { return true; }
+            };
+            options = $.extend({}, defaults, options);
+
+            var html = '<div class="wpbridge-modal-overlay wpbridge-modal-prompt-overlay"></div>' +
+                '<div class="wpbridge-modal wpbridge-modal-prompt">' +
+                    '<div class="wpbridge-modal-header">' +
+                        '<h3 class="wpbridge-modal-title">' +
+                            '<span class="dashicons dashicons-edit"></span> ' +
+                            this.escapeHtml(options.title) +
+                        '</h3>' +
+                    '</div>' +
+                    '<div class="wpbridge-modal-body">' +
+                        (options.message ? '<p class="wpbridge-modal-message">' + this.escapeHtml(options.message) + '</p>' : '') +
+                        '<input type="' + options.inputType + '" class="wpbridge-form-input wpbridge-modal-input" ' +
+                            'placeholder="' + this.escapeHtml(options.placeholder) + '" ' +
+                            'value="' + this.escapeHtml(options.defaultValue) + '">' +
+                        '<p class="wpbridge-modal-error" style="display: none; color: #dc3545; margin-top: 8px;"></p>' +
+                    '</div>' +
+                    '<div class="wpbridge-modal-footer">' +
+                        '<button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-modal-cancel">' +
+                            this.escapeHtml(options.cancelText) +
+                        '</button>' +
+                        '<button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-modal-confirm-btn">' +
+                            this.escapeHtml(options.confirmText) +
+                        '</button>' +
+                    '</div>' +
+                '</div>';
+
+            var $modal = $(html).appendTo('body');
+            $('body').addClass('wpbridge-modal-open');
+
+            var $input = $modal.filter('.wpbridge-modal').find('.wpbridge-modal-input');
+            var $error = $modal.filter('.wpbridge-modal').find('.wpbridge-modal-error');
+
+            var submitValue = function() {
+                var value = $input.val().trim();
+                var validation = options.validate(value);
+
+                if (validation === true) {
+                    Modal.close($modal);
+                    options.onConfirm(value);
+                } else {
+                    $error.text(validation || wpbridge.i18n.invalid_input || '输入无效').show();
+                    $input.focus();
+                }
+            };
+
+            // 绑定事件
+            $modal.filter('.wpbridge-modal').find('.wpbridge-modal-confirm-btn').on('click', submitValue);
+
+            $input.on('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitValue();
+                }
+            });
+
+            $modal.filter('.wpbridge-modal').find('.wpbridge-modal-cancel').on('click', function() {
+                Modal.close($modal);
+                options.onCancel();
+            });
+
+            $modal.filter('.wpbridge-modal-overlay').on('click', function() {
+                Modal.close($modal);
+                options.onCancel();
+            });
+
+            // ESC 关闭
+            $(document).one('keydown.wpbridge-modal', function(e) {
+                if (e.key === 'Escape') {
+                    Modal.close($modal);
+                    options.onCancel();
+                }
+            });
+
+            // 聚焦输入框
+            $input.focus().select();
+
+            return $modal;
+        },
+
+        /**
+         * 显示提示对话框（显示重要信息，需要用户确认）
+         * @param {Object} options 配置选项
+         * @param {string} options.title 标题
+         * @param {string} options.message 消息内容（支持 HTML）
+         * @param {boolean} options.copyable 是否可复制
+         * @param {string} options.copyText 要复制的文本
+         * @param {string} options.confirmText 确认按钮文字
+         * @param {Function} options.onConfirm 确认回调
+         */
+        alert: function(options) {
+            var defaults = {
+                title: wpbridge.i18n.notice_title || '提示',
+                message: '',
+                copyable: false,
+                copyText: '',
+                confirmText: wpbridge.i18n.confirm_btn || '确定',
+                onConfirm: function() {}
+            };
+            options = $.extend({}, defaults, options);
+
+            var copySection = '';
+            if (options.copyable && options.copyText) {
+                copySection = '<div class="wpbridge-modal-copy-section">' +
+                    '<input type="text" class="wpbridge-form-input wpbridge-modal-copy-input" readonly value="' + this.escapeHtml(options.copyText) + '">' +
+                    '<button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-modal-copy-btn">' +
+                        '<span class="dashicons dashicons-clipboard"></span> ' + (wpbridge.i18n.copy || '复制') +
+                    '</button>' +
+                '</div>';
+            }
+
+            var html = '<div class="wpbridge-modal-overlay wpbridge-modal-alert-overlay"></div>' +
+                '<div class="wpbridge-modal wpbridge-modal-alert">' +
+                    '<div class="wpbridge-modal-header">' +
+                        '<h3 class="wpbridge-modal-title">' +
+                            '<span class="dashicons dashicons-info"></span> ' +
+                            this.escapeHtml(options.title) +
+                        '</h3>' +
+                    '</div>' +
+                    '<div class="wpbridge-modal-body">' +
+                        '<div class="wpbridge-modal-message">' + options.message + '</div>' +
+                        copySection +
+                    '</div>' +
+                    '<div class="wpbridge-modal-footer">' +
+                        '<button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-modal-confirm-btn">' +
+                            this.escapeHtml(options.confirmText) +
+                        '</button>' +
+                    '</div>' +
+                '</div>';
+
+            var $modal = $(html).appendTo('body');
+            $('body').addClass('wpbridge-modal-open');
+
+            // 复制功能
+            if (options.copyable) {
+                $modal.filter('.wpbridge-modal').find('.wpbridge-modal-copy-btn').on('click', function() {
+                    var $input = $modal.filter('.wpbridge-modal').find('.wpbridge-modal-copy-input');
+                    $input.select();
+                    document.execCommand('copy');
+                    Toast.success(wpbridge.i18n.copied || '已复制到剪贴板');
+                });
+            }
+
+            // 绑定事件
+            $modal.filter('.wpbridge-modal').find('.wpbridge-modal-confirm-btn').on('click', function() {
+                Modal.close($modal);
+                options.onConfirm();
+            });
+
+            // ESC 关闭
+            $(document).one('keydown.wpbridge-modal', function(e) {
+                if (e.key === 'Escape') {
+                    Modal.close($modal);
+                    options.onConfirm();
+                }
+            });
+
+            // 聚焦确认按钮
+            $modal.filter('.wpbridge-modal').find('.wpbridge-modal-confirm-btn').focus();
+
+            return $modal;
+        },
+
+        /**
+         * 关闭模态框
+         */
+        close: function($modal) {
+            $(document).off('keydown.wpbridge-modal');
+            $modal.remove();
+            $('body').removeClass('wpbridge-modal-open');
+        },
+
+        /**
+         * HTML 转义
+         */
+        escapeHtml: function(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    };
+
+    /**
      * Tab 导航
      */
     var Tabs = {
@@ -263,10 +560,16 @@
         deleteSource: function($button) {
             var sourceId = $button.data('source-id');
 
-            if (confirm(wpbridge.i18n.confirm_delete)) {
-                $('#wpbridge-delete-source-id').val(sourceId);
-                $('#wpbridge-delete-form').submit();
-            }
+            Modal.confirm({
+                title: wpbridge.i18n.confirm_delete_title || '删除更新源',
+                message: wpbridge.i18n.confirm_delete || '确定要删除这个更新源吗？',
+                type: 'danger',
+                confirmText: wpbridge.i18n.delete_btn || '删除',
+                onConfirm: function() {
+                    $('#wpbridge-delete-source-id').val(sourceId);
+                    $('#wpbridge-delete-form').submit();
+                }
+            });
         },
 
         clearCache: function($button) {
@@ -319,71 +622,92 @@
         },
 
         generateKey: function($button) {
-            var keyName = prompt(wpbridge.i18n.enter_key_name || '请输入 API Key 名称：');
-            if (!keyName) return;
-
-            $button.prop('disabled', true);
-
-            $.ajax({
-                url: wpbridge.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'wpbridge_generate_api_key',
-                    nonce: wpbridge.nonce,
-                    key_name: keyName
-                },
-                success: function(response) {
-                    if (response.success) {
-                        // 显示新生成的 Key
-                        var message = wpbridge.i18n.key_generated + '\n\n' +
-                            response.data.api_key + '\n\n' +
-                            wpbridge.i18n.key_warning;
-                        alert(message);
-                        location.reload();
-                    } else {
-                        Toast.error(response.data.message || wpbridge.i18n.failed);
+            Modal.prompt({
+                title: wpbridge.i18n.generate_api_key || '生成 API Key',
+                message: wpbridge.i18n.enter_key_name || '请输入 API Key 名称：',
+                placeholder: wpbridge.i18n.key_name_placeholder || '例如：我的应用',
+                validate: function(value) {
+                    if (!value) {
+                        return wpbridge.i18n.key_name_required || '请输入名称';
                     }
+                    return true;
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
-                },
-                complete: function() {
-                    $button.prop('disabled', false);
+                onConfirm: function(keyName) {
+                    $button.prop('disabled', true);
+
+                    $.ajax({
+                        url: wpbridge.ajax_url,
+                        type: 'POST',
+                        data: {
+                            action: 'wpbridge_generate_api_key',
+                            nonce: wpbridge.nonce,
+                            key_name: keyName
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                // 显示新生成的 Key（使用模态框）
+                                Modal.alert({
+                                    title: wpbridge.i18n.key_generated_title || 'API Key 已生成',
+                                    message: '<p>' + (wpbridge.i18n.key_generated || 'API Key 已生成，请妥善保存：') + '</p>' +
+                                        '<p class="wpbridge-key-warning"><span class="dashicons dashicons-warning"></span> ' +
+                                        (wpbridge.i18n.key_warning || '此 Key 只会显示一次，请立即复制保存。') + '</p>',
+                                    copyable: true,
+                                    copyText: response.data.api_key,
+                                    onConfirm: function() {
+                                        location.reload();
+                                    }
+                                });
+                            } else {
+                                Toast.error(response.data.message || wpbridge.i18n.failed);
+                            }
+                        },
+                        error: function() {
+                            Toast.error(wpbridge.i18n.failed);
+                        },
+                        complete: function() {
+                            $button.prop('disabled', false);
+                        }
+                    });
                 }
             });
         },
 
         revokeKey: function($button) {
-            if (!confirm(wpbridge.i18n.confirm_revoke || '确定要撤销此 API Key 吗？')) {
-                return;
-            }
-
             var keyId = $button.data('key-id');
-            $button.prop('disabled', true);
+            var keyName = $button.closest('.wpbridge-settings-row').find('.wpbridge-key-name').text() || 'API Key';
 
-            $.ajax({
-                url: wpbridge.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'wpbridge_revoke_api_key',
-                    nonce: wpbridge.nonce,
-                    key_id: keyId
-                },
-                success: function(response) {
-                    if (response.success) {
-                        Toast.success(wpbridge.i18n.key_revoked || 'API Key 已撤销');
-                        $button.closest('.wpbridge-settings-row').fadeOut(function() {
-                            $(this).remove();
-                        });
-                    } else {
-                        Toast.error(response.data.message || wpbridge.i18n.failed);
-                    }
-                },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
-                },
-                complete: function() {
-                    $button.prop('disabled', false);
+            Modal.confirm({
+                title: wpbridge.i18n.revoke_key_title || '撤销 API Key',
+                message: (wpbridge.i18n.confirm_revoke || '确定要撤销此 API Key 吗？') + '\n\n' + keyName,
+                type: 'danger',
+                confirmText: wpbridge.i18n.revoke_btn || '撤销',
+                onConfirm: function() {
+                    $button.prop('disabled', true);
+
+                    $.ajax({
+                        url: wpbridge.ajax_url,
+                        type: 'POST',
+                        data: {
+                            action: 'wpbridge_revoke_api_key',
+                            nonce: wpbridge.nonce,
+                            key_id: keyId
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                Toast.success(wpbridge.i18n.key_revoked || 'API Key 已撤销');
+                                $button.closest('.wpbridge-settings-row').fadeOut(function() {
+                                    $(this).remove();
+                                });
+                            } else {
+                                Toast.error(response.data.message || wpbridge.i18n.failed);
+                                $button.prop('disabled', false);
+                            }
+                        },
+                        error: function() {
+                            Toast.error(wpbridge.i18n.failed);
+                            $button.prop('disabled', false);
+                        }
+                    });
                 }
             });
         }
@@ -406,37 +730,41 @@
         },
 
         clearLogs: function($button) {
-            if (!confirm(wpbridge.i18n.confirm_clear_logs || '确定要清除所有日志吗？')) {
-                return;
-            }
+            Modal.confirm({
+                title: wpbridge.i18n.clear_logs_title || '清除日志',
+                message: wpbridge.i18n.confirm_clear_logs || '确定要清除所有日志吗？',
+                type: 'warning',
+                confirmText: wpbridge.i18n.clear_btn || '清除',
+                onConfirm: function() {
+                    $button.prop('disabled', true);
 
-            $button.prop('disabled', true);
-
-            $.ajax({
-                url: wpbridge.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'wpbridge_clear_logs',
-                    nonce: wpbridge.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        Toast.success(wpbridge.i18n.logs_cleared || '日志已清除');
-                        $('.wpbridge-logs-list').html(
-                            '<div class="wpbridge-logs-empty">' +
-                            '<span class="dashicons dashicons-media-text" style="font-size: 32px; width: 32px; height: 32px; color: var(--wpbridge-gray-300);"></span>' +
-                            '<p>' + (wpbridge.i18n.no_logs || '暂无日志记录') + '</p>' +
-                            '</div>'
-                        );
-                    } else {
-                        Toast.error(response.data.message || wpbridge.i18n.failed);
-                    }
-                },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
-                },
-                complete: function() {
-                    $button.prop('disabled', false);
+                    $.ajax({
+                        url: wpbridge.ajax_url,
+                        type: 'POST',
+                        data: {
+                            action: 'wpbridge_clear_logs',
+                            nonce: wpbridge.nonce
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                Toast.success(wpbridge.i18n.logs_cleared || '日志已清除');
+                                $('.wpbridge-logs-list').html(
+                                    '<div class="wpbridge-logs-empty">' +
+                                    '<span class="dashicons dashicons-media-text" style="font-size: 32px; width: 32px; height: 32px; color: var(--wpbridge-gray-300);"></span>' +
+                                    '<p>' + (wpbridge.i18n.no_logs || '暂无日志记录') + '</p>' +
+                                    '</div>'
+                                );
+                            } else {
+                                Toast.error(response.data.message || wpbridge.i18n.failed);
+                            }
+                        },
+                        error: function() {
+                            Toast.error(wpbridge.i18n.failed);
+                        },
+                        complete: function() {
+                            $button.prop('disabled', false);
+                        }
+                    });
                 }
             });
         }
@@ -603,43 +931,58 @@
                 return;
             }
 
-            // 确认操作
-            var confirmMsg = wpbridge.i18n.confirm_bulk_action || '确定要对选中的 ' + items.length + ' 个项目执行此操作吗？';
-            if (!confirm(confirmMsg)) {
-                return;
-            }
-
-            var data = {
-                action: 'wpbridge_batch_set_source',
-                nonce: wpbridge.nonce,
-                bulk_action: action,
-                item_keys: items
-            };
-
-            // 如果是设置源，从下拉框获取选择的源
+            // 如果是设置源，先检查是否选择了源
+            var sourceKey = '';
             if (action === 'set_source') {
-                var sourceKey = $('#wpbridge-bulk-source-' + type).val();
+                sourceKey = $('#wpbridge-bulk-source-' + type).val();
                 if (!sourceKey) {
                     Toast.error(wpbridge.i18n.select_source || '请选择更新源');
                     return;
                 }
-                data.source_key = sourceKey;
             }
 
-            $.ajax({
-                url: wpbridge.ajax_url,
-                type: 'POST',
-                data: data,
-                success: function(response) {
-                    if (response.success) {
-                        Toast.success(response.data.message);
-                        location.reload();
-                    } else {
-                        Toast.error(response.data.message || wpbridge.i18n.failed);
+            // 确认操作
+            var actionLabels = {
+                set_source: wpbridge.i18n.action_set_source || '设置更新源',
+                reset_default: wpbridge.i18n.action_reset || '重置为默认',
+                disable: wpbridge.i18n.action_disable || '禁用更新'
+            };
+            var confirmMsg = (wpbridge.i18n.confirm_bulk_action || '确定要对选中的 {count} 个项目执行"{action}"操作吗？')
+                .replace('{count}', items.length)
+                .replace('{action}', actionLabels[action] || action);
+
+            Modal.confirm({
+                title: wpbridge.i18n.bulk_action_title || '批量操作',
+                message: confirmMsg,
+                type: 'warning',
+                onConfirm: function() {
+                    var data = {
+                        action: 'wpbridge_batch_set_source',
+                        nonce: wpbridge.nonce,
+                        bulk_action: action,
+                        item_keys: items
+                    };
+
+                    if (sourceKey) {
+                        data.source_key = sourceKey;
                     }
-                },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+
+                    $.ajax({
+                        url: wpbridge.ajax_url,
+                        type: 'POST',
+                        data: data,
+                        success: function(response) {
+                            if (response.success) {
+                                Toast.success(response.data.message);
+                                location.reload();
+                            } else {
+                                Toast.error(response.data.message || wpbridge.i18n.failed);
+                            }
+                        },
+                        error: function() {
+                            Toast.error(wpbridge.i18n.failed);
+                        }
+                    });
                 }
             });
         },
@@ -1511,13 +1854,15 @@
             }
 
             // 确认导入
-            if (!confirm(wpbridge.i18n.confirm_import || '确定要导入配置吗？这将覆盖当前设置。')) {
-                return;
-            }
-
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                var content = e.target.result;
+            Modal.confirm({
+                title: wpbridge.i18n.import_config_title || '导入配置',
+                message: wpbridge.i18n.confirm_import || '确定要导入配置吗？这将覆盖当前设置。',
+                type: 'warning',
+                confirmText: wpbridge.i18n.import_btn || '导入',
+                onConfirm: function() {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        var content = e.target.result;
 
                 // 验证 JSON 格式
                 try {
@@ -1561,6 +1906,8 @@
             };
 
             reader.readAsText(file);
+                }
+            });
         }
     };
 
@@ -1603,11 +1950,15 @@
                 var $btn = $(this);
                 var itemKey = $btn.data('item-key');
 
-                if (!confirm(wpbridge.i18n.confirm_unlock || '确定要解锁此版本吗？')) {
-                    return;
-                }
-
-                self.unlockVersion($btn, itemKey);
+                Modal.confirm({
+                    title: wpbridge.i18n.unlock_version_title || '解锁版本',
+                    message: wpbridge.i18n.confirm_unlock || '确定要解锁此版本吗？',
+                    type: 'warning',
+                    confirmText: wpbridge.i18n.unlock_btn || '解锁',
+                    onConfirm: function() {
+                        self.unlockVersion($btn, itemKey);
+                    }
+                });
             });
         },
 

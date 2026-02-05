@@ -2416,3 +2416,78 @@
         font-size: var(--wpbridge-text-sm);
     }
 }
+
+/* ========================================
+   确认/输入模态框
+   ======================================== */
+
+.wpbridge-modal-confirm,
+.wpbridge-modal-prompt,
+.wpbridge-modal-alert {
+    max-width: 450px;
+}
+
+.wpbridge-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--wpbridge-space-2);
+    padding: var(--wpbridge-space-4);
+    border-top: 1px solid var(--wpbridge-gray-200);
+}
+
+.wpbridge-modal-message {
+    margin: 0;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.wpbridge-modal-input {
+    width: 100%;
+    margin-top: var(--wpbridge-space-3);
+}
+
+/* 模态框类型样式 */
+.wpbridge-modal-warning .wpbridge-modal-title .dashicons {
+    color: var(--wpbridge-warning);
+}
+
+.wpbridge-modal-danger .wpbridge-modal-title .dashicons {
+    color: var(--wpbridge-danger);
+}
+
+.wpbridge-modal-info .wpbridge-modal-title .dashicons {
+    color: var(--wpbridge-info);
+}
+
+/* 复制区域 */
+.wpbridge-modal-copy-section {
+    display: flex;
+    gap: var(--wpbridge-space-2);
+    margin-top: var(--wpbridge-space-4);
+}
+
+.wpbridge-modal-copy-input {
+    flex: 1;
+    font-family: var(--wpbridge-font-mono);
+    font-size: var(--wpbridge-text-sm);
+}
+
+.wpbridge-modal-copy-btn {
+    white-space: nowrap;
+}
+
+/* API Key 警告样式 */
+.wpbridge-key-warning {
+    background: var(--wpbridge-warning-bg, #fff3cd);
+    color: var(--wpbridge-warning-text, #856404);
+    padding: var(--wpbridge-space-3);
+    border-radius: var(--wpbridge-radius-md);
+    margin-top: var(--wpbridge-space-3);
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-key-warning .dashicons {
+    color: var(--wpbridge-warning);
+}
