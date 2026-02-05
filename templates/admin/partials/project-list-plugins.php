@@ -107,14 +107,6 @@ $version_lock = VersionLock::get_instance();
                         <?php if ( $is_active ) : ?>
                             <span class="wpbridge-badge wpbridge-badge-success"><?php esc_html_e( '已激活', 'wpbridge' ); ?></span>
                         <?php endif; ?>
-                        <!-- 插件类型徽章 -->
-                        <span class="wpbridge-badge wpbridge-badge-type-<?php echo esc_attr( $type_info['type'] ); ?>"
-                              data-plugin-slug="<?php echo esc_attr( $plugin_slug ); ?>"
-                              data-source="<?php echo esc_attr( $type_info['source'] ); ?>"
-                              title="<?php echo esc_attr( $type_info['source'] === 'manual' ? __( '手动标记', 'wpbridge' ) : __( '自动检测', 'wpbridge' ) ); ?>">
-                            <span class="dashicons <?php echo esc_attr( $type_label['icon'] ); ?>"></span>
-                            <?php echo esc_html( $type_label['label'] ); ?>
-                        </span>
                     </div>
                     <div class="wpbridge-project-meta">
                         <span class="wpbridge-project-version">v<?php echo esc_html( $plugin_data['Version'] ); ?></span>
@@ -133,6 +125,14 @@ $version_lock = VersionLock::get_instance();
                 </div>
 
                 <div class="wpbridge-project-status">
+                    <!-- 插件类型徽章 -->
+                    <span class="wpbridge-status-badge wpbridge-status-type-<?php echo esc_attr( $type_info['type'] ); ?>"
+                          data-plugin-slug="<?php echo esc_attr( $plugin_slug ); ?>"
+                          data-source="<?php echo esc_attr( $type_info['source'] ); ?>"
+                          title="<?php echo esc_attr( $type_info['source'] === 'manual' ? __( '手动标记', 'wpbridge' ) : __( '自动检测', 'wpbridge' ) ); ?>">
+                        <span class="dashicons <?php echo esc_attr( $type_label['icon'] ); ?>"></span>
+                        <?php echo esc_html( $type_label['label'] ); ?>
+                    </span>
                     <?php if ( $is_locked ) : ?>
                         <span class="wpbridge-status-badge wpbridge-status-locked wpbridge-version-lock-badge"
                               data-item-key="<?php echo esc_attr( $item_key ); ?>"
