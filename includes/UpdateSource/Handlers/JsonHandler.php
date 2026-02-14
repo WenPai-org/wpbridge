@@ -34,6 +34,33 @@ class JsonHandler extends AbstractHandler {
     }
 
     /**
+     * 获取健康检查 URL
+     *
+     * 对于包含 {slug} 模板的 URL，提取基础 URL 进行健康检查
+     *
+     * @return string
+     */
+    public function get_check_url(): string {
+        $url = $this->source->api_url;
+
+        // 如果 URL 包含 {slug} 模板，提取基础 URL
+        if ( strpos( $url, '{slug}' ) !== false ) {
+            // 从 https://updates.wenpai.net/api/v1/plugins/{slug}/info
+            // 提取 https://updates.wenpai.net/
+            $parsed = wp_parse_url( $url );
+            if ( $parsed && isset( $parsed['scheme'], $parsed['host'] ) ) {
+                $base_url = $parsed['scheme'] . '://' . $parsed['host'];
+                if ( isset( $parsed['port'] ) ) {
+                    $base_url .= ':' . $parsed['port'];
+                }
+                return $base_url . '/';
+            }
+        }
+
+        return $url;
+    }
+
+    /**
      * 检查更新
      *
      * @param string $slug    插件/主题 slug

@@ -85,8 +85,8 @@ class Settings {
             [
                 'id'         => 'wenpai-open',
                 'name'       => __( '文派开源更新源', 'wpbridge' ),
-                'type'       => 'arkpress',
-                'api_url'    => 'https://api.wenpai.net/v1',
+                'type'       => 'json',
+                'api_url'    => 'https://updates.wenpai.net/api/v1/plugins/{slug}/info',
                 'slug'       => '',
                 'item_type'  => 'plugin',
                 'auth_token' => '',
