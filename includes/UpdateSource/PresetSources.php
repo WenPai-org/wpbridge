@@ -23,8 +23,8 @@ class PresetSources {
     const WENPAI_OPEN = [
         'id'        => 'wenpai-open',
         'name'      => '文派开源更新源',
-        'type'      => SourceType::ARKPRESS,
-        'api_url'   => 'https://api.wenpai.net/v1',
+        'type'      => SourceType::JSON,
+        'api_url'   => 'https://updates.wenpai.net/api/v1/plugins/{slug}/info',
         'enabled'   => true,
         'priority'  => 10,
         'is_preset' => true,

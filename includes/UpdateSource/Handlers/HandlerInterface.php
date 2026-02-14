@@ -179,7 +179,7 @@ class UpdateInfo {
 
         $info->slug         = $data['slug'] ?? '';
         $info->version      = $data['version'] ?? '';
-        $info->download_url = $data['download_url'] ?? $data['package'] ?? '';
+        $info->download_url = $data['download_url'] ?? $data['package'] ?? $data['download_link'] ?? '';
         $info->details_url  = $data['details_url'] ?? $data['url'] ?? '';
         $info->requires     = $data['requires'] ?? '';
         $info->tested       = $data['tested'] ?? '';
