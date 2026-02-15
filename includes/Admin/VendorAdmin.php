@@ -64,6 +64,9 @@ class VendorAdmin {
 		// 自定义插件 AJAX 处理
 		add_action( 'wp_ajax_wpbridge_add_custom_plugin', [ $this, 'ajax_add_custom_plugin' ] );
 		add_action( 'wp_ajax_wpbridge_remove_custom_plugin', [ $this, 'ajax_remove_custom_plugin' ] );
+
+		// Bridge Server AJAX 处理
+		add_action( 'wp_ajax_wpbridge_test_bridge_server', [ $this, 'ajax_test_bridge_server' ] );
 	}
 
 	/**
@@ -337,6 +340,31 @@ class VendorAdmin {
 			wp_send_json_success( $result );
 		} else {
 			wp_send_json_error( $result );
+		}
+	}
+
+	/**
+	 * AJAX: 测试 Bridge Server 连接
+	 *
+	 * @return void
+	 */
+	public function ajax_test_bridge_server(): void {
+		check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+		}
+
+		$bridge_client = $this->get_bridge_manager()->get_bridge_client();
+
+		if ( ! $bridge_client ) {
+			wp_send_json_error( [ 'message' => __( 'Bridge Server 未配置', 'wpbridge' ) ] );
+		}
+
+		if ( $bridge_client->health_check() ) {
+			wp_send_json_success( [ 'message' => __( '连接成功', 'wpbridge' ) ] );
+		} else {
+			wp_send_json_error( [ 'message' => __( '连接失败', 'wpbridge' ) ] );
 		}
 	}
 

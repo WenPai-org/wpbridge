@@ -56,6 +56,13 @@ class BridgeManager {
 	private VendorManager $vendor_manager;
 
 	/**
+	 * Bridge Server 客户端
+	 *
+	 * @var BridgeClient|null
+	 */
+	private ?BridgeClient $bridge_client = null;
+
+	/**
 	 * 构造函数
 	 *
 	 * @param Settings     $settings      设置实例
@@ -67,8 +74,66 @@ class BridgeManager {
 		$this->gpl_validator  = new GPLValidator();
 		$this->vendor_manager = new VendorManager();
 
+		// 初始化 Bridge Server 客户端
+		$this->init_bridge_client();
+
 		// 初始化已配置的供应商
 		$this->init_vendors();
+	}
+
+	/**
+	 * 初始化 Bridge Server 客户端
+	 *
+	 * @return void
+	 */
+	private function init_bridge_client(): void {
+		$server_url = $this->settings->get( 'bridge_server_url', '' );
+		$api_key    = $this->settings->get( 'bridge_server_api_key', '' );
+
+		if ( ! empty( $server_url ) ) {
+			$this->bridge_client = new BridgeClient( $server_url, $api_key );
+		}
+	}
+
+	/**
+	 * 获取 Bridge Server 客户端
+	 *
+	 * @return BridgeClient|null
+	 */
+	public function get_bridge_client(): ?BridgeClient {
+		return $this->bridge_client;
+	}
+
+	/**
+	 * 设置 Bridge Server 配置
+	 *
+	 * @param string $server_url 服务端 URL
+	 * @param string $api_key    API Key
+	 * @return array
+	 */
+	public function set_bridge_server( string $server_url, string $api_key ): array {
+		// 验证连接
+		$client = new BridgeClient( $server_url, $api_key );
+
+		if ( ! $client->health_check() ) {
+			return [
+				'success' => false,
+				'message' => __( '无法连接到 Bridge Server', 'wpbridge' ),
+			];
+		}
+
+		// 保存配置
+		$this->settings->set( 'bridge_server_url', $server_url );
+		$this->settings->set( 'bridge_server_api_key', $api_key );
+
+		$this->bridge_client = $client;
+
+		Logger::info( 'Bridge server configured', [ 'url' => $server_url ] );
+
+		return [
+			'success' => true,
+			'message' => __( 'Bridge Server 配置成功', 'wpbridge' ),
+		];
 	}
 
 	/**
@@ -105,10 +170,40 @@ class BridgeManager {
 	/**
 	 * 获取可桥接的商业插件列表（从服务端）
 	 *
+	 * 优先从 Bridge Server 获取，回退到 RemoteConfig
+	 *
 	 * @return array
 	 */
 	public function get_available_plugins(): array {
+		// 优先使用 Bridge Server
+		if ( $this->bridge_client && $this->bridge_client->is_configured() ) {
+			$plugins = $this->bridge_client->list_plugins();
+			if ( ! empty( $plugins ) ) {
+				// 转换为 slug => info 格式
+				$result = [];
+				foreach ( $plugins as $plugin ) {
+					$result[ $plugin['slug'] ] = $plugin;
+				}
+				return $result;
+			}
+		}
+
+		// 回退到 RemoteConfig
 		return $this->remote_config->get( 'bridgeable_plugins', [] );
+	}
+
+	/**
+	 * 获取插件下载 URL
+	 *
+	 * @param string $slug 插件 slug
+	 * @return string|null
+	 */
+	public function get_plugin_download_url( string $slug ): ?string {
+		if ( $this->bridge_client && $this->bridge_client->is_configured() ) {
+			return $this->bridge_client->get_download_url( $slug );
+		}
+
+		return null;
 	}
 
 	/**

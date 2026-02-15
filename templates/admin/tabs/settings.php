@@ -95,6 +95,53 @@ if ( ! defined( 'ABSPATH' ) ) {
         </div>
     </div>
 
+    <!-- Bridge Server 配置 -->
+    <div class="wpbridge-settings-panel" style="margin-top: 24px; border-top: 1px solid var(--wpbridge-gray-200); padding-top: 24px;">
+        <h3 style="margin: 0 0 16px; font-size: 14px; font-weight: 600; color: var(--wpbridge-gray-700);">
+            <span class="dashicons dashicons-cloud" style="margin-right: 4px;"></span>
+            <?php esc_html_e( 'Bridge Server', 'wpbridge' ); ?>
+        </h3>
+
+        <div class="wpbridge-settings-row">
+            <div class="wpbridge-settings-info">
+                <h3 class="wpbridge-settings-title"><?php esc_html_e( '服务端地址', 'wpbridge' ); ?></h3>
+                <p class="wpbridge-settings-desc"><?php esc_html_e( 'wpbridge-server 服务端 URL，用于商业插件下载代理。', 'wpbridge' ); ?></p>
+            </div>
+            <input type="url"
+                   name="bridge_server_url"
+                   value="<?php echo esc_attr( $settings['bridge_server_url'] ?? '' ); ?>"
+                   placeholder="https://bridge.example.com"
+                   class="wpbridge-form-input"
+                   style="max-width: 300px;">
+        </div>
+
+        <div class="wpbridge-settings-row">
+            <div class="wpbridge-settings-info">
+                <h3 class="wpbridge-settings-title"><?php esc_html_e( 'API Key', 'wpbridge' ); ?></h3>
+                <p class="wpbridge-settings-desc"><?php esc_html_e( '用于访问 Bridge Server 管理 API 的密钥。', 'wpbridge' ); ?></p>
+            </div>
+            <input type="password"
+                   name="bridge_server_api_key"
+                   value="<?php echo esc_attr( $settings['bridge_server_api_key'] ?? '' ); ?>"
+                   placeholder="<?php esc_attr_e( '输入 API Key', 'wpbridge' ); ?>"
+                   class="wpbridge-form-input"
+                   style="max-width: 300px;">
+        </div>
+
+        <?php if ( ! empty( $settings['bridge_server_url'] ) ) : ?>
+        <div class="wpbridge-settings-row">
+            <div class="wpbridge-settings-info">
+                <h3 class="wpbridge-settings-title"><?php esc_html_e( '连接状态', 'wpbridge' ); ?></h3>
+                <p class="wpbridge-settings-desc"><?php esc_html_e( '测试与 Bridge Server 的连接。', 'wpbridge' ); ?></p>
+            </div>
+            <button type="button" class="wpbridge-btn wpbridge-btn-secondary" id="wpbridge-test-bridge-server">
+                <span class="dashicons dashicons-update"></span>
+                <?php esc_html_e( '测试连接', 'wpbridge' ); ?>
+            </button>
+        </div>
+        <?php endif; ?>
+    </div>
+
     <div class="wpbridge-form-actions" style="margin-top: 24px;">
         <button type="submit" class="wpbridge-btn wpbridge-btn-primary">
             <span class="dashicons dashicons-saved"></span>
