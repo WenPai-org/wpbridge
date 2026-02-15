@@ -16,6 +16,7 @@ use WPBridge\Core\Settings;
 use WPBridge\Core\RemoteConfig;
 use WPBridge\Core\Logger;
 use WPBridge\Commercial\Vendors\VendorManager;
+use WPBridge\Security\Encryption;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -88,7 +89,8 @@ class BridgeManager {
 	 */
 	private function init_bridge_client(): void {
 		$server_url = $this->settings->get( 'bridge_server_url', '' );
-		$api_key    = $this->settings->get( 'bridge_server_api_key', '' );
+		// API Key 使用加密存储
+		$api_key = Encryption::get_secure( 'bridge_server_api_key', '' );
 
 		if ( ! empty( $server_url ) ) {
 			$this->bridge_client = new BridgeClient( $server_url, $api_key );
@@ -122,9 +124,9 @@ class BridgeManager {
 			];
 		}
 
-		// 保存配置
+		// 保存配置（URL 明文存储，API Key 加密存储）
 		$this->settings->set( 'bridge_server_url', $server_url );
-		$this->settings->set( 'bridge_server_api_key', $api_key );
+		Encryption::store_secure( 'bridge_server_api_key', $api_key );
 
 		$this->bridge_client = $client;
 

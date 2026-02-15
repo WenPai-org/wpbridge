@@ -72,6 +72,11 @@ class SourceType {
      */
     const PUC = 'puc';
 
+    /**
+     * WPBridge Server（商业插件桥接服务）
+     */
+    const BRIDGE_SERVER = 'bridge_server';
+
     // === 类型分组 ===
 
     /**
@@ -92,6 +97,7 @@ class SourceType {
         self::ASPIRECLOUD,
         self::FAIR,
         self::PUC,
+        self::BRIDGE_SERVER,
     ];
 
     /**
@@ -108,6 +114,7 @@ class SourceType {
         self::ASPIRECLOUD,
         self::FAIR,
         self::PUC,
+        self::BRIDGE_SERVER,
     ];
 
     /**
@@ -117,16 +124,17 @@ class SourceType {
      */
     public static function get_labels(): array {
         return [
-            self::JSON        => __( 'JSON API', 'wpbridge' ),
-            self::GITHUB      => __( 'GitHub', 'wpbridge' ),
-            self::GITLAB      => __( 'GitLab', 'wpbridge' ),
-            self::GITEE       => __( 'Gitee', 'wpbridge' ),
-            self::WENPAI_GIT  => __( '菲码源库', 'wpbridge' ),
-            self::ZIP         => __( 'ZIP URL', 'wpbridge' ),
-            self::ARKPRESS    => __( 'ArkPress', 'wpbridge' ),
-            self::ASPIRECLOUD => __( 'AspireCloud', 'wpbridge' ),
-            self::FAIR        => __( 'FAIR', 'wpbridge' ),
-            self::PUC         => __( 'PUC Server', 'wpbridge' ),
+            self::JSON          => __( 'JSON API', 'wpbridge' ),
+            self::GITHUB        => __( 'GitHub', 'wpbridge' ),
+            self::GITLAB        => __( 'GitLab', 'wpbridge' ),
+            self::GITEE         => __( 'Gitee', 'wpbridge' ),
+            self::WENPAI_GIT    => __( '菲码源库', 'wpbridge' ),
+            self::ZIP           => __( 'ZIP URL', 'wpbridge' ),
+            self::ARKPRESS      => __( 'ArkPress', 'wpbridge' ),
+            self::ASPIRECLOUD   => __( 'AspireCloud', 'wpbridge' ),
+            self::FAIR          => __( 'FAIR', 'wpbridge' ),
+            self::PUC           => __( 'PUC Server', 'wpbridge' ),
+            self::BRIDGE_SERVER => __( 'Bridge Server', 'wpbridge' ),
         ];
     }
 
@@ -179,16 +187,17 @@ class SourceType {
      */
     public static function get_handler_class( string $type ): ?string {
         $handlers = [
-            self::JSON        => 'WPBridge\\UpdateSource\\Handlers\\JsonHandler',
-            self::GITHUB      => 'WPBridge\\UpdateSource\\Handlers\\GitHubHandler',
-            self::GITLAB      => 'WPBridge\\UpdateSource\\Handlers\\GitLabHandler',
-            self::GITEE       => 'WPBridge\\UpdateSource\\Handlers\\GiteeHandler',
-            self::WENPAI_GIT  => 'WPBridge\\UpdateSource\\Handlers\\WenPaiGitHandler',
-            self::ZIP         => 'WPBridge\\UpdateSource\\Handlers\\ZipHandler',
-            self::ARKPRESS    => 'WPBridge\\UpdateSource\\Handlers\\ArkPressHandler',
-            self::ASPIRECLOUD => 'WPBridge\\UpdateSource\\Handlers\\AspireCloudHandler',
-            self::FAIR        => 'WPBridge\\UpdateSource\\Handlers\\FairHandler',
-            self::PUC         => 'WPBridge\\UpdateSource\\Handlers\\PUCHandler',
+            self::JSON          => 'WPBridge\\UpdateSource\\Handlers\\JsonHandler',
+            self::GITHUB        => 'WPBridge\\UpdateSource\\Handlers\\GitHubHandler',
+            self::GITLAB        => 'WPBridge\\UpdateSource\\Handlers\\GitLabHandler',
+            self::GITEE         => 'WPBridge\\UpdateSource\\Handlers\\GiteeHandler',
+            self::WENPAI_GIT    => 'WPBridge\\UpdateSource\\Handlers\\WenPaiGitHandler',
+            self::ZIP           => 'WPBridge\\UpdateSource\\Handlers\\ZipHandler',
+            self::ARKPRESS      => 'WPBridge\\UpdateSource\\Handlers\\ArkPressHandler',
+            self::ASPIRECLOUD   => 'WPBridge\\UpdateSource\\Handlers\\AspireCloudHandler',
+            self::FAIR          => 'WPBridge\\UpdateSource\\Handlers\\FairHandler',
+            self::PUC           => 'WPBridge\\UpdateSource\\Handlers\\PUCHandler',
+            self::BRIDGE_SERVER => 'WPBridge\\UpdateSource\\Handlers\\BridgeServerHandler',
         ];
 
         return $handlers[ $type ] ?? null;
