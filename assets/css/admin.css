@@ -2523,3 +2523,447 @@
 .wpbridge-key-warning .dashicons {
     color: var(--wpbridge-warning);
 }
+
+/* ========================================
+   Vendors Tab - 供应商管理
+   ======================================== */
+
+/* 供应商页面容器 */
+.wpbridge-vendors-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wpbridge-space-6);
+}
+
+/* 统计卡片行 */
+.wpbridge-stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--wpbridge-space-4);
+}
+
+.wpbridge-stat-card {
+    background: var(--wpbridge-white);
+    padding: var(--wpbridge-space-4);
+    box-shadow: var(--wpbridge-shadow);
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-3);
+}
+
+.wpbridge-stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--wpbridge-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.wpbridge-stat-icon .dashicons {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    color: var(--wpbridge-white);
+}
+
+.wpbridge-stat-icon-primary {
+    background: var(--wpbridge-primary);
+}
+
+.wpbridge-stat-icon-success {
+    background: var(--wpbridge-success);
+}
+
+.wpbridge-stat-icon-info {
+    background: var(--wpbridge-info);
+}
+
+.wpbridge-stat-icon-warning {
+    background: var(--wpbridge-warning);
+}
+
+.wpbridge-stat-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.wpbridge-stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--wpbridge-gray-900);
+    line-height: 1.2;
+}
+
+.wpbridge-stat-label {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-500);
+    margin-top: 2px;
+}
+
+/* 通用区块样式 */
+.wpbridge-section {
+    background: var(--wpbridge-white);
+    box-shadow: var(--wpbridge-shadow);
+}
+
+.wpbridge-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-gray-200);
+}
+
+.wpbridge-section-header h3 {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0;
+}
+
+.wpbridge-section-header h3 .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-section-desc {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-500);
+    margin: 0;
+}
+
+.wpbridge-section-actions {
+    display: flex;
+    gap: var(--wpbridge-space-2);
+}
+
+/* 供应商表格 */
+.wpbridge-vendors-table,
+.wpbridge-custom-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.wpbridge-vendors-table th,
+.wpbridge-vendors-table td,
+.wpbridge-custom-table th,
+.wpbridge-custom-table td {
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+}
+
+.wpbridge-vendors-table th,
+.wpbridge-custom-table th {
+    font-size: var(--wpbridge-text-xs);
+    font-weight: 600;
+    color: var(--wpbridge-gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--wpbridge-gray-50);
+}
+
+.wpbridge-vendors-table tr:last-child td,
+.wpbridge-custom-table tr:last-child td {
+    border-bottom: none;
+}
+
+.wpbridge-vendors-table tr:hover td,
+.wpbridge-custom-table tr:hover td {
+    background: var(--wpbridge-gray-50);
+}
+
+.wpbridge-vendor-name {
+    font-weight: 500;
+    color: var(--wpbridge-gray-800);
+}
+
+.wpbridge-vendor-url {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    font-family: var(--wpbridge-font-mono);
+}
+
+/* 开关切换 */
+.wpbridge-toggle {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.wpbridge-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.wpbridge-toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--wpbridge-gray-300);
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.wpbridge-toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--wpbridge-white);
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.wpbridge-toggle input:checked + .wpbridge-toggle-slider {
+    background-color: var(--wpbridge-success);
+}
+
+.wpbridge-toggle input:checked + .wpbridge-toggle-slider:before {
+    transform: translateX(20px);
+}
+
+.wpbridge-toggle input:disabled + .wpbridge-toggle-slider {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 表格操作按钮 */
+.wpbridge-table-actions {
+    display: flex;
+    gap: var(--wpbridge-space-1);
+}
+
+.wpbridge-table-actions .wpbridge-btn-icon {
+    padding: var(--wpbridge-space-1);
+    min-width: 28px;
+    height: 28px;
+}
+
+.wpbridge-table-actions .wpbridge-btn-icon .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* 空状态 */
+.wpbridge-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--wpbridge-space-8);
+    text-align: center;
+}
+
+.wpbridge-empty-state .dashicons {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    color: var(--wpbridge-gray-300);
+    margin-bottom: var(--wpbridge-space-3);
+}
+
+.wpbridge-empty-state p {
+    color: var(--wpbridge-gray-500);
+    margin: 0 0 var(--wpbridge-space-4) 0;
+}
+
+/* 插件网格 */
+.wpbridge-plugins-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--wpbridge-space-4);
+    padding: var(--wpbridge-space-4);
+}
+
+.wpbridge-plugin-card {
+    background: var(--wpbridge-white);
+    border: 1px solid var(--wpbridge-gray-200);
+    border-radius: var(--wpbridge-radius-md);
+    padding: var(--wpbridge-space-4);
+    transition: all var(--wpbridge-transition);
+}
+
+.wpbridge-plugin-card:hover {
+    border-color: var(--wpbridge-primary);
+    box-shadow: var(--wpbridge-shadow-md);
+}
+
+.wpbridge-plugin-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--wpbridge-space-3);
+}
+
+.wpbridge-plugin-card-title {
+    font-size: var(--wpbridge-text-base);
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0 0 var(--wpbridge-space-1) 0;
+}
+
+.wpbridge-plugin-card-slug {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    font-family: var(--wpbridge-font-mono);
+}
+
+.wpbridge-plugin-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wpbridge-space-2);
+    margin-bottom: var(--wpbridge-space-3);
+}
+
+.wpbridge-plugin-card-version {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-600);
+    background: var(--wpbridge-gray-100);
+    padding: 2px 8px;
+    border-radius: var(--wpbridge-radius-sm);
+    font-family: var(--wpbridge-font-mono);
+}
+
+.wpbridge-plugin-card-actions {
+    display: flex;
+    gap: var(--wpbridge-space-2);
+}
+
+/* 来源徽章 */
+.wpbridge-source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--wpbridge-text-xs);
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: var(--wpbridge-radius-sm);
+}
+
+.wpbridge-source-official {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+}
+
+.wpbridge-source-vendor {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
+}
+
+.wpbridge-source-custom {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+/* 表单组 */
+.wpbridge-form-group {
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-form-group:last-child {
+    margin-bottom: 0;
+}
+
+.wpbridge-form-group label {
+    display: block;
+    font-size: var(--wpbridge-text-sm);
+    font-weight: 500;
+    color: var(--wpbridge-gray-700);
+    margin-bottom: var(--wpbridge-space-2);
+}
+
+.wpbridge-form-group label .required {
+    color: var(--wpbridge-danger);
+}
+
+.wpbridge-form-group input[type="text"],
+.wpbridge-form-group input[type="url"],
+.wpbridge-form-group input[type="password"],
+.wpbridge-form-group select,
+.wpbridge-form-group textarea {
+    width: 100%;
+    padding: var(--wpbridge-space-2) var(--wpbridge-space-3);
+    border: 1px solid var(--wpbridge-gray-300);
+    border-radius: var(--wpbridge-radius-md);
+    font-size: var(--wpbridge-text-sm);
+    transition: border-color var(--wpbridge-transition), box-shadow var(--wpbridge-transition);
+}
+
+.wpbridge-form-group input:focus,
+.wpbridge-form-group select:focus,
+.wpbridge-form-group textarea:focus {
+    outline: none;
+    border-color: var(--wpbridge-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.wpbridge-form-hint {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    margin-top: var(--wpbridge-space-1);
+}
+
+/* 模态框表单 */
+.wpbridge-modal .wpbridge-form-group input,
+.wpbridge-modal .wpbridge-form-group select {
+    box-sizing: border-box;
+}
+
+/* 响应式 - 供应商页面 */
+@media screen and (max-width: 1200px) {
+    .wpbridge-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media screen and (max-width: 782px) {
+    .wpbridge-stats-row {
+        grid-template-columns: 1fr;
+    }
+
+    .wpbridge-section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--wpbridge-space-3);
+    }
+
+    .wpbridge-section-actions {
+        width: 100%;
+    }
+
+    .wpbridge-section-actions .wpbridge-btn {
+        flex: 1;
+    }
+
+    .wpbridge-vendors-table,
+    .wpbridge-custom-table {
+        display: block;
+        overflow-x: auto;
+    }
+
+    .wpbridge-plugins-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .wpbridge-plugin-card-header {
+        flex-direction: column;
+        gap: var(--wpbridge-space-2);
+    }
+}

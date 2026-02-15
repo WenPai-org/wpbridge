@@ -83,6 +83,9 @@ foreach ( $sources as $source ) {
                 <a href="#sources" class="wpbridge-tab" data-tab="sources">
                     <?php esc_html_e( '更新源', 'wpbridge' ); ?>
                 </a>
+                <a href="#vendors" class="wpbridge-tab" data-tab="vendors">
+                    <?php esc_html_e( '供应商', 'wpbridge' ); ?>
+                </a>
                 <a href="#diagnostics" class="wpbridge-tab" data-tab="diagnostics">
                     <?php esc_html_e( '诊断', 'wpbridge' ); ?>
                 </a>
@@ -110,6 +113,11 @@ foreach ( $sources as $source ) {
             <!-- Tab: 更新源 -->
             <div id="sources" class="wpbridge-tab-pane">
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/sources.php'; ?>
+            </div>
+
+            <!-- Tab: 供应商 -->
+            <div id="vendors" class="wpbridge-tab-pane">
+                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/vendors.php'; ?>
             </div>
 
             <!-- Tab: 诊断 -->
