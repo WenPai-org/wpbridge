@@ -246,6 +246,21 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
                     <span class="wpbridge-info-value"><?php echo esc_html( PHP_VERSION ); ?></span>
                 </div>
                 <div class="wpbridge-info-item">
+                    <span class="wpbridge-info-label"><?php esc_html_e( 'MySQL', 'wpbridge' ); ?></span>
+                    <span class="wpbridge-info-value">
+                        <?php
+                        global $wpdb;
+                        echo esc_html( $wpdb->db_version() ?: 'N/A' );
+                        ?>
+                    </span>
+                </div>
+                <div class="wpbridge-info-item">
+                    <span class="wpbridge-info-label"><?php esc_html_e( '服务器', 'wpbridge' ); ?></span>
+                    <span class="wpbridge-info-value">
+                        <?php echo esc_html( isset( $_SERVER['SERVER_SOFTWARE'] ) ? $_SERVER['SERVER_SOFTWARE'] : 'N/A' ); ?>
+                    </span>
+                </div>
+                <div class="wpbridge-info-item">
                     <span class="wpbridge-info-label"><?php esc_html_e( '插件版本', 'wpbridge' ); ?></span>
                     <span class="wpbridge-info-value"><?php echo esc_html( WPBRIDGE_VERSION ); ?></span>
                 </div>
