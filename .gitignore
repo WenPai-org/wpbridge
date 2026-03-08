@@ -5,14 +5,3 @@ node_modules/
 .DS_Store
 build/
 dist/
-
-# AI & internal docs (sensitive)
-CLAUDE.md
-.agent/
-docs/
-ARCHITECTURE.md
-DESIGN.md
-DEVELOPMENT-PLAN.md
-DISCUSSION.md
-RESEARCH.md
-ROADMAP.md

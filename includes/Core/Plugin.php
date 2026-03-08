@@ -10,6 +10,7 @@ namespace WPBridge\Core;
 use WPBridge\UpdateSource\PluginUpdater;
 use WPBridge\UpdateSource\ThemeUpdater;
 use WPBridge\Admin\AdminPage;
+use WPBridge\Admin\VendorAdmin;
 use WPBridge\AIBridge\AIGateway;
 use WPBridge\Commercial\CommercialManager;
 use WPBridge\Notification\NotificationManager;
@@ -259,6 +260,7 @@ class Plugin {
      */
     public function init_admin(): void {
         new AdminPage( $this->settings );
+        new VendorAdmin( $this->settings );
     }
 
     /**
@@ -394,6 +396,12 @@ class Plugin {
                 'detecting'            => __( '正在检测插件...', 'wpbridge' ),
                 'detection_complete'   => __( '检测完成', 'wpbridge' ),
                 'progress'             => __( '检测进度', 'wpbridge' ),
+                // 预设供应商
+                'activate'                 => __( '激活', 'wpbridge' ),
+                'deactivate_btn'           => __( '停用', 'wpbridge' ),
+                'deactivate_preset_title'  => __( '停用供应商', 'wpbridge' ),
+                'confirm_deactivate_preset' => __( '确定要停用此预设供应商吗？授权凭据将被清除。', 'wpbridge' ),
+                'fill_required'            => __( '请填写必填字段', 'wpbridge' ),
             ],
         ] );
     }

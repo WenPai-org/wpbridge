@@ -13,6 +13,8 @@ namespace WPBridge\Admin;
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
 use WPBridge\Commercial\BridgeManager;
+use WPBridge\Commercial\Vendors\PresetRegistry;
+use WPBridge\Security\Encryption;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -61,6 +63,11 @@ class VendorAdmin {
 		add_action( 'wp_ajax_wpbridge_toggle_vendor', [ $this, 'ajax_toggle_vendor' ] );
 		add_action( 'wp_ajax_wpbridge_sync_vendor_plugins', [ $this, 'ajax_sync_vendor_plugins' ] );
 
+		// 预设供应商 AJAX 处理
+		add_action( 'wp_ajax_wpbridge_activate_preset', [ $this, 'ajax_activate_preset' ] );
+		add_action( 'wp_ajax_wpbridge_deactivate_preset', [ $this, 'ajax_deactivate_preset' ] );
+		add_action( 'wp_ajax_wpbridge_add_bridge_vendor', [ $this, 'ajax_add_bridge_vendor' ] );
+
 		// 自定义插件 AJAX 处理
 		add_action( 'wp_ajax_wpbridge_add_custom_plugin', [ $this, 'ajax_add_custom_plugin' ] );
 		add_action( 'wp_ajax_wpbridge_remove_custom_plugin', [ $this, 'ajax_remove_custom_plugin' ] );
@@ -76,7 +83,7 @@ class VendorAdmin {
 	 */
 	private function get_bridge_manager(): BridgeManager {
 		if ( null === $this->bridge_manager ) {
-			$remote_config = new \WPBridge\Core\RemoteConfig( $this->settings );
+			$remote_config = \WPBridge\Core\RemoteConfig::get_instance();
 			$this->bridge_manager = new BridgeManager( $this->settings, $remote_config );
 		}
 		return $this->bridge_manager;
@@ -121,7 +128,7 @@ class VendorAdmin {
 		}
 
 		// 验证供应商类型
-		$allowed_types = [ 'woocommerce' ];
+		$allowed_types = [ 'woocommerce', 'wc_am', 'bridge_api' ];
 		if ( ! in_array( $type, $allowed_types, true ) ) {
 			wp_send_json_error( [ 'message' => __( '不支持的供应商类型', 'wpbridge' ) ] );
 		}
@@ -209,7 +216,7 @@ class VendorAdmin {
 		}
 
 		$vendor_id = sanitize_key( $_POST['vendor_id'] ?? '' );
-		$enabled   = ! empty( $_POST['enabled'] );
+		$enabled   = (int) ( $_POST['enabled'] ?? 0 ) === 1;
 
 		if ( empty( $vendor_id ) ) {
 			wp_send_json_error( [ 'message' => __( '供应商 ID 不能为空', 'wpbridge' ) ] );
@@ -254,23 +261,25 @@ class VendorAdmin {
 
 		if ( ! empty( $vendor_id ) ) {
 			// 同步单个供应商
-			$vendor = $vendor_manager->get( $vendor_id );
+			$vendor = $vendor_manager->get_vendor( $vendor_id );
 			if ( ! $vendor ) {
 				wp_send_json_error( [ 'message' => __( '供应商不存在', 'wpbridge' ) ] );
+				return;
 			}
 
-			$plugins = $vendor->get_plugins( true ); // 强制刷新
+			$result = $vendor->get_plugins();
+			$count  = $result['total'] ?? count( $result['plugins'] ?? [] );
 			wp_send_json_success( [
 				'message' => sprintf(
 					/* translators: %d: plugin count */
 					__( '已同步 %d 个插件', 'wpbridge' ),
-					count( $plugins )
+					$count
 				),
-				'count'   => count( $plugins ),
+				'count'   => $count,
 			] );
 		} else {
 			// 同步所有供应商
-			$all_plugins = $vendor_manager->get_all_plugins( true );
+			$all_plugins = $vendor_manager->get_all_plugins();
 			wp_send_json_success( [
 				'message' => sprintf(
 					/* translators: %d: plugin count */
@@ -279,6 +288,145 @@ class VendorAdmin {
 				),
 				'count'   => count( $all_plugins ),
 			] );
+		}
+	}
+
+	/**
+	 * AJAX: 激活预设供应商
+	 *
+	 * @return void
+	 */
+	public function ajax_activate_preset(): void {
+		check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+		}
+
+		$preset_id = sanitize_key( $_POST['preset_id'] ?? '' );
+		$email     = sanitize_email( $_POST['email'] ?? '' );
+		$license   = sanitize_text_field( $_POST['license_key'] ?? '' );
+
+		if ( empty( $preset_id ) ) {
+			wp_send_json_error( [ 'message' => __( '预设 ID 不能为空', 'wpbridge' ) ] );
+		}
+
+		$preset = PresetRegistry::get_preset( $preset_id );
+		if ( $preset === null ) {
+			wp_send_json_error( [ 'message' => __( '无效的预设供应商', 'wpbridge' ) ] );
+		}
+
+		if ( ( $preset['status'] ?? '' ) === 'coming_soon' ) {
+			wp_send_json_error( [ 'message' => __( '该供应商即将上线，暂不可用', 'wpbridge' ) ] );
+		}
+
+		if ( empty( $email ) || empty( $license ) ) {
+			wp_send_json_error( [ 'message' => __( '请填写邮箱和授权密钥', 'wpbridge' ) ] );
+		}
+
+		$result = $this->get_bridge_manager()->add_vendor_v2( $preset_id, [
+			'name'        => $preset['name'],
+			'type'        => $preset['type'],
+			'auth_mode'   => $preset['auth_mode'] ?? 'wc_am',
+			'api_url'     => $preset['api_url'],
+			'email'       => $email,
+			'license_key' => $license,
+			'is_preset'   => true,
+		] );
+
+		if ( $result['success'] ) {
+			wp_send_json_success( $result );
+		} else {
+			wp_send_json_error( $result );
+		}
+	}
+
+	/**
+	 * AJAX: 停用预设供应商
+	 *
+	 * @return void
+	 */
+	public function ajax_deactivate_preset(): void {
+		check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+		}
+
+		$preset_id = sanitize_key( $_POST['preset_id'] ?? '' );
+
+		if ( empty( $preset_id ) ) {
+			wp_send_json_error( [ 'message' => __( '预设 ID 不能为空', 'wpbridge' ) ] );
+		}
+
+		$preset = PresetRegistry::get_preset( $preset_id );
+		if ( $preset === null ) {
+			wp_send_json_error( [ 'message' => __( '无效的预设供应商', 'wpbridge' ) ] );
+		}
+
+		$result = $this->get_bridge_manager()->remove_vendor( $preset_id );
+
+		// 清理加密存储的敏感数据
+		Encryption::delete_secure( "vendor_{$preset_id}_license_key" );
+		Encryption::delete_secure( "vendor_{$preset_id}_api_key" );
+
+		if ( $result['success'] ) {
+			wp_send_json_success( $result );
+		} else {
+			wp_send_json_error( $result );
+		}
+	}
+
+	/**
+	 * AJAX: 添加 Bridge API 连接
+	 *
+	 * @return void
+	 */
+	public function ajax_add_bridge_vendor(): void {
+		check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+		}
+
+		$name    = sanitize_text_field( $_POST['name'] ?? '' );
+		$api_url = esc_url_raw( $_POST['api_url'] ?? '' );
+		$api_key = sanitize_text_field( $_POST['api_key'] ?? '' );
+
+		if ( empty( $api_url ) ) {
+			wp_send_json_error( [ 'message' => __( 'API 地址不能为空', 'wpbridge' ) ] );
+		}
+
+		if ( empty( $api_key ) ) {
+			wp_send_json_error( [ 'message' => __( 'API Key 不能为空', 'wpbridge' ) ] );
+		}
+
+		// 验证 URL 协议
+		$scheme = wp_parse_url( $api_url, PHP_URL_SCHEME );
+		if ( ! in_array( $scheme, [ 'http', 'https' ], true ) ) {
+			wp_send_json_error( [ 'message' => __( 'API 地址必须使用 http 或 https 协议', 'wpbridge' ) ] );
+		}
+
+		// 自动生成 vendor_id
+		$host      = wp_parse_url( $api_url, PHP_URL_HOST );
+		$vendor_id = 'bridge-' . sanitize_key( str_replace( '.', '-', $host ?? '' ) ) . '-' . substr( md5( $api_url ), 0, 6 );
+
+		if ( empty( $name ) ) {
+			$name = $host ?: $api_url;
+		}
+
+		$result = $this->get_bridge_manager()->add_vendor_v2( $vendor_id, [
+			'name'    => $name,
+			'type'    => 'bridge_api',
+			'api_url' => $api_url,
+			'api_key' => $api_key,
+		] );
+
+		if ( $result['success'] ) {
+			$result['vendor_id'] = $vendor_id;
+			wp_send_json_success( $result );
+		} else {
+			wp_send_json_error( $result );
 		}
 	}
 
@@ -388,14 +536,38 @@ class VendorAdmin {
 	 * @return array
 	 */
 	public function get_vendor_data(): array {
+		$vendors = $this->get_bridge_manager()->get_vendors();
+		$presets = PresetRegistry::get_presets();
+
+		// 标记已激活的预设
+		foreach ( $presets as $preset_id => &$preset ) {
+			$preset['activated'] = isset( $vendors[ $preset_id ] ) && ! empty( $vendors[ $preset_id ]['enabled'] );
+		}
+		unset( $preset );
+
+		// 统计 Bridge API 连接数
+		$bridge_count = 0;
+		foreach ( $vendors as $vid => $vc ) {
+			if ( ( $vc['type'] ?? '' ) === 'bridge_api' ) {
+				$bridge_count++;
+			}
+		}
+
 		return [
-			'vendors'       => $this->get_bridge_manager()->get_vendors(),
+			'vendors'       => $vendors,
+			'presets'        => $presets,
+			'bridge_count'   => $bridge_count,
 			'custom'        => $this->settings->get( 'custom_plugins', [] ),
 			'all_plugins'   => $this->get_bridge_manager()->get_all_available_plugins(),
 			'stats'         => $this->get_bridge_manager()->get_stats(),
 			'vendor_types'  => [
 				'woocommerce' => __( 'WooCommerce 商店', 'wpbridge' ),
+				'wc_am'       => __( 'WC API Manager', 'wpbridge' ),
+				'bridge_api'  => __( 'Bridge API', 'wpbridge' ),
 			],
+			'field_labels'       => PresetRegistry::get_auth_field_labels(),
+			'field_placeholders' => PresetRegistry::get_auth_field_placeholders(),
+			'status_labels'      => PresetRegistry::get_status_labels(),
 		];
 	}
 }

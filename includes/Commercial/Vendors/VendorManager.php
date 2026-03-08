@@ -106,9 +106,8 @@ class VendorManager {
 			case 'wc_am':
 				return new WooCommerceVendor( $vendor_id, $name, $config );
 
-			// 未来可以添加更多类型
-			// case 'edd':
-			//     return new EDDVendor($vendor_id, $name, $config);
+			case 'bridge_api':
+				return new BridgeApiVendor( $vendor_id, $name, $config );
 
 			default:
 				Logger::warning( 'Unknown vendor type', [
@@ -348,6 +347,35 @@ class VendorManager {
 			'message'      => __( '连接成功', 'wpbridge' ),
 			'plugin_count' => $plugins['total'] ?? count( $plugins['plugins'] ),
 		];
+	}
+
+	/**
+	 * 获取所有供应商的全部插件
+	 *
+	 * @return array slug => plugin info
+	 */
+	public function get_all_plugins(): array {
+		$all_plugins = [];
+
+		foreach ( $this->get_vendors( true ) as $vendor ) {
+			$result      = $vendor->get_plugins();
+			$plugins     = $result['plugins'] ?? [];
+			$vendor_info = $vendor->get_info();
+
+			foreach ( $plugins as $plugin ) {
+				$slug = $plugin['slug'] ?? '';
+				if ( empty( $slug ) || isset( $all_plugins[ $slug ] ) ) {
+					continue;
+				}
+
+				$plugin['source']    = 'vendor';
+				$plugin['vendor']    = $vendor_info['name'] ?? $vendor->get_id();
+				$plugin['vendor_id'] = $vendor->get_id();
+				$all_plugins[ $slug ] = $plugin;
+			}
+		}
+
+		return $all_plugins;
 	}
 
 	/**

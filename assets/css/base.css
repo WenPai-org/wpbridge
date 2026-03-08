@@ -1,0 +1,149 @@
+/* base.css - Base Layout, Header, Content, Tabs Card | @package WPBridge | @since 1.1.0 */
+
+/* ========================================
+   Base Layout - 基础布局
+   ======================================== */
+.toplevel_page_wpbridge #wpcontent {
+    padding-left: 0;
+}
+
+.toplevel_page_wpbridge .wrap {
+    margin: 0;
+    max-width: none;
+}
+
+.wpbridge-wrap {
+    background: var(--wpbridge-gray-100);
+    min-height: 100vh;
+    padding: var(--wpbridge-space-6);
+}
+
+/* ========================================
+   Header - 标题栏
+   ======================================== */
+.wpbridge-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-4) var(--wpbridge-space-6);
+    background: #fff;
+    box-shadow: var(--wpbridge-shadow);
+}
+
+.wpbridge-header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-3);
+}
+
+.wpbridge-logo {
+    width: 32px;
+    height: 32px;
+}
+
+.wpbridge-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-900);
+    margin: 0;
+}
+
+.wpbridge-version {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    background: var(--wpbridge-gray-100);
+    padding: 2px 8px;
+    margin-left: var(--wpbridge-space-2);
+}
+
+.wpbridge-header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-4);
+}
+
+.wpbridge-header-link {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-1);
+    color: var(--wpbridge-gray-600);
+    text-decoration: none;
+    font-size: var(--wpbridge-text-sm);
+    transition: color var(--wpbridge-transition);
+}
+
+.wpbridge-header-link:hover {
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-back-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: var(--wpbridge-gray-600);
+    text-decoration: none;
+    transition: color var(--wpbridge-transition);
+}
+
+.wpbridge-back-link:hover {
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-back-link .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+}
+
+/* ========================================
+   Content - 主内容区
+   ======================================== */
+.wpbridge-content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* ========================================
+   Tabs Card - Tab 卡片
+   ======================================== */
+.wpbridge-tabs-card {
+    background: #fff;
+    box-shadow: var(--wpbridge-shadow);
+}
+
+.wpbridge-tab-list {
+    display: flex;
+    border-bottom: 1px solid var(--wpbridge-gray-200);
+    padding: 0 var(--wpbridge-space-4);
+}
+
+.wpbridge-tab {
+    padding: var(--wpbridge-space-4) var(--wpbridge-space-5);
+    color: var(--wpbridge-gray-600);
+    text-decoration: none;
+    font-size: var(--wpbridge-text-md);
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all var(--wpbridge-transition);
+}
+
+.wpbridge-tab:hover {
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-tab-active {
+    color: var(--wpbridge-primary);
+    border-bottom-color: var(--wpbridge-primary);
+}
+
+.wpbridge-tab-pane {
+    display: none;
+    padding: var(--wpbridge-space-6);
+}
+
+.wpbridge-tab-pane-active {
+    display: block;
+}

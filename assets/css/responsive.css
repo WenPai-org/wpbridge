@@ -1,0 +1,219 @@
+/* responsive.css - All @media query blocks | @package WPBridge | @since 1.1.0 */
+
+/* ========================================
+   Responsive - 响应式 (基础布局/表单)
+   ======================================== */
+@media screen and (max-width: 960px) {
+    .wpbridge-sources-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .wpbridge-form-row {
+        grid-template-columns: 1fr;
+        gap: var(--wpbridge-space-2);
+    }
+
+    .wpbridge-form-input,
+    .wpbridge-form-select {
+        max-width: none;
+    }
+}
+
+@media screen and (max-width: 782px) {
+    .wpbridge-wrap {
+        padding: var(--wpbridge-space-4);
+    }
+
+    .wpbridge-header {
+        flex-direction: column;
+        gap: var(--wpbridge-space-4);
+        text-align: center;
+    }
+
+    .wpbridge-header-right {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .wpbridge-tab-list {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .wpbridge-stats-panel {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .wpbridge-log-item {
+        grid-template-columns: 1fr;
+        gap: var(--wpbridge-space-1);
+    }
+}
+
+/* ========================================
+   Responsive - 项目列表
+   ======================================== */
+@media screen and (max-width: 782px) {
+    .wpbridge-subtabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .wpbridge-toolbar {
+        flex-direction: column;
+        gap: var(--wpbridge-space-3);
+    }
+
+    .wpbridge-project-item {
+        flex-wrap: wrap;
+    }
+
+    .wpbridge-project-source {
+        width: 100%;
+        margin-top: var(--wpbridge-space-2);
+    }
+}
+
+/* ========================================
+   Responsive - 概览页面
+   ======================================== */
+@media screen and (max-width: 1200px) {
+    .wpbridge-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media screen and (max-width: 782px) {
+    .wpbridge-status-bar {
+        flex-wrap: wrap;
+        gap: var(--wpbridge-space-2);
+    }
+
+    .wpbridge-status-bar-actions {
+        width: 100%;
+        margin-left: 0;
+        margin-top: var(--wpbridge-space-2);
+    }
+
+    .wpbridge-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .wpbridge-metric-card {
+        padding: var(--wpbridge-space-4);
+    }
+
+    .wpbridge-metric-value {
+        font-size: 24px;
+    }
+
+    .wpbridge-overview-panels {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ========================================
+   Responsive - 诊断页面
+   ======================================== */
+@media screen and (max-width: 782px) {
+    .wpbridge-diagnostics-header {
+        flex-direction: column;
+        gap: var(--wpbridge-space-4);
+    }
+
+    .wpbridge-diagnostics-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .wpbridge-source-test-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .wpbridge-source-test-meta {
+        flex-wrap: wrap;
+    }
+
+    .wpbridge-check-item {
+        flex-wrap: wrap;
+    }
+
+    .wpbridge-check-requirement {
+        width: 100%;
+        margin-top: var(--wpbridge-space-1);
+    }
+}
+
+/* ========================================
+   Responsive - 模态框
+   ======================================== */
+@media screen and (max-width: 782px) {
+    .wpbridge-modal {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .wpbridge-changelog-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--wpbridge-space-2);
+    }
+
+    .wpbridge-changelog-slug {
+        display: block;
+        font-size: var(--wpbridge-text-sm);
+    }
+}
+
+/* ========================================
+   Responsive - 供应商页面
+   ======================================== */
+@media screen and (max-width: 1200px) {
+    .wpbridge-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .wpbridge-vendor-presets-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media screen and (max-width: 782px) {
+    .wpbridge-stats-row {
+        grid-template-columns: 1fr;
+    }
+
+    .wpbridge-vendor-presets-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .wpbridge-section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--wpbridge-space-3);
+    }
+
+    .wpbridge-section-actions {
+        width: 100%;
+    }
+
+    .wpbridge-section-actions .wpbridge-btn {
+        flex: 1;
+    }
+
+    .wpbridge-vendors-table,
+    .wpbridge-custom-table {
+        display: block;
+        overflow-x: auto;
+    }
+
+    .wpbridge-plugins-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .wpbridge-plugin-card-header {
+        flex-direction: column;
+        gap: var(--wpbridge-space-2);
+    }
+}

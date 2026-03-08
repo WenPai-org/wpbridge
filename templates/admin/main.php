@@ -28,7 +28,7 @@ $settings       = $settings_obj->get_all();
 $logs           = Logger::get_logs();
 
 // 健康检查
-$health_checker = new HealthChecker( $settings_obj );
+$health_checker = new HealthChecker();
 $health_status  = [];
 foreach ( $sources as $source ) {
     if ( $source->enabled ) {

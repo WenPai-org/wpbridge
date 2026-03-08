@@ -1,0 +1,560 @@
+/* components.css - Stats Panel, Toggle Switch, Badges, Buttons, Empty State, Form, Settings, Logs, Notice, Loading Spinner | @package WPBridge | @since 1.1.0 */
+
+/* ========================================
+   Stats Panel - 统计面板
+   ======================================== */
+.wpbridge-stats-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--wpbridge-space-4);
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-stat-card {
+    background: #fff;
+    padding: var(--wpbridge-space-5);
+    box-shadow: var(--wpbridge-shadow);
+}
+
+.wpbridge-stat-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    color: var(--wpbridge-gray-500);
+    font-size: var(--wpbridge-text-sm);
+    margin-bottom: var(--wpbridge-space-2);
+}
+
+.wpbridge-stat-card-header .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.wpbridge-stat-value {
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--wpbridge-gray-900);
+}
+
+.wpbridge-stat-value.success {
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-stat-value.warning {
+    color: var(--wpbridge-warning);
+}
+
+.wpbridge-stat-value.error {
+    color: var(--wpbridge-error);
+}
+
+/* ========================================
+   Toggle Switch - 开关
+   ======================================== */
+.wpbridge-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.wpbridge-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.wpbridge-toggle-track {
+    width: 36px;
+    height: 18px;
+    background: var(--wpbridge-gray-300);
+    position: relative;
+    transition: background var(--wpbridge-transition);
+}
+
+.wpbridge-toggle-track::after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    top: 2px;
+    left: 2px;
+    transition: transform var(--wpbridge-transition);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.wpbridge-toggle input:checked + .wpbridge-toggle-track {
+    background: var(--wpbridge-primary);
+}
+
+.wpbridge-toggle input:checked + .wpbridge-toggle-track::after {
+    transform: translateX(18px);
+}
+
+.wpbridge-toggle input:focus + .wpbridge-toggle-track {
+    box-shadow: 0 0 0 2px var(--wpbridge-primary-light);
+}
+
+/* ========================================
+   Badges - 徽章
+   ======================================== */
+.wpbridge-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    font-size: var(--wpbridge-text-xs);
+    font-weight: 500;
+    gap: var(--wpbridge-space-1);
+}
+
+.wpbridge-badge-preset {
+    background: var(--wpbridge-info-light);
+    color: var(--wpbridge-info);
+}
+
+.wpbridge-badge-type {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-700);
+}
+
+.wpbridge-badge-type.github {
+    background: #24292e;
+    color: #fff;
+}
+
+.wpbridge-badge-type.gitlab {
+    background: #fc6d26;
+    color: #fff;
+}
+
+.wpbridge-badge-type.arkpress,
+.wpbridge-badge-type.aspirecloud {
+    background: var(--wpbridge-primary);
+    color: #fff;
+}
+
+.wpbridge-badge-type.gitee {
+    background: #c71d23;
+    color: #fff;
+}
+
+/* 插件类型徽章 */
+.wpbridge-badge-type-free {
+    background: var(--wpbridge-success-light);
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-badge-type-commercial {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.wpbridge-badge-type-private {
+    background: var(--wpbridge-info-light);
+    color: var(--wpbridge-info);
+}
+
+.wpbridge-badge-type-unknown {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-600);
+}
+
+.wpbridge-badge-type-free .dashicons,
+.wpbridge-badge-type-commercial .dashicons,
+.wpbridge-badge-type-private .dashicons,
+.wpbridge-badge-type-unknown .dashicons {
+    font-size: 12px;
+    width: 12px;
+    height: 12px;
+    vertical-align: middle;
+    margin-right: 2px;
+}
+
+.wpbridge-badge-status {
+    padding: 4px 10px;
+}
+
+.wpbridge-badge-status.healthy {
+    background: var(--wpbridge-success-light);
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-badge-status.degraded {
+    background: var(--wpbridge-warning-light);
+    color: var(--wpbridge-warning);
+}
+
+.wpbridge-badge-status.failed {
+    background: var(--wpbridge-error-light);
+    color: var(--wpbridge-error);
+}
+
+/* ========================================
+   Buttons - 按钮
+   ======================================== */
+.wpbridge-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wpbridge-space-1);
+    padding: var(--wpbridge-space-2) var(--wpbridge-space-4);
+    font-size: var(--wpbridge-text-sm);
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all var(--wpbridge-transition);
+}
+
+.wpbridge-btn-primary {
+    background: var(--wpbridge-primary);
+    color: #fff;
+    border-color: var(--wpbridge-primary);
+}
+
+.wpbridge-btn-primary:hover {
+    background: var(--wpbridge-primary-hover);
+    border-color: var(--wpbridge-primary-hover);
+    color: #fff;
+}
+
+.wpbridge-btn-secondary {
+    background: #fff;
+    color: var(--wpbridge-gray-700);
+    border-color: var(--wpbridge-gray-300);
+}
+
+.wpbridge-btn-secondary:hover {
+    background: var(--wpbridge-gray-50);
+    color: var(--wpbridge-gray-900);
+}
+
+.wpbridge-btn-danger {
+    background: #fff;
+    color: var(--wpbridge-error);
+    border-color: var(--wpbridge-error);
+}
+
+.wpbridge-btn-danger:hover {
+    background: var(--wpbridge-error);
+    color: #fff;
+}
+
+.wpbridge-btn-sm {
+    padding: var(--wpbridge-space-1) var(--wpbridge-space-3);
+    font-size: var(--wpbridge-text-xs);
+}
+
+.wpbridge-btn .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+/* ========================================
+   Empty State - 空状态
+   ======================================== */
+.wpbridge-empty {
+    text-align: center;
+    padding: var(--wpbridge-space-8);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-empty .dashicons {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    color: var(--wpbridge-gray-300);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-empty-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-700);
+    margin: 0 0 var(--wpbridge-space-2);
+}
+
+.wpbridge-empty-desc {
+    font-size: var(--wpbridge-text-sm);
+    margin: 0 0 var(--wpbridge-space-4);
+}
+
+/* ========================================
+   Form - 表单
+   ======================================== */
+.wpbridge-form-section {
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-form-section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0 0 var(--wpbridge-space-4);
+    padding-bottom: var(--wpbridge-space-3);
+    border-bottom: 1px solid var(--wpbridge-gray-200);
+}
+
+.wpbridge-form-row {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: var(--wpbridge-space-4);
+    margin-bottom: var(--wpbridge-space-4);
+    align-items: start;
+}
+
+.wpbridge-form-label {
+    font-size: var(--wpbridge-text-sm);
+    font-weight: 500;
+    color: var(--wpbridge-gray-700);
+    padding-top: var(--wpbridge-space-2);
+}
+
+.wpbridge-form-label .required {
+    color: var(--wpbridge-error);
+}
+
+.wpbridge-form-input {
+    width: 100%;
+    max-width: 400px;
+    padding: var(--wpbridge-space-2) var(--wpbridge-space-3);
+    font-size: var(--wpbridge-text-md);
+    border: 1px solid var(--wpbridge-gray-300);
+    background: #fff;
+    transition:
+        border-color var(--wpbridge-transition),
+        box-shadow var(--wpbridge-transition);
+}
+
+.wpbridge-form-input:focus {
+    outline: none;
+    border-color: var(--wpbridge-primary);
+    box-shadow: 0 0 0 1px var(--wpbridge-primary);
+}
+
+.wpbridge-form-input::placeholder {
+    color: var(--wpbridge-gray-400);
+}
+
+.wpbridge-form-select {
+    width: 100%;
+    max-width: 400px;
+    padding: var(--wpbridge-space-2) var(--wpbridge-space-3);
+    font-size: var(--wpbridge-text-md);
+    border: 1px solid var(--wpbridge-gray-300);
+    background: #fff;
+    cursor: pointer;
+}
+
+.wpbridge-form-help {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    margin-top: var(--wpbridge-space-1);
+}
+
+.wpbridge-form-actions {
+    display: flex;
+    gap: var(--wpbridge-space-3);
+    padding-top: var(--wpbridge-space-4);
+    border-top: 1px solid var(--wpbridge-gray-200);
+}
+
+/* ========================================
+   Settings Panel - 设置面板
+   ======================================== */
+.wpbridge-settings-panel {
+    background: #fff;
+    box-shadow: var(--wpbridge-shadow);
+    padding: var(--wpbridge-space-6);
+}
+
+.wpbridge-settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-4) 0;
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+}
+
+.wpbridge-settings-row:last-child {
+    border-bottom: none;
+}
+
+.wpbridge-settings-info {
+    flex: 1;
+}
+
+.wpbridge-settings-title {
+    font-size: var(--wpbridge-text-md);
+    font-weight: 500;
+    color: var(--wpbridge-gray-800);
+    margin: 0 0 var(--wpbridge-space-1);
+}
+
+.wpbridge-settings-desc {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-500);
+    margin: 0;
+}
+
+/* ========================================
+   Logs Panel - 日志面板
+   ======================================== */
+.wpbridge-logs-panel {
+    background: #fff;
+    box-shadow: var(--wpbridge-shadow);
+}
+
+.wpbridge-logs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-gray-200);
+}
+
+.wpbridge-logs-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0;
+}
+
+.wpbridge-logs-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.wpbridge-log-item {
+    display: grid;
+    grid-template-columns: 80px 140px 1fr;
+    gap: var(--wpbridge-space-3);
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+    font-size: var(--wpbridge-text-sm);
+}
+
+.wpbridge-log-item:last-child {
+    border-bottom: none;
+}
+
+.wpbridge-log-level {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: var(--wpbridge-text-xs);
+}
+
+.wpbridge-log-level.debug {
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-log-level.info {
+    color: var(--wpbridge-info);
+}
+
+.wpbridge-log-level.warning {
+    color: var(--wpbridge-warning);
+}
+
+.wpbridge-log-level.error {
+    color: var(--wpbridge-error);
+}
+
+.wpbridge-log-time {
+    color: var(--wpbridge-gray-500);
+    font-family: var(--wpbridge-font-mono);
+    font-size: var(--wpbridge-text-xs);
+}
+
+.wpbridge-log-message {
+    color: var(--wpbridge-gray-700);
+    word-break: break-word;
+}
+
+.wpbridge-logs-empty {
+    text-align: center;
+    padding: var(--wpbridge-space-8);
+    color: var(--wpbridge-gray-500);
+}
+
+/* ========================================
+   Notice Notifications - WordPress 原生通知样式
+   ======================================== */
+.wpbridge-notice-container {
+    position: relative;
+    z-index: 100;
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-notice {
+    margin: 0 0 var(--wpbridge-space-2) 0 !important;
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-4) !important;
+    border-left-width: 4px !important;
+}
+
+.wpbridge-notice p {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.wpbridge-notice-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.wpbridge-notice.notice-success .wpbridge-notice-icon {
+    color: #00a32a;
+}
+
+.wpbridge-notice.notice-error .wpbridge-notice-icon {
+    color: #d63638;
+}
+
+.wpbridge-notice.notice-warning .wpbridge-notice-icon {
+    color: #dba617;
+}
+
+.wpbridge-notice.notice-info .wpbridge-notice-icon {
+    color: #72aee6;
+}
+
+.wpbridge-notice-text {
+    flex: 1;
+}
+
+/* ========================================
+   Loading Spinner - 加载动画
+   ======================================== */
+.wpbridge-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--wpbridge-gray-200);
+    border-top-color: var(--wpbridge-primary);
+    border-radius: 50%;
+    animation: wpbridge-spin 0.8s linear infinite;
+}
+
+@keyframes wpbridge-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.wpbridge-spin {
+    animation: wpbridge-spin 1s linear infinite;
+}

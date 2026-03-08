@@ -2192,7 +2192,7 @@
                         '<h3 class="wpbridge-modal-title">' +
                             '<span class="dashicons dashicons-list-view"></span> ' +
                             (wpbridge.i18n.changelog_title || '更新日志') +
-                            ' - <span class="wpbridge-changelog-slug">' + slug + '</span>' +
+                            ' - <span class="wpbridge-changelog-slug"></span>' +
                         '</h3>' +
                         '<button type="button" class="wpbridge-modal-close">' +
                             '<span class="dashicons dashicons-no-alt"></span>' +
@@ -2207,6 +2207,7 @@
                 '</div>';
 
             this.modal = $(html).appendTo('body');
+            this.modal.find('.wpbridge-changelog-slug').text(slug);
             $('body').addClass('wpbridge-modal-open');
         },
 
@@ -2300,14 +2301,31 @@
         bindEvents: function() {
             var self = this;
 
-            // 添加供应商按钮
-            $(document).on('click', '#wpbridge-add-vendor-btn', function() {
-                self.showVendorModal();
+            // 预设供应商 - 激活按钮
+            $(document).on('click', '.wpbridge-activate-preset-btn', function() {
+                var presetId = $(this).closest('.wpbridge-vendor-preset-card').data('preset-id');
+                self.showPresetModal(presetId);
             });
 
-            // 保存供应商
-            $(document).on('click', '#wpbridge-save-vendor', function() {
-                self.saveVendor();
+            // 预设供应商 - 保存
+            $(document).on('click', '#wpbridge-save-preset', function() {
+                self.savePreset();
+            });
+
+            // 预设供应商 - 停用
+            $(document).on('click', '.wpbridge-deactivate-preset', function() {
+                var presetId = $(this).data('preset-id');
+                self.deactivatePreset(presetId, $(this));
+            });
+
+            // Bridge API - 添加按钮
+            $(document).on('click', '.wpbridge-add-bridge-vendor-btn', function() {
+                self.showBridgeVendorModal();
+            });
+
+            // Bridge API - 保存
+            $(document).on('click', '#wpbridge-save-bridge', function() {
+                self.saveBridgeVendor();
             });
 
             // 删除供应商
@@ -2369,32 +2387,30 @@
             });
         },
 
-        showVendorModal: function() {
-            $('#wpbridge-vendor-form')[0].reset();
-            $('#wpbridge-vendor-modal').show();
+        // === 预设供应商 ===
+
+        showPresetModal: function(presetId) {
+            var $card = $('[data-preset-id="' + presetId + '"]');
+            var name = $card.find('.wpbridge-vendor-preset-name').text().trim();
+            $('#wpbridge-preset-modal-title').text(name + ' — ' + (wpbridge.i18n.activate || '激活'));
+            $('#wpbridge-preset-form')[0].reset();
+            $('#preset_id').val(presetId);
+            $('#wpbridge-preset-modal').show();
         },
 
-        showCustomModal: function() {
-            $('#wpbridge-custom-form')[0].reset();
-            $('#wpbridge-custom-modal').show();
-        },
-
-        saveVendor: function() {
-            var $form = $('#wpbridge-vendor-form');
-            var $btn = $('#wpbridge-save-vendor');
+        savePreset: function() {
+            var $form = $('#wpbridge-preset-form');
+            var $btn = $('#wpbridge-save-preset');
 
             var data = {
-                action: 'wpbridge_add_vendor',
+                action: 'wpbridge_activate_preset',
                 nonce: wpbridge.nonce,
-                vendor_id: $form.find('#vendor_id').val(),
-                name: $form.find('#vendor_name').val(),
-                type: $form.find('#vendor_type').val(),
-                api_url: $form.find('#vendor_api_url').val(),
-                consumer_key: $form.find('#vendor_consumer_key').val(),
-                consumer_secret: $form.find('#vendor_consumer_secret').val()
+                preset_id: $form.find('#preset_id').val(),
+                email: $form.find('#preset_email').val(),
+                license_key: $form.find('#preset_license_key').val()
             };
 
-            if (!data.vendor_id || !data.name || !data.api_url) {
+            if (!data.email || !data.license_key) {
                 Toast.error(wpbridge.i18n.fill_required || '请填写必填字段');
                 return;
             }
@@ -2408,7 +2424,7 @@
                 success: function(response) {
                     if (response.success) {
                         Toast.success(response.data.message);
-                        $('#wpbridge-vendor-modal').hide();
+                        $('#wpbridge-preset-modal').hide();
                         location.reload();
                     } else {
                         Toast.error(response.data.message || wpbridge.i18n.failed);
@@ -2421,6 +2437,96 @@
                     $btn.prop('disabled', false);
                 }
             });
+        },
+
+        deactivatePreset: function(presetId, $btn) {
+            Modal.confirm({
+                title: wpbridge.i18n.deactivate_preset_title || '停用供应商',
+                message: wpbridge.i18n.confirm_deactivate_preset || '确定要停用此预设供应商吗？',
+                type: 'warning',
+                confirmText: wpbridge.i18n.deactivate_btn || '停用',
+                onConfirm: function() {
+                    $btn.prop('disabled', true);
+
+                    $.ajax({
+                        url: wpbridge.ajax_url,
+                        type: 'POST',
+                        data: {
+                            action: 'wpbridge_deactivate_preset',
+                            nonce: wpbridge.nonce,
+                            preset_id: presetId
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                Toast.success(response.data.message);
+                                location.reload();
+                            } else {
+                                Toast.error(response.data.message || wpbridge.i18n.failed);
+                                $btn.prop('disabled', false);
+                            }
+                        },
+                        error: function() {
+                            Toast.error(wpbridge.i18n.failed);
+                            $btn.prop('disabled', false);
+                        }
+                    });
+                }
+            });
+        },
+
+        // === Bridge API ===
+
+        showBridgeVendorModal: function() {
+            $('#wpbridge-bridge-form')[0].reset();
+            $('#wpbridge-bridge-modal').show();
+        },
+
+        saveBridgeVendor: function() {
+            var $form = $('#wpbridge-bridge-form');
+            var $btn = $('#wpbridge-save-bridge');
+
+            var data = {
+                action: 'wpbridge_add_bridge_vendor',
+                nonce: wpbridge.nonce,
+                name: $form.find('#bridge_name').val(),
+                api_url: $form.find('#bridge_api_url').val(),
+                api_key: $form.find('#bridge_api_key').val()
+            };
+
+            if (!data.api_url || !data.api_key) {
+                Toast.error(wpbridge.i18n.fill_required || '请填写必填字段');
+                return;
+            }
+
+            $btn.prop('disabled', true);
+
+            $.ajax({
+                url: wpbridge.ajax_url,
+                type: 'POST',
+                data: data,
+                success: function(response) {
+                    if (response.success) {
+                        Toast.success(response.data.message);
+                        $('#wpbridge-bridge-modal').hide();
+                        location.reload();
+                    } else {
+                        Toast.error(response.data.message || wpbridge.i18n.failed);
+                    }
+                },
+                error: function() {
+                    Toast.error(wpbridge.i18n.failed);
+                },
+                complete: function() {
+                    $btn.prop('disabled', false);
+                }
+            });
+        },
+
+        // === 现有供应商操作（保持不变） ===
+
+        showCustomModal: function() {
+            $('#wpbridge-custom-form')[0].reset();
+            $('#wpbridge-custom-modal').show();
         },
 
         removeVendor: function(vendorId, $btn) {
@@ -2666,10 +2772,5 @@
         Changelog.init();
         Vendors.init();
     });
-
-    // 添加旋转动画样式
-    $('<style>')
-        .text('.wpbridge-spin { animation: wpbridge-spin 1s linear infinite; }')
-        .appendTo('head');
 
 })(jQuery);

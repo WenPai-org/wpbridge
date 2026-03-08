@@ -1,0 +1,82 @@
+/* variables.css - CSS Variables / Design Tokens | @package WPBridge | @since 1.1.0 */
+
+:root {
+    /* Primary Colors - 文派品牌蓝 */
+    --wpbridge-primary: #3858e9;
+    --wpbridge-primary-hover: #2d47c7;
+    --wpbridge-primary-light: #eef1fd;
+    --wpbridge-primary-dark: #2a3eb8;
+
+    /* Gray Scale */
+    --wpbridge-gray-50: #f9fafb;
+    --wpbridge-gray-100: #f3f4f6;
+    --wpbridge-gray-200: #e5e7eb;
+    --wpbridge-gray-300: #d1d5db;
+    --wpbridge-gray-400: #9ca3af;
+    --wpbridge-gray-500: #6b7280;
+    --wpbridge-gray-600: #4b5563;
+    --wpbridge-gray-700: #374151;
+    --wpbridge-gray-800: #1f2937;
+    --wpbridge-gray-900: #111827;
+
+    /* Base Colors */
+    --wpbridge-white: #ffffff;
+    --wpbridge-black: #000000;
+
+    /* Status Colors */
+    --wpbridge-success: #059669;
+    --wpbridge-success-light: #d1fae5;
+    --wpbridge-warning: #d97706;
+    --wpbridge-warning-light: #fef3c7;
+    --wpbridge-warning-bg: #fff3cd;
+    --wpbridge-warning-text: #856404;
+    --wpbridge-error: #dc2626;
+    --wpbridge-error-light: #fee2e2;
+    --wpbridge-danger: #dc2626;
+    --wpbridge-danger-light: #fee2e2;
+    --wpbridge-info: #0284c7;
+    --wpbridge-info-light: #e0f2fe;
+
+    /* Spacing (8px base grid) */
+    --wpbridge-space-1: 4px;
+    --wpbridge-space-2: 8px;
+    --wpbridge-space-3: 12px;
+    --wpbridge-space-4: 16px;
+    --wpbridge-space-5: 20px;
+    --wpbridge-space-6: 24px;
+    --wpbridge-space-8: 32px;
+
+    /* Typography */
+    --wpbridge-font-sans:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans,
+        Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    --wpbridge-font-mono:
+        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    --wpbridge-text-xs: 11px;
+    --wpbridge-text-sm: 12px;
+    --wpbridge-text-base: 13px;
+    --wpbridge-text-md: 14px;
+    --wpbridge-text-lg: 16px;
+
+    /* Border Radius */
+    --wpbridge-radius: 4px;
+    --wpbridge-radius-sm: 2px;
+    --wpbridge-radius-md: 6px;
+    --wpbridge-radius-lg: 8px;
+
+    /* Shadows - 古腾堡风格 */
+    --wpbridge-shadow: 0 0 0 1px #ccd0d4, 0 1px 1px 1px rgba(0, 0, 0, 0.04);
+    --wpbridge-shadow-md: 0 0 0 1px #ccd0d4, 0 1px 2px 1px rgba(0, 0, 0, 0.06);
+    --wpbridge-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+    /* Transitions */
+    --wpbridge-transition: 150ms ease;
+
+    /* Additional Variables (used in project list) */
+    --wpbridge-border: #e5e7eb;
+    --wpbridge-bg: #ffffff;
+    --wpbridge-bg-secondary: #f9fafb;
+    --wpbridge-text: #1f2937;
+    --wpbridge-text-secondary: #6b7280;
+}

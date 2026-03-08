@@ -1,0 +1,95 @@
+/* sources.css - Source Cards | @package WPBridge | @since 1.1.0 */
+
+/* ========================================
+   Source Cards - 更新源卡片
+   ======================================== */
+.wpbridge-sources-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-sources-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0;
+}
+
+.wpbridge-sources-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--wpbridge-space-4);
+}
+
+.wpbridge-source-card {
+    background: #fff;
+    box-shadow: var(--wpbridge-shadow);
+    transition: box-shadow var(--wpbridge-transition);
+}
+
+.wpbridge-source-card:hover {
+    box-shadow: var(--wpbridge-shadow-md);
+}
+
+.wpbridge-source-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+}
+
+.wpbridge-source-card-title {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wpbridge-space-1);
+}
+
+.wpbridge-source-name {
+    font-size: var(--wpbridge-text-md);
+    font-weight: 600;
+    color: var(--wpbridge-gray-900);
+    margin: 0;
+}
+
+.wpbridge-source-url {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    word-break: break-all;
+    font-family: var(--wpbridge-font-mono);
+}
+
+.wpbridge-source-card-body {
+    padding: var(--wpbridge-space-4);
+}
+
+.wpbridge-source-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wpbridge-space-3);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-source-meta-item {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-1);
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-600);
+}
+
+.wpbridge-source-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-4);
+    background: var(--wpbridge-gray-50);
+    border-top: 1px solid var(--wpbridge-gray-100);
+}
+
+.wpbridge-source-actions {
+    display: flex;
+    gap: var(--wpbridge-space-2);
+}

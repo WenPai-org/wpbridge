@@ -74,7 +74,7 @@ class SiteHealth {
      */
     public function test_sources(): array {
         $sources = $this->settings->get_enabled_sources();
-        $health_checker = new HealthChecker( $this->settings );
+        $health_checker = new HealthChecker();
 
         $healthy = 0;
         $degraded = 0;
@@ -84,13 +84,13 @@ class SiteHealth {
         foreach ( $sources as $source ) {
             $status = $health_checker->check( $source );
 
-            if ( $status['status'] === 'healthy' ) {
+            if ( $status->status === 'healthy' ) {
                 $healthy++;
-            } elseif ( $status['status'] === 'degraded' ) {
+            } elseif ( $status->status === 'degraded' ) {
                 $degraded++;
             } else {
                 $failed++;
-                $failed_sources[] = $source['name'];
+                $failed_sources[] = $source->name;
             }
         }
 

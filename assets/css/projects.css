@@ -1,0 +1,555 @@
+/* projects.css - Project List, Inline Config Panel, Status Badge, Radio Group, Custom Source Row | @package WPBridge | @since 1.1.0 */
+
+/* ========================================
+   Project List - 项目列表 (方案 B)
+   ======================================== */
+
+/* 子 Tab 导航 */
+.wpbridge-subtabs {
+    display: flex;
+    gap: var(--wpbridge-space-1);
+    padding: var(--wpbridge-space-4);
+    background: var(--wpbridge-bg-secondary);
+    border-bottom: 1px solid var(--wpbridge-border);
+    margin: calc(var(--wpbridge-space-4) * -1);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-subtab {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    padding: var(--wpbridge-space-2) var(--wpbridge-space-4);
+    color: var(--wpbridge-text-secondary);
+    text-decoration: none;
+    border-radius: var(--wpbridge-radius);
+    transition: all var(--wpbridge-transition);
+}
+
+.wpbridge-subtab:hover {
+    background: var(--wpbridge-bg);
+    color: var(--wpbridge-text);
+}
+
+.wpbridge-subtab-active {
+    background: var(--wpbridge-primary);
+    color: #fff;
+}
+
+.wpbridge-subtab-active:hover {
+    background: var(--wpbridge-primary-hover);
+    color: #fff;
+}
+
+.wpbridge-subtab-count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: var(--wpbridge-text-xs);
+}
+
+.wpbridge-subtab-pane {
+    display: none;
+}
+
+.wpbridge-subtab-pane-active {
+    display: block;
+}
+
+/* 工具栏 */
+.wpbridge-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-3);
+    background: var(--wpbridge-bg-secondary);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-toolbar-left,
+.wpbridge-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-3);
+}
+
+.wpbridge-checkbox-all {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    cursor: pointer;
+}
+
+.wpbridge-select {
+    padding: var(--wpbridge-space-2) var(--wpbridge-space-3);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    background: var(--wpbridge-bg);
+    font-size: var(--wpbridge-text-sm);
+}
+
+.wpbridge-search {
+    padding: var(--wpbridge-space-2) var(--wpbridge-space-3);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    min-width: 200px;
+}
+
+/* 项目列表 */
+.wpbridge-project-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-project-item {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-4);
+    padding: var(--wpbridge-space-4);
+    background: var(--wpbridge-bg);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    transition: all var(--wpbridge-transition);
+}
+
+.wpbridge-project-item:hover {
+    border-color: var(--wpbridge-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.wpbridge-project-checkbox {
+    flex-shrink: 0;
+}
+
+.wpbridge-project-thumbnail {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--wpbridge-radius);
+    overflow: hidden;
+    background: var(--wpbridge-bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.wpbridge-project-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.wpbridge-project-thumbnail .dashicons {
+    font-size: 24px;
+    color: var(--wpbridge-text-secondary);
+}
+
+.wpbridge-project-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.wpbridge-project-name {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    font-weight: 500;
+    margin-bottom: var(--wpbridge-space-1);
+}
+
+.wpbridge-project-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wpbridge-space-3);
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-text-secondary);
+}
+
+.wpbridge-project-version {
+    font-family: monospace;
+}
+
+.wpbridge-project-slug {
+    font-family: monospace;
+    background: var(--wpbridge-bg-secondary);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.wpbridge-project-source {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wpbridge-space-1);
+    min-width: 180px;
+}
+
+.wpbridge-project-source-label {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-text-secondary);
+    text-transform: uppercase;
+}
+
+.wpbridge-source-select {
+    padding: var(--wpbridge-space-2);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    background: var(--wpbridge-bg);
+    font-size: var(--wpbridge-text-sm);
+}
+
+.wpbridge-project-actions {
+    display: flex;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-btn-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: var(--wpbridge-radius);
+}
+
+/* 默认规则配置 */
+.wpbridge-defaults-config {
+    max-width: 800px;
+}
+
+.wpbridge-section {
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    font-size: var(--wpbridge-text-lg);
+    margin-bottom: var(--wpbridge-space-2);
+}
+
+.wpbridge-section-desc {
+    color: var(--wpbridge-text-secondary);
+    margin: 0;
+}
+
+.wpbridge-config-card {
+    background: var(--wpbridge-bg);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-config-card-header {
+    padding: var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-border);
+}
+
+.wpbridge-config-card-header h4 {
+    margin: 0 0 var(--wpbridge-space-1) 0;
+    font-size: var(--wpbridge-text-base);
+}
+
+.wpbridge-config-card-desc {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-text-secondary);
+}
+
+.wpbridge-config-card-body {
+    padding: var(--wpbridge-space-4);
+}
+
+.wpbridge-source-order {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-source-order-item {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-3);
+    padding: var(--wpbridge-space-3);
+    background: var(--wpbridge-bg-secondary);
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+}
+
+.wpbridge-drag-handle {
+    cursor: grab;
+    color: var(--wpbridge-text-secondary);
+}
+
+.wpbridge-source-order-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.wpbridge-source-order-type {
+    font-size: var(--wpbridge-text-xs);
+}
+
+.wpbridge-source-order-override {
+    margin-top: var(--wpbridge-space-3);
+}
+
+.wpbridge-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    cursor: pointer;
+}
+
+.wpbridge-form-actions {
+    padding-top: var(--wpbridge-space-4);
+    border-top: 1px solid var(--wpbridge-border);
+    margin-top: var(--wpbridge-space-4);
+}
+
+/* ========================================
+   Inline Config Panel - 内联配置面板 (P1)
+   参考 WPMind 折叠卡片设计
+   ======================================== */
+
+/* 项目卡片容器 */
+.wpbridge-project-item {
+    flex-wrap: wrap;
+    position: relative;
+}
+
+/* 项目行作为可点击的头部 */
+.wpbridge-project-item > .wpbridge-project-checkbox,
+.wpbridge-project-item > .wpbridge-project-thumbnail,
+.wpbridge-project-item > .wpbridge-project-info,
+.wpbridge-project-item > .wpbridge-project-source,
+.wpbridge-project-item > .wpbridge-project-actions {
+    /* 保持原有布局 */
+}
+
+/* 展开按钮 - 位于 checkbox 后面 */
+.wpbridge-project-expand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    margin-right: var(--wpbridge-space-2);
+}
+
+.wpbridge-project-expand:hover {
+    background: var(--wpbridge-gray-100);
+    border-color: var(--wpbridge-gray-300);
+}
+
+.wpbridge-project-expand .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--wpbridge-gray-500);
+    transition: transform 0.2s ease;
+}
+
+/* 展开状态 */
+.wpbridge-project-item.is-expanded {
+    border-color: var(--wpbridge-primary);
+}
+
+.wpbridge-project-item.is-expanded .wpbridge-project-expand {
+    background: var(--wpbridge-primary-light);
+    border-color: var(--wpbridge-primary);
+}
+
+.wpbridge-project-item.is-expanded .wpbridge-project-expand .dashicons {
+    color: var(--wpbridge-primary);
+    transform: rotate(180deg);
+}
+
+/* 内联配置面板 */
+.wpbridge-project-config-panel {
+    width: 100%;
+    background: var(--wpbridge-gray-50);
+    border-top: 1px solid var(--wpbridge-border);
+    padding: var(--wpbridge-space-5);
+    margin-top: var(--wpbridge-space-4);
+}
+
+/* 配置行 - 参考 WPMind form-table 样式 */
+.wpbridge-config-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--wpbridge-space-4);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-config-row:last-of-type {
+    margin-bottom: 0;
+}
+
+.wpbridge-config-label {
+    width: 100px;
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--wpbridge-gray-700);
+    padding-top: 8px;
+}
+
+.wpbridge-config-field {
+    flex: 1;
+    max-width: 500px;
+}
+
+.wpbridge-config-field .wpbridge-form-input {
+    width: 100%;
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    font-size: 14px;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.wpbridge-config-field .wpbridge-form-input:focus {
+    outline: none;
+    border-color: var(--wpbridge-primary);
+    box-shadow: 0 0 0 2px var(--wpbridge-primary-light);
+}
+
+.wpbridge-config-field .wpbridge-form-help {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--wpbridge-gray-500);
+    line-height: 1.4;
+}
+
+/* 配置操作按钮 */
+.wpbridge-config-actions {
+    display: flex;
+    gap: var(--wpbridge-space-3);
+    margin-top: var(--wpbridge-space-5);
+    padding-top: var(--wpbridge-space-4);
+    border-top: 1px solid var(--wpbridge-border);
+}
+
+.wpbridge-config-actions .wpbridge-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-config-actions .wpbridge-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* ========================================
+   Status Badge - 状态徽章
+   ======================================== */
+.wpbridge-project-status {
+    flex-shrink: 0;
+    min-width: 80px;
+}
+
+.wpbridge-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 4px;
+}
+
+.wpbridge-status-badge .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+.wpbridge-status-default {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-600);
+}
+
+.wpbridge-status-custom {
+    background: var(--wpbridge-info-light);
+    color: var(--wpbridge-info);
+}
+
+.wpbridge-status-disabled {
+    background: var(--wpbridge-error-light);
+    color: var(--wpbridge-error);
+}
+
+.wpbridge-status-locked {
+    background: var(--wpbridge-warning-light);
+    color: var(--wpbridge-warning);
+}
+
+/* 插件类型状态徽章 */
+.wpbridge-status-type-free {
+    background: var(--wpbridge-success-light);
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-status-type-commercial {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.wpbridge-status-type-private {
+    background: var(--wpbridge-info-light);
+    color: var(--wpbridge-info);
+}
+
+.wpbridge-status-type-unknown {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-600);
+}
+
+/* ========================================
+   Radio Group - 单选按钮组
+   ======================================== */
+.wpbridge-radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wpbridge-space-4);
+}
+
+.wpbridge-radio {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.wpbridge-radio input[type="radio"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.wpbridge-radio span {
+    color: var(--wpbridge-gray-700);
+}
+
+/* Custom Source Row - 自定义源字段行 */
+.wpbridge-custom-source-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--wpbridge-space-4);
+    margin-bottom: var(--wpbridge-space-4);
+}
+
+.wpbridge-custom-source-row:last-of-type {
+    margin-bottom: 0;
+}

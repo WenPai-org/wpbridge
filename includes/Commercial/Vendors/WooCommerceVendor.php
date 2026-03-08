@@ -64,12 +64,15 @@ class WooCommerceVendor extends AbstractVendor {
 	 */
 	protected function get_default_config(): array {
 		return array_merge( parent::get_default_config(), [
-			'api_version'    => 'v2',           // API 版本
-			'product_id'     => '',             // 产品 ID（某些商店需要）
-			'instance'       => '',             // 实例标识
-			'use_rest_api'   => true,           // 是否使用 REST API
-			'products_endpoint' => '/wp-json/wc/v3/products', // 产品列表端点
-			'download_endpoint' => '/wp-json/wc-am/v2/download', // 下载端点
+			'auth_mode'      => 'consumer_key', // consumer_key | wc_am
+			'api_version'    => 'v2',
+			'product_id'     => '',
+			'instance'       => '',
+			'email'          => '',
+			'license_key'    => '',
+			'use_rest_api'   => true,
+			'products_endpoint' => '/wp-json/wc/v3/products',
+			'download_endpoint' => '/wp-json/wc-am/v2/download',
 		] );
 	}
 
@@ -94,6 +97,7 @@ class WooCommerceVendor extends AbstractVendor {
 			'url'          => $this->config['api_url'],
 			'api_type'     => 'wc_am',
 			'api_version'  => $this->config['api_version'],
+			'auth_mode'    => $this->config['auth_mode'],
 			'requires_key' => true,
 		];
 	}
@@ -106,7 +110,12 @@ class WooCommerceVendor extends AbstractVendor {
 	protected function get_request_headers(): array {
 		$headers = parent::get_request_headers();
 
-		// WooCommerce REST API 认证
+		// WC AM 模式不发 Authorization header（用 query params 认证）
+		if ( $this->config['auth_mode'] === 'wc_am' ) {
+			return $headers;
+		}
+
+		// Consumer Key 模式：WooCommerce REST API Basic Auth
 		if ( ! empty( $this->config['api_key'] ) && ! empty( $this->config['api_secret'] ) ) {
 			$headers['Authorization'] = 'Basic ' . base64_encode(
 				$this->config['api_key'] . ':' . $this->config['api_secret']
@@ -129,14 +138,17 @@ class WooCommerceVendor extends AbstractVendor {
 			return (bool) $cached;
 		}
 
-		// 尝试获取产品列表来验证
-		$response = $this->api_request( $this->config['products_endpoint'], [
-			'per_page' => 1,
-			'status'   => 'publish',
-		] );
+		if ( $this->config['auth_mode'] === 'wc_am' ) {
+			$valid = $this->wc_am_status() !== null;
+		} else {
+			$response = $this->api_request( $this->config['products_endpoint'], [
+				'per_page' => 1,
+				'status'   => 'publish',
+			] );
+			$valid = $response !== null;
+		}
 
-		$valid = $response !== null;
-		$this->set_cache( $cache_key, $valid, 300 ); // 5分钟缓存
+		$this->set_cache( $cache_key, $valid, 300 );
 
 		return $valid;
 	}
@@ -412,23 +424,44 @@ class WooCommerceVendor extends AbstractVendor {
 			return null;
 		}
 
-		// 构建 WC API Manager 下载链接
+		$instance = $this->config['instance'] ?: $this->generate_instance_id();
+
+		// WC AM 模式：用 wc_am_action=download + api_key + email
+		if ( $this->config['auth_mode'] === 'wc_am' ) {
+			$params = [
+				'wc-api'        => 'wc-am-api',
+				'wc_am_action'  => 'download',
+				'product_id'    => $product_id,
+				'api_key'       => $this->config['license_key'],
+				'email'         => $this->config['email'],
+				'instance'      => $instance,
+			];
+
+			if ( ! empty( $version ) ) {
+				$params['version'] = $version;
+			}
+
+			return add_query_arg(
+				$params,
+				trailingslashit( $this->config['api_url'] )
+			);
+		}
+
+		// Consumer Key 模式
 		$params = [
 			'product_id' => $product_id,
 			'api_key'    => $this->config['api_key'],
-			'instance'   => $this->config['instance'] ?: $this->generate_instance_id(),
+			'instance'   => $instance,
 		];
 
 		if ( ! empty( $version ) ) {
 			$params['version'] = $version;
 		}
 
-		$download_url = add_query_arg(
+		return add_query_arg(
 			$params,
 			trailingslashit( $this->config['api_url'] ) . ltrim( $this->config['download_endpoint'], '/' )
 		);
-
-		return $download_url;
 	}
 
 	/**
@@ -452,6 +485,81 @@ class WooCommerceVendor extends AbstractVendor {
 		}
 
 		return '';
+	}
+
+	/**
+	 * WC AM: 激活授权
+	 *
+	 * @return array|null
+	 */
+	public function wc_am_activate(): ?array {
+		if ( $this->config['auth_mode'] !== 'wc_am' ) {
+			return null;
+		}
+
+		$url = add_query_arg( [
+			'wc-api'       => 'wc-am-api',
+			'wc_am_action' => 'activate',
+			'api_key'      => $this->config['license_key'],
+			'email'        => $this->config['email'],
+			'instance'     => $this->config['instance'] ?: $this->generate_instance_id(),
+		], trailingslashit( $this->config['api_url'] ) );
+
+		$response = wp_remote_get( $url, [
+			'timeout' => $this->config['timeout'],
+			'headers' => [ 'Accept' => 'application/json' ],
+		] );
+
+		if ( is_wp_error( $response ) ) {
+			Logger::error( 'WC AM activate failed', [
+				'vendor' => $this->get_id(),
+				'error'  => $response->get_error_message(),
+			] );
+			return null;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		return json_decode( $body, true ) ?: null;
+	}
+
+	/**
+	 * WC AM: 查询授权状态
+	 *
+	 * @return array|null
+	 */
+	public function wc_am_status(): ?array {
+		if ( $this->config['auth_mode'] !== 'wc_am' ) {
+			return null;
+		}
+
+		$url = add_query_arg( [
+			'wc-api'       => 'wc-am-api',
+			'wc_am_action' => 'status',
+			'api_key'      => $this->config['license_key'],
+			'email'        => $this->config['email'],
+			'instance'     => $this->config['instance'] ?: $this->generate_instance_id(),
+		], trailingslashit( $this->config['api_url'] ) );
+
+		$response = wp_remote_get( $url, [
+			'timeout' => $this->config['timeout'],
+			'headers' => [ 'Accept' => 'application/json' ],
+		] );
+
+		if ( is_wp_error( $response ) ) {
+			Logger::error( 'WC AM status check failed', [
+				'vendor' => $this->get_id(),
+				'error'  => $response->get_error_message(),
+			] );
+			return null;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( $code !== 200 ) {
+			return null;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		return json_decode( $body, true ) ?: null;
 	}
 
 	/**

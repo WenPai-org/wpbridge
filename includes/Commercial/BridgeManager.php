@@ -73,7 +73,7 @@ class BridgeManager {
 		$this->settings       = $settings;
 		$this->remote_config  = $remote_config;
 		$this->gpl_validator  = new GPLValidator();
-		$this->vendor_manager = new VendorManager();
+		$this->vendor_manager = new VendorManager( $settings );
 
 		// 初始化 Bridge Server 客户端
 		$this->init_bridge_client();
@@ -153,18 +153,28 @@ class BridgeManager {
 
 			$type = $config['type'] ?? 'woocommerce';
 
+			// 解密敏感字段
+			$decrypted = $this->decrypt_vendor_config( $vendor_id, $config );
+
 			switch ( $type ) {
 				case 'woocommerce':
+				case 'wc_am':
 					$vendor = new Vendors\WooCommerceVendor(
 						$vendor_id,
 						$config['name'] ?? $vendor_id,
-						$config['api_url'] ?? '',
-						$config['consumer_key'] ?? '',
-						$config['consumer_secret'] ?? ''
+						$decrypted
 					);
 					$this->vendor_manager->register( $vendor );
 					break;
-				// 未来可扩展其他供应商类型
+
+				case 'bridge_api':
+					$vendor = new Vendors\BridgeApiVendor(
+						$vendor_id,
+						$config['name'] ?? $vendor_id,
+						$decrypted
+					);
+					$this->vendor_manager->register( $vendor );
+					break;
 			}
 		}
 	}
@@ -190,8 +200,17 @@ class BridgeManager {
 			}
 		}
 
-		// 回退到 RemoteConfig
-		return $this->remote_config->get( 'bridgeable_plugins', [] );
+		// 回退到 RemoteConfig（返回 slug 列表，需标准化为 slug => info）
+		$commercial = $this->remote_config->get_commercial_plugins();
+		$result     = [];
+		foreach ( $commercial as $key => $value ) {
+			if ( is_string( $value ) ) {
+				$result[ $value ] = [ 'slug' => $value, 'name' => $value ];
+			} elseif ( is_array( $value ) && isset( $value['slug'] ) ) {
+				$result[ $value['slug'] ] = $value;
+			}
+		}
+		return $result;
 	}
 
 	/**
@@ -232,6 +251,7 @@ class BridgeManager {
 
 		// 2. 供应商渠道插件
 		$vendor_plugins = $this->vendor_manager->get_all_plugins();
+
 		foreach ( $vendor_plugins as $slug => $info ) {
 			if ( ! isset( $plugins[ $slug ] ) ) {
 				$plugins[ $slug ] = $info;
@@ -499,7 +519,86 @@ class BridgeManager {
 	}
 
 	/**
+	 * 添加供应商（v2 灵活配置接口）
+	 *
+	 * @param string $vendor_id 供应商 ID
+	 * @param array  $config    供应商配置
+	 * @return array
+	 */
+	public function add_vendor_v2( string $vendor_id, array $config ): array {
+		$vendors = $this->settings->get( 'vendors', [] );
+
+		if ( isset( $vendors[ $vendor_id ] ) ) {
+			return [
+				'success' => false,
+				'message' => __( '供应商 ID 已存在', 'wpbridge' ),
+			];
+		}
+
+		// 敏感字段加密存储
+		$sensitive_fields = [ 'license_key', 'api_key', 'consumer_key', 'consumer_secret' ];
+		foreach ( $sensitive_fields as $field ) {
+			if ( ! empty( $config[ $field ] ) ) {
+				Encryption::store_secure( "vendor_{$vendor_id}_{$field}", $config[ $field ] );
+				$config[ $field ] = '***encrypted***';
+			}
+		}
+
+		$config['enabled']    = $config['enabled'] ?? true;
+		$config['created_at'] = time();
+
+		$vendors[ $vendor_id ] = $config;
+		$this->settings->set( 'vendors', $vendors );
+
+		// 解密后实例化
+		$decrypted = $this->decrypt_vendor_config( $vendor_id, $config );
+		$type      = $config['type'] ?? 'woocommerce';
+		$name      = $config['name'] ?? $vendor_id;
+
+		switch ( $type ) {
+			case 'woocommerce':
+			case 'wc_am':
+				$vendor = new Vendors\WooCommerceVendor( $vendor_id, $name, $decrypted );
+				$this->vendor_manager->register( $vendor );
+				break;
+
+			case 'bridge_api':
+				$vendor = new Vendors\BridgeApiVendor( $vendor_id, $name, $decrypted );
+				$this->vendor_manager->register( $vendor );
+				break;
+		}
+
+		Logger::info( 'Vendor added (v2)', [ 'vendor_id' => $vendor_id, 'type' => $type ] );
+
+		return [
+			'success' => true,
+			'message' => __( '供应商已添加', 'wpbridge' ),
+		];
+	}
+
+	/**
+	 * 解密供应商配置中的敏感字段
+	 *
+	 * @param string $vendor_id 供应商 ID
+	 * @param array  $config    供应商配置
+	 * @return array 解密后的配置
+	 */
+	public function decrypt_vendor_config( string $vendor_id, array $config ): array {
+		$sensitive_fields = [ 'license_key', 'api_key', 'consumer_key', 'consumer_secret' ];
+
+		foreach ( $sensitive_fields as $field ) {
+			if ( isset( $config[ $field ] ) && $config[ $field ] === '***encrypted***' ) {
+				$config[ $field ] = Encryption::get_secure( "vendor_{$vendor_id}_{$field}", '' );
+			}
+		}
+
+		return $config;
+	}
+
+	/**
 	 * 添加供应商
+	 *
+	 * @deprecated 1.1.0 使用 add_vendor_v2() 代替
 	 *
 	 * @param string $vendor_id       供应商 ID
 	 * @param string $name            供应商名称
@@ -517,45 +616,13 @@ class BridgeManager {
 		string $consumer_key,
 		string $consumer_secret
 	): array {
-		$vendors = $this->settings->get( 'vendors', [] );
-
-		if ( isset( $vendors[ $vendor_id ] ) ) {
-			return [
-				'success' => false,
-				'message' => __( '供应商 ID 已存在', 'wpbridge' ),
-			];
-		}
-
-		$vendors[ $vendor_id ] = [
+		return $this->add_vendor_v2( $vendor_id, [
 			'name'            => $name,
 			'type'            => $type,
 			'api_url'         => $api_url,
 			'consumer_key'    => $consumer_key,
 			'consumer_secret' => $consumer_secret,
-			'enabled'         => true,
-			'created_at'      => time(),
-		];
-
-		$this->settings->set( 'vendors', $vendors );
-
-		// 立即注册供应商
-		if ( $type === 'woocommerce' ) {
-			$vendor = new Vendors\WooCommerceVendor(
-				$vendor_id,
-				$name,
-				$api_url,
-				$consumer_key,
-				$consumer_secret
-			);
-			$this->vendor_manager->register( $vendor );
-		}
-
-		Logger::info( 'Vendor added', [ 'vendor_id' => $vendor_id, 'type' => $type ] );
-
-		return [
-			'success' => true,
-			'message' => __( '供应商已添加', 'wpbridge' ),
-		];
+		] );
 	}
 
 	/**
@@ -574,9 +641,17 @@ class BridgeManager {
 			];
 		}
 
+		// 清理加密存储的敏感数据
+		$sensitive_fields = [ 'license_key', 'api_key', 'consumer_key', 'consumer_secret' ];
+		foreach ( $sensitive_fields as $field ) {
+			Encryption::delete_secure( "vendor_{$vendor_id}_{$field}" );
+		}
+
+		$this->vendor_manager->remove_vendor_config( $vendor_id );
+
+		// 持久化删除到设置存储
 		unset( $vendors[ $vendor_id ] );
 		$this->settings->set( 'vendors', $vendors );
-		$this->vendor_manager->unregister( $vendor_id );
 
 		Logger::info( 'Vendor removed', [ 'vendor_id' => $vendor_id ] );
 
@@ -602,7 +677,7 @@ class BridgeManager {
 	 * @return array
 	 */
 	public function test_vendor_connection( string $vendor_id ): array {
-		$vendor = $this->vendor_manager->get( $vendor_id );
+		$vendor = $this->vendor_manager->get_vendor( $vendor_id );
 
 		if ( ! $vendor ) {
 			return [
@@ -611,7 +686,7 @@ class BridgeManager {
 			];
 		}
 
-		$result = $vendor->test_connection();
+		$result = $vendor->is_available();
 
 		return [
 			'success' => $result,
