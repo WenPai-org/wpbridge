@@ -139,7 +139,8 @@ class WooCommerceVendor extends AbstractVendor {
 		}
 
 		if ( $this->config['auth_mode'] === 'wc_am' ) {
-			$valid = $this->wc_am_status() !== null;
+			$response = $this->wc_am_verify_key();
+			$valid    = ! empty( $response['success'] );
 		} else {
 			$response = $this->api_request( $this->config['products_endpoint'], [
 				'per_page' => 1,
@@ -166,6 +167,13 @@ class WooCommerceVendor extends AbstractVendor {
 
 		if ( $cached !== null ) {
 			return $cached;
+		}
+
+		// WC AM 模式：通过 product_list + information 获取
+		if ( $this->config['auth_mode'] === 'wc_am' ) {
+			$result = $this->get_plugins_via_wc_am();
+			$this->set_cache( $cache_key, $result );
+			return $result;
 		}
 
 		$response = $this->api_request( $this->config['products_endpoint'], [
@@ -201,6 +209,119 @@ class WooCommerceVendor extends AbstractVendor {
 		$this->set_cache( $cache_key, $result );
 
 		return $result;
+	}
+
+	/**
+	 * 通过 WC AM API 获取插件列表
+	 *
+	 * @return array
+	 */
+	protected function get_plugins_via_wc_am(): array {
+		$list_response = $this->wc_am_product_list();
+
+		if ( empty( $list_response['success'] ) || empty( $list_response['data']['product_list'] ) ) {
+			return [
+				'plugins' => [],
+				'total'   => 0,
+				'pages'   => 0,
+			];
+		}
+
+		$product_list = $list_response['data']['product_list'];
+
+		// Kestrel 返回 non_wc_subs_resources 嵌套结构
+		if ( isset( $product_list['non_wc_subs_resources'] ) ) {
+			$products = $product_list['non_wc_subs_resources'];
+		} elseif ( isset( $product_list[0] ) ) {
+			// 标准索引数组格式
+			$products = $product_list;
+		} else {
+			$products = [];
+		}
+		$plugins  = [];
+
+		foreach ( $products as $product ) {
+			$product_id    = (int) ( $product['product_id'] ?? 0 );
+			$product_title = $product['product_title'] ?? '';
+
+			if ( $product_id <= 0 ) {
+				continue;
+			}
+
+			// 从产品标题提取 slug（标题格式: "English Name | 中文描述"）
+			$slug = $this->extract_slug_from_title( $product_title );
+
+			// 纯中文标题无法提取英文 slug，用 product_id 占位
+			if ( empty( $slug ) ) {
+				$slug = 'product-' . $product_id;
+			}
+
+			// 尝试获取详情（带 transient 缓存）
+			$info_cache_key = 'wc_am_info_' . $product_id;
+			$info           = $this->get_cache( $info_cache_key );
+
+			if ( $info === null ) {
+				$info_response = $this->wc_am_information( $product_id, $slug );
+				if ( ! empty( $info_response['success'] ) && ! empty( $info_response['data']['info'] ) ) {
+					$info = $info_response['data']['info'];
+					$this->set_cache( $info_cache_key, $info, 7200 );
+				}
+			}
+
+			$plugin_data = [
+				'slug'         => $info['slug'] ?? $slug,
+				'name'         => $product_title,
+				'version'      => $info['version'] ?? '',
+				'author'       => $info['author'] ?? $this->vendor_name,
+				'description'  => '',
+				'homepage'     => $info['homepage'] ?? '',
+				'download_url' => '',
+				'tested'       => $info['tested'] ?? '',
+				'requires'     => $info['requires'] ?? '',
+				'requires_php' => $info['requires_php'] ?? '',
+				'last_updated' => $info['last_updated'] ?? '',
+				'product_id'   => $product_id,
+				'vendor'       => $this->get_id(),
+			];
+
+			$plugins[] = $plugin_data;
+		}
+
+		return [
+			'plugins' => $plugins,
+			'total'   => count( $plugins ),
+			'pages'   => 1,
+		];
+	}
+
+	/**
+	 * 从产品标题提取 slug
+	 *
+	 * 薇晓朵商城标题格式: "Blocksy | 企业 博客 商店 可定制轻量级 WordPress 主题"
+	 * 提取 "|" 前的英文部分，避免 sanitize_title 被 WPSlug 转成拼音
+	 *
+	 * @param string $title 产品标题
+	 * @return string
+	 */
+	protected function extract_slug_from_title( string $title ): string {
+		// 按 | 分割，取第一部分
+		if ( strpos( $title, '|' ) !== false ) {
+			$parts = explode( '|', $title, 2 );
+			$name  = trim( $parts[0] );
+		} else {
+			$name = $title;
+		}
+
+		// 只保留 ASCII 字符生成 slug，避免 WPSlug 拼音转换
+		$ascii_only = preg_replace( '/[^\x20-\x7E]/', '', $name );
+		$ascii_only = trim( $ascii_only );
+
+		if ( ! empty( $ascii_only ) ) {
+			return sanitize_title( $ascii_only );
+		}
+
+		// 全中文标题：返回空，由调用处用 product_id 兜底
+		return '';
 	}
 
 	/**
@@ -378,6 +499,11 @@ class WooCommerceVendor extends AbstractVendor {
 	 * @return array|null
 	 */
 	public function check_update( string $slug, string $current_version ): ?array {
+		// WC AM 模式：通过 update action 检查
+		if ( $this->config['auth_mode'] === 'wc_am' ) {
+			return $this->check_update_via_wc_am( $slug, $current_version );
+		}
+
 		$plugin = $this->get_plugin( $slug );
 
 		if ( $plugin === null ) {
@@ -405,6 +531,88 @@ class WooCommerceVendor extends AbstractVendor {
 	}
 
 	/**
+	 * 通过 WC AM 检查更新
+	 *
+	 * @param string $slug            插件 slug
+	 * @param string $current_version 当前版本
+	 * @return array|null
+	 */
+	protected function check_update_via_wc_am( string $slug, string $current_version ): ?array {
+		$product_id = $this->resolve_product_id( $slug );
+
+		if ( $product_id <= 0 ) {
+			return null;
+		}
+
+		$plugin_name = $slug . '/' . $slug . '.php';
+
+		$response = $this->wc_am_update( $product_id, $slug, $plugin_name, $current_version );
+
+		if ( empty( $response['success'] ) || empty( $response['data']['package'] ) ) {
+			return null;
+		}
+
+		$package = $response['data']['package'];
+
+		return [
+			'version'      => $package['new_version'] ?? '',
+			'download_url' => $package['package'] ?? '',
+			'changelog'    => $package['upgrade_notice'] ?? '',
+			'tested'       => $package['tested'] ?? '',
+			'requires'     => $package['requires'] ?? '',
+			'requires_php' => $package['requires_php'] ?? '',
+		];
+	}
+
+	/**
+	 * 从缓存的产品列表中查找 slug 对应的 product_id
+	 *
+	 * 查找策略（按优先级）：
+	 * 1. 精确匹配：缓存产品列表的 slug
+	 * 2. 本地激活记录：wp_options 中 wpbridge_slug_map_{vendor_id} 的手动绑定
+	 * 3. 模糊匹配：slug 是否包含在产品标题中（英文部分）
+	 *
+	 * @param string $slug 插件 slug
+	 * @return int
+	 */
+	protected function resolve_product_id( string $slug ): int {
+		// 1. 精确匹配缓存列表
+		$plugin = $this->get_plugin( $slug );
+		if ( $plugin !== null && ! empty( $plugin['product_id'] ) ) {
+			return (int) $plugin['product_id'];
+		}
+
+		// 2. 查本地 slug→product_id 映射表
+		$slug_map = get_option( 'wpbridge_slug_map_' . $this->vendor_id, [] );
+		if ( ! empty( $slug_map[ $slug ] ) ) {
+			return (int) $slug_map[ $slug ];
+		}
+
+		// 3. 模糊匹配：遍历产品列表，看 slug 是否出现在标题英文部分
+		$all_plugins = $this->get_plugins( 1, 1000 );
+		foreach ( $all_plugins['plugins'] as $p ) {
+			$title = strtolower( $p['name'] ?? '' );
+			// 提取 | 前的英文部分
+			if ( strpos( $title, '|' ) !== false ) {
+				$title = trim( explode( '|', $title, 2 )[0] );
+			}
+			// slug 完整出现在标题中（如 "avada" 在 "avada" 或 "dokan pro" 含 "dokan-pro"）
+			$title_slug = sanitize_title( $title );
+			if ( $title_slug === $slug || strpos( $title_slug, $slug ) === 0 ) {
+				$pid = (int) ( $p['product_id'] ?? 0 );
+				if ( $pid > 0 ) {
+					// 存入映射表加速下次查找
+					$slug_map[ $slug ] = $pid;
+					update_option( 'wpbridge_slug_map_' . $this->vendor_id, $slug_map, false );
+					return $pid;
+				}
+			}
+		}
+
+		return 0;
+	}
+
+	/**
 	 * 获取下载链接
 	 *
 	 * @param string $slug    插件 slug
@@ -424,31 +632,26 @@ class WooCommerceVendor extends AbstractVendor {
 			return null;
 		}
 
-		$instance = $this->config['instance'] ?: $this->generate_instance_id();
-
-		// WC AM 模式：用 wc_am_action=download + api_key + email
+		// WC AM 模式：通过 update action 获取 package URL
 		if ( $this->config['auth_mode'] === 'wc_am' ) {
-			$params = [
-				'wc-api'        => 'wc-am-api',
-				'wc_am_action'  => 'download',
-				'product_id'    => $product_id,
-				'api_key'       => $this->config['license_key'],
-				'email'         => $this->config['email'],
-				'instance'      => $instance,
-			];
+			$plugin_name = $slug . '/' . $slug . '.php';
+			$response    = $this->wc_am_update(
+				$product_id,
+				$slug,
+				$plugin_name,
+				$version ?: '0.0.0'
+			);
 
-			if ( ! empty( $version ) ) {
-				$params['version'] = $version;
+			if ( ! empty( $response['success'] ) && ! empty( $response['data']['package']['package'] ) ) {
+				return $response['data']['package']['package'];
 			}
 
-			return add_query_arg(
-				$params,
-				trailingslashit( $this->config['api_url'] )
-			);
+			return null;
 		}
 
 		// Consumer Key 模式
-		$params = [
+		$instance = $this->config['instance'] ?: $this->generate_instance_id();
+		$params   = [
 			'product_id' => $product_id,
 			'api_key'    => $this->config['api_key'],
 			'instance'   => $instance,
@@ -490,76 +693,75 @@ class WooCommerceVendor extends AbstractVendor {
 	/**
 	 * WC AM: 激活授权
 	 *
+	 * @param int    $product_id       产品 ID
+	 * @param string $software_version 当前版本（可选）
 	 * @return array|null
 	 */
-	public function wc_am_activate(): ?array {
+	public function wc_am_activate( int $product_id, string $software_version = '' ): ?array {
 		if ( $this->config['auth_mode'] !== 'wc_am' ) {
 			return null;
 		}
 
-		$url = add_query_arg( [
-			'wc-api'       => 'wc-am-api',
-			'wc_am_action' => 'activate',
-			'api_key'      => $this->config['license_key'],
-			'email'        => $this->config['email'],
-			'instance'     => $this->config['instance'] ?: $this->generate_instance_id(),
-		], trailingslashit( $this->config['api_url'] ) );
+		$params = [
+			'product_id' => $product_id,
+			'instance'   => $this->get_or_create_instance(),
+			'object'     => $this->get_object(),
+		];
 
-		$response = wp_remote_get( $url, [
-			'timeout' => $this->config['timeout'],
-			'headers' => [ 'Accept' => 'application/json' ],
-		] );
-
-		if ( is_wp_error( $response ) ) {
-			Logger::error( 'WC AM activate failed', [
-				'vendor' => $this->get_id(),
-				'error'  => $response->get_error_message(),
-			] );
-			return null;
+		if ( ! empty( $software_version ) ) {
+			$params['software_version'] = $software_version;
 		}
 
-		$body = wp_remote_retrieve_body( $response );
-		return json_decode( $body, true ) ?: null;
+		return $this->wc_am_request( 'activate', $params );
 	}
 
 	/**
 	 * WC AM: 查询授权状态
 	 *
+	 * @param int $product_id 产品 ID（可选）
 	 * @return array|null
 	 */
-	public function wc_am_status(): ?array {
+	public function wc_am_status( int $product_id = 0 ): ?array {
 		if ( $this->config['auth_mode'] !== 'wc_am' ) {
 			return null;
 		}
 
-		$url = add_query_arg( [
-			'wc-api'       => 'wc-am-api',
-			'wc_am_action' => 'status',
-			'api_key'      => $this->config['license_key'],
-			'email'        => $this->config['email'],
-			'instance'     => $this->config['instance'] ?: $this->generate_instance_id(),
-		], trailingslashit( $this->config['api_url'] ) );
+		$params = [
+			'instance' => $this->get_or_create_instance(),
+			'object'   => $this->get_object(),
+		];
 
-		$response = wp_remote_get( $url, [
-			'timeout' => $this->config['timeout'],
-			'headers' => [ 'Accept' => 'application/json' ],
-		] );
-
-		if ( is_wp_error( $response ) ) {
-			Logger::error( 'WC AM status check failed', [
-				'vendor' => $this->get_id(),
-				'error'  => $response->get_error_message(),
-			] );
-			return null;
+		if ( $product_id > 0 ) {
+			$params['product_id'] = $product_id;
 		}
 
-		$code = wp_remote_retrieve_response_code( $response );
-		if ( $code !== 200 ) {
-			return null;
+		return $this->wc_am_request( 'status', $params );
+	}
+
+	/**
+	 * 获取站点域名（不含 scheme）
+	 *
+	 * @return string
+	 */
+	protected function get_object(): string {
+		return str_ireplace( [ 'http://', 'https://' ], '', home_url() );
+	}
+
+	/**
+	 * 获取或创建站点实例 ID
+	 *
+	 * @return string
+	 */
+	protected function get_or_create_instance(): string {
+		$option_key = 'wpbridge_instance_' . $this->vendor_id;
+		$instance   = get_option( $option_key );
+
+		if ( empty( $instance ) ) {
+			$instance = wp_generate_uuid4();
+			update_option( $option_key, $instance, false );
 		}
 
-		$body = wp_remote_retrieve_body( $response );
-		return json_decode( $body, true ) ?: null;
+		return $instance;
 	}
 
 	/**
@@ -568,6 +770,155 @@ class WooCommerceVendor extends AbstractVendor {
 	 * @return string
 	 */
 	protected function generate_instance_id(): string {
-		return md5( home_url() . AUTH_KEY );
+		return $this->get_or_create_instance();
+	}
+
+	/**
+	 * WC AM 统一请求方法
+	 *
+	 * @param string $action WC AM action
+	 * @param array  $params 额外参数
+	 * @return array|null
+	 */
+	protected function wc_am_request( string $action, array $params = [] ): ?array {
+		$base_params = [
+			'wc-api'       => 'wc-am-api',
+			'wc_am_action' => $action,
+			'api_key'      => $this->config['license_key'],
+		];
+
+		$url = add_query_arg(
+			array_merge( $base_params, $params ),
+			trailingslashit( $this->config['api_url'] )
+		);
+
+		$response = wp_remote_get( $url, [
+			'timeout' => $this->config['timeout'],
+			'headers' => [ 'Accept' => 'application/json' ],
+		] );
+
+		if ( is_wp_error( $response ) ) {
+			Logger::error( "WC AM {$action} failed", [
+				'vendor' => $this->get_id(),
+				'error'  => $response->get_error_message(),
+			] );
+			return null;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( $code !== 200 ) {
+			Logger::warning( "WC AM {$action} non-200", [
+				'vendor' => $this->get_id(),
+				'code'   => $code,
+			] );
+			return null;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			Logger::error( "WC AM {$action} invalid JSON", [
+				'vendor' => $this->get_id(),
+			] );
+			return null;
+		}
+
+		return $data;
+	}
+
+	/**
+	 * WC AM: 解除产品激活
+	 *
+	 * @param int $product_id 产品 ID
+	 * @return array|null
+	 */
+	public function wc_am_deactivate( int $product_id ): ?array {
+		if ( $this->config['auth_mode'] !== 'wc_am' ) {
+			return null;
+		}
+
+		return $this->wc_am_request( 'deactivate', [
+			'product_id' => $product_id,
+			'instance'   => $this->get_or_create_instance(),
+			'object'     => $this->get_object(),
+		] );
+	}
+
+	/**
+	 * WC AM: 验证 Key 有效性
+	 *
+	 * @return array|null
+	 */
+	public function wc_am_verify_key(): ?array {
+		if ( $this->config['auth_mode'] !== 'wc_am' ) {
+			return null;
+		}
+
+		return $this->wc_am_request( 'verify_api_key_is_active', [
+			'instance' => $this->get_or_create_instance(),
+			'object'   => $this->get_object(),
+		] );
+	}
+
+	/**
+	 * WC AM: 获取已购产品列表
+	 *
+	 * @return array|null
+	 */
+	public function wc_am_product_list(): ?array {
+		if ( $this->config['auth_mode'] !== 'wc_am' ) {
+			return null;
+		}
+
+		return $this->wc_am_request( 'product_list', [
+			'instance' => $this->get_or_create_instance(),
+			'object'   => $this->get_object(),
+		] );
+	}
+
+	/**
+	 * WC AM: 检查产品更新
+	 *
+	 * @param int    $product_id  产品 ID
+	 * @param string $slug        插件 slug
+	 * @param string $plugin_name 插件 basename
+	 * @param string $version     当前版本
+	 * @return array|null
+	 */
+	public function wc_am_update( int $product_id, string $slug, string $plugin_name, string $version ): ?array {
+		if ( $this->config['auth_mode'] !== 'wc_am' ) {
+			return null;
+		}
+
+		return $this->wc_am_request( 'update', [
+			'product_id'  => $product_id,
+			'slug'        => $slug,
+			'plugin_name' => $plugin_name,
+			'version'     => $version,
+			'instance'    => $this->get_or_create_instance(),
+			'object'      => $this->get_object(),
+		] );
+	}
+
+	/**
+	 * WC AM: 获取插件详情
+	 *
+	 * @param int    $product_id 产品 ID
+	 * @param string $slug       插件 slug
+	 * @return array|null
+	 */
+	public function wc_am_information( int $product_id, string $slug ): ?array {
+		if ( $this->config['auth_mode'] !== 'wc_am' ) {
+			return null;
+		}
+
+		return $this->wc_am_request( 'information', [
+			'product_id'  => $product_id,
+			'slug'        => $slug,
+			'plugin_name' => $slug . '/' . $slug . '.php',
+			'instance'    => $this->get_or_create_instance(),
+			'object'      => $this->get_object(),
+		] );
 	}
 }

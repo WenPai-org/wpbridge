@@ -2301,6 +2301,16 @@
         bindEvents: function() {
             var self = this;
 
+            // 插件分组折叠/展开
+            $(document).on('click', '.wpbridge-plugin-group-toggle', function() {
+                var $btn = $(this);
+                var $items = $btn.next('.wpbridge-plugin-group-items');
+                var expanded = $btn.attr('aria-expanded') === 'true';
+                $btn.attr('aria-expanded', !expanded);
+                $btn.find('.wpbridge-group-arrow').toggleClass('is-open');
+                $items.slideToggle(200);
+            });
+
             // 预设供应商 - 激活按钮
             $(document).on('click', '.wpbridge-activate-preset-btn', function() {
                 var presetId = $(this).closest('.wpbridge-vendor-preset-card').data('preset-id');

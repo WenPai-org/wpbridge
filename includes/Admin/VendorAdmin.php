@@ -334,11 +334,45 @@ class VendorAdmin {
 			'is_preset'   => true,
 		] );
 
-		if ( $result['success'] ) {
-			wp_send_json_success( $result );
-		} else {
+		if ( ! $result['success'] ) {
 			wp_send_json_error( $result );
+			return;
 		}
+
+		// 验证凭证
+		$vendor_manager = $this->get_bridge_manager()->get_vendor_manager();
+		$vendor         = $vendor_manager->get_vendor( $preset_id );
+
+		if ( $vendor && ! $vendor->verify_credentials() ) {
+			$this->get_bridge_manager()->remove_vendor( $preset_id );
+			wp_send_json_error( [ 'message' => __( 'API Key 验证失败，请检查邮箱和授权密钥是否正确', 'wpbridge' ) ] );
+			return;
+		}
+
+		// WC AM 模式：获取产品数量
+		$product_count = 0;
+		if ( $vendor && method_exists( $vendor, 'wc_am_product_list' ) ) {
+			$list_response = $vendor->wc_am_product_list();
+			if ( ! empty( $list_response['success'] ) && ! empty( $list_response['data']['product_list'] ) ) {
+				$pl = $list_response['data']['product_list'];
+				if ( isset( $pl['non_wc_subs_resources'] ) ) {
+					$product_count = count( $pl['non_wc_subs_resources'] );
+				} elseif ( isset( $pl[0] ) ) {
+					$product_count = count( $pl );
+				}
+			}
+		}
+
+		$result['product_count'] = $product_count;
+		if ( $product_count > 0 ) {
+			$result['message'] = sprintf(
+				/* translators: %d: product count */
+				__( '连接成功，已发现 %d 个已购产品', 'wpbridge' ),
+				$product_count
+			);
+		}
+
+		wp_send_json_success( $result );
 	}
 
 	/**

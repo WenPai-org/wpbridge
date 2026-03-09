@@ -59,7 +59,7 @@ $active_vendors = array_filter( $vendors, function( $v ) {
 	<div class="wpbridge-stats-row">
 		<div class="wpbridge-stat-card">
 			<span class="wpbridge-stat-value"><?php echo esc_html( count( $active_vendors ) ); ?></span>
-			<span class="wpbridge-stat-label"><?php esc_html_e( '活跃供应商', 'wpbridge' ); ?></span>
+			<span class="wpbridge-stat-label"><?php esc_html_e( '已连接', 'wpbridge' ); ?></span>
 		</div>
 		<div class="wpbridge-stat-card">
 			<span class="wpbridge-stat-value"><?php echo esc_html( count( $all_plugins ) ); ?></span>
@@ -80,12 +80,12 @@ $active_vendors = array_filter( $vendors, function( $v ) {
 		<div class="wpbridge-section-header">
 			<h3>
 				<span class="dashicons dashicons-store"></span>
-				<?php esc_html_e( '供应商渠道', 'wpbridge' ); ?>
+				<?php esc_html_e( '更新渠道', 'wpbridge' ); ?>
 			</h3>
 		</div>
 
 		<p class="wpbridge-section-desc" style="padding: var(--wpbridge-space-3) var(--wpbridge-space-4) 0;">
-			<?php esc_html_e( '接入第三方 GPL 插件分发商，获取更多商业插件的更新支持。', 'wpbridge' ); ?>
+			<?php esc_html_e( '连接你购买插件的商店，自动获取已购产品的更新推送。', 'wpbridge' ); ?>
 		</p>
 
 		<div class="wpbridge-vendor-presets-grid">
@@ -149,7 +149,7 @@ $active_vendors = array_filter( $vendors, function( $v ) {
 			<div class="wpbridge-section-header">
 				<h3>
 					<span class="dashicons dashicons-networking"></span>
-					<?php esc_html_e( '已激活供应商', 'wpbridge' ); ?>
+					<?php esc_html_e( '已连接渠道', 'wpbridge' ); ?>
 				</h3>
 			</div>
 
@@ -224,7 +224,7 @@ $active_vendors = array_filter( $vendors, function( $v ) {
 		</div>
 
 		<p class="wpbridge-section-desc" style="padding: var(--wpbridge-space-3) var(--wpbridge-space-4) 0;">
-			<?php esc_html_e( '手动添加不在官方列表或供应商渠道中的插件。', 'wpbridge' ); ?>
+			<?php esc_html_e( '手动添加其他来源的插件更新地址。', 'wpbridge' ); ?>
 		</p>
 
 		<?php if ( empty( $custom ) ) : ?>
@@ -281,44 +281,57 @@ $active_vendors = array_filter( $vendors, function( $v ) {
 		</div>
 
 		<p class="wpbridge-section-desc" style="padding: var(--wpbridge-space-3) var(--wpbridge-space-4) 0;">
-			<?php esc_html_e( '来自官方列表、供应商渠道和自定义的所有可桥接插件。', 'wpbridge' ); ?>
+			<?php esc_html_e( '所有渠道和自定义来源提供的插件。', 'wpbridge' ); ?>
 		</p>
 
 		<?php if ( empty( $all_plugins ) ) : ?>
 			<div class="wpbridge-empty-state">
 				<span class="dashicons dashicons-admin-plugins"></span>
-				<p><?php esc_html_e( '暂无可用插件，请添加供应商或同步官方列表', 'wpbridge' ); ?></p>
+				<p><?php esc_html_e( '暂无可用插件，请先连接更新渠道或添加自定义插件', 'wpbridge' ); ?></p>
 			</div>
-		<?php else : ?>
-			<div class="wpbridge-plugins-grid">
-				<?php foreach ( $all_plugins as $slug => $info ) : ?>
-					<div class="wpbridge-plugin-card" data-slug="<?php echo esc_attr( $slug ); ?>">
-						<div class="wpbridge-plugin-header">
-							<span class="wpbridge-plugin-name">
-								<?php echo esc_html( $info['name'] ?? $slug ); ?>
-							</span>
-							<span class="wpbridge-plugin-source wpbridge-source-<?php echo esc_attr( $info['source'] ?? 'unknown' ); ?>">
-								<?php
-								$source_labels = [
-									'official' => __( '官方', 'wpbridge' ),
-									'vendor'   => __( '供应商', 'wpbridge' ),
-									'custom'   => __( '自定义', 'wpbridge' ),
-								];
-								echo esc_html( $source_labels[ $info['source'] ] ?? $info['source'] );
-								?>
-							</span>
-						</div>
-						<div class="wpbridge-plugin-meta">
-							<code><?php echo esc_html( $slug ); ?></code>
-							<?php if ( ! empty( $info['vendor'] ) ) : ?>
-								<span class="wpbridge-plugin-vendor">
-									<?php echo esc_html( $info['vendor'] ); ?>
-								</span>
-							<?php endif; ?>
-						</div>
+		<?php else :
+			// 按来源分组
+			$grouped = [];
+			foreach ( $all_plugins as $slug => $info ) {
+				$group_key = $info['vendor'] ?? ( $info['source'] === 'custom' ? __( '自定义', 'wpbridge' ) : __( '其他', 'wpbridge' ) );
+				if ( ! isset( $grouped[ $group_key ] ) ) {
+					$grouped[ $group_key ] = [];
+				}
+				$grouped[ $group_key ][ $slug ] = $info;
+			}
+		?>
+			<?php foreach ( $grouped as $group_name => $group_plugins ) : ?>
+				<div class="wpbridge-plugin-group">
+					<div class="wpbridge-plugin-group-toggle" style="display:flex;align-items:center;gap:8px;padding:12px 16px;cursor:pointer;user-select:none;"
+						 onclick="var items=this.nextElementSibling;var arrow=this.querySelector('.wpbridge-group-arrow');if(items.style.display==='none'){items.style.display='';arrow.style.transform='rotate(90deg)';}else{items.style.display='none';arrow.style.transform='';}">
+						<span class="dashicons dashicons-arrow-right-alt2 wpbridge-group-arrow" style="transition:transform .2s;"></span>
+						<strong><?php echo esc_html( $group_name ); ?></strong>
+						<span style="color:#666;margin-left:auto;"><?php echo esc_html( count( $group_plugins ) ); ?> <?php esc_html_e( '个产品', 'wpbridge' ); ?></span>
 					</div>
-				<?php endforeach; ?>
-			</div>
+					<div class="wpbridge-plugin-group-items" style="display: none;">
+						<table class="wp-list-table widefat fixed striped">
+							<thead>
+								<tr>
+									<th style="width: 40%;"><?php esc_html_e( '名称', 'wpbridge' ); ?></th>
+									<th style="width: 25%;">Slug</th>
+									<th style="width: 15%;"><?php esc_html_e( '版本', 'wpbridge' ); ?></th>
+									<th style="width: 20%;"><?php esc_html_e( '作者', 'wpbridge' ); ?></th>
+								</tr>
+							</thead>
+							<tbody>
+								<?php foreach ( $group_plugins as $slug => $info ) : ?>
+									<tr>
+										<td><?php echo esc_html( $info['name'] ?? $slug ); ?></td>
+										<td><code><?php echo esc_html( $slug ); ?></code></td>
+										<td><?php echo esc_html( $info['version'] ?? '-' ); ?></td>
+										<td><?php echo esc_html( $info['author'] ?? '-' ); ?></td>
+									</tr>
+								<?php endforeach; ?>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			<?php endforeach; ?>
 		<?php endif; ?>
 	</div>
 </div>
@@ -327,7 +340,7 @@ $active_vendors = array_filter( $vendors, function( $v ) {
 <div id="wpbridge-preset-modal" class="wpbridge-modal" style="display:none;">
 	<div class="wpbridge-modal-content">
 		<div class="wpbridge-modal-header">
-			<h2 id="wpbridge-preset-modal-title"><?php esc_html_e( '激活供应商', 'wpbridge' ); ?></h2>
+			<h2 id="wpbridge-preset-modal-title"><?php esc_html_e( '连接更新渠道', 'wpbridge' ); ?></h2>
 			<button type="button" class="wpbridge-modal-close">&times;</button>
 		</div>
 		<div class="wpbridge-modal-body">

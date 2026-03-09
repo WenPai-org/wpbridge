@@ -27,7 +27,7 @@ class PresetRegistry {
 		return [
 			'wenpai-marketplace' => [
 				'name'        => '文派集市',
-				'description' => '文派官方 WooCommerce 商城，提供高质量 WordPress 商业插件和主题，WC API Manager 授权。',
+				'description' => '文派官方商城，购买后输入邮箱和授权密钥即可自动接收更新。',
 				'type'        => 'wc_am',
 				'auth_mode'   => 'wc_am',
 				'api_url'     => '',
@@ -39,7 +39,7 @@ class PresetRegistry {
 			],
 			'weixiaoduo-store'   => [
 				'name'        => '薇晓朵商城',
-				'description' => '薇晓朵 WordPress 商业插件商城，WC API Manager 3.5.2 授权，Amazon S3 高速下载。',
+				'description' => '薇晓朵 WordPress 商业插件商城，购买后输入邮箱和授权密钥即可自动接收更新。',
 				'type'        => 'wc_am',
 				'auth_mode'   => 'wc_am',
 				'api_url'     => 'https://mall.weixiaoduo.com',
@@ -50,8 +50,8 @@ class PresetRegistry {
 				'removable'   => false,
 			],
 			'custom-bridge-api'  => [
-				'name'           => '自定义供应商',
-				'description'    => '通过 Bridge API 连接其他 WPBridge 站点（hub-spoke 架构），聚合多个插件源。',
+				'name'           => 'Bridge API',
+				'description'    => '连接其他安装了文派云桥的站点，聚合多个插件源的更新。',
 				'type'           => 'bridge_api',
 				'status'         => 'available',
 				'icon'           => 'dashicons-admin-links',

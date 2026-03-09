@@ -240,28 +240,14 @@ class BridgeManager {
 	public function get_all_available_plugins(): array {
 		$plugins = [];
 
-		// 1. 官方优化列表
-		$official = $this->get_available_plugins();
-		foreach ( $official as $slug => $info ) {
-			$plugins[ $slug ] = array_merge( $info, [
-				'source' => 'official',
-				'vendor' => null,
-			] );
-		}
-
-		// 2. 供应商渠道插件
+		// 1. 供应商渠道插件
 		$vendor_plugins = $this->vendor_manager->get_all_plugins();
 
 		foreach ( $vendor_plugins as $slug => $info ) {
-			if ( ! isset( $plugins[ $slug ] ) ) {
-				$plugins[ $slug ] = $info;
-			} else {
-				// 官方列表优先，但记录供应商也有
-				$plugins[ $slug ]['also_available_from'] = $info['vendor'];
-			}
+			$plugins[ $slug ] = $info;
 		}
 
-		// 3. 用户自定义插件
+		// 2. 用户自定义插件
 		$custom = $this->settings->get( 'custom_plugins', [] );
 		foreach ( $custom as $slug => $info ) {
 			if ( ! isset( $plugins[ $slug ] ) ) {

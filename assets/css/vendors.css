@@ -536,3 +536,76 @@
     background: var(--wpbridge-warning-light);
     color: var(--wpbridge-warning);
 }
+
+/* ========================================
+   Plugin Group (折叠列表)
+   ======================================== */
+
+.wpbridge-plugin-group {
+    border: 1px solid var(--wpbridge-border);
+    border-radius: var(--wpbridge-radius);
+    margin: var(--wpbridge-space-3) var(--wpbridge-space-4);
+}
+
+.wpbridge-plugin-group + .wpbridge-plugin-group {
+    margin-top: 0;
+    border-top: 0;
+    border-radius: 0 0 var(--wpbridge-radius) var(--wpbridge-radius);
+}
+
+.wpbridge-plugin-group:first-child + .wpbridge-plugin-group {
+    border-radius: 0;
+}
+
+.wpbridge-plugin-group:first-child {
+    border-radius: var(--wpbridge-radius) var(--wpbridge-radius) 0 0;
+}
+
+.wpbridge-plugin-group:last-child {
+    border-radius: 0 0 var(--wpbridge-radius) var(--wpbridge-radius);
+}
+
+.wpbridge-plugin-group:only-child {
+    border-radius: var(--wpbridge-radius);
+}
+
+.wpbridge-plugin-group-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    width: 100%;
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-4);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-size: 13px;
+}
+
+.wpbridge-plugin-group-toggle:hover {
+    background: var(--wpbridge-bg-hover, #f6f7f7);
+}
+
+.wpbridge-group-arrow {
+    transition: transform 0.2s;
+}
+
+.wpbridge-group-arrow.is-open {
+    transform: rotate(90deg);
+}
+
+.wpbridge-group-count {
+    color: var(--wpbridge-text-muted);
+    margin-left: auto;
+    font-weight: normal;
+}
+
+.wpbridge-plugin-group-items {
+    border-top: 1px solid var(--wpbridge-border);
+}
+
+.wpbridge-plugin-group-items .wp-list-table {
+    margin: 0;
+    border: none;
+    box-shadow: none;
+}
