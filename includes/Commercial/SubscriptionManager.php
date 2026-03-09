@@ -174,18 +174,29 @@ class SubscriptionManager {
 		$product_ids  = [];
 		$product_list = $response['data']['product_list'] ?? [];
 
-		// Kestrel 格式: product_list.non_wc_subs_resources
-		$resources = $product_list['non_wc_subs_resources']
-			?? $product_list['wc_subs_resources']
-			?? $product_list;
+		// Kestrel 返回两类资源，需要合并：
+		// - non_wc_subs_resources: 普通（非订阅）产品
+		// - wc_subs_resources: WooCommerce Subscriptions 产品
+		$resource_keys = [ 'non_wc_subs_resources', 'wc_subs_resources' ];
+		$has_resources = false;
 
-		if ( ! is_array( $resources ) ) {
-			return [];
+		foreach ( $resource_keys as $key ) {
+			if ( ! empty( $product_list[ $key ] ) && is_array( $product_list[ $key ] ) ) {
+				$has_resources = true;
+				foreach ( $product_list[ $key ] as $resource ) {
+					if ( isset( $resource['product_id'] ) ) {
+						$product_ids[] = (int) $resource['product_id'];
+					}
+				}
+			}
 		}
 
-		foreach ( $resources as $resource ) {
-			if ( isset( $resource['product_id'] ) ) {
-				$product_ids[] = (int) $resource['product_id'];
+		// Fallback: 如果两个 key 都不存在，尝试直接遍历 product_list
+		if ( ! $has_resources && is_array( $product_list ) ) {
+			foreach ( $product_list as $resource ) {
+				if ( is_array( $resource ) && isset( $resource['product_id'] ) ) {
+					$product_ids[] = (int) $resource['product_id'];
+				}
 			}
 		}
 
