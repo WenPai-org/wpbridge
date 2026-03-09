@@ -72,6 +72,10 @@ class VendorAdmin {
 		add_action( 'wp_ajax_wpbridge_add_custom_plugin', [ $this, 'ajax_add_custom_plugin' ] );
 		add_action( 'wp_ajax_wpbridge_remove_custom_plugin', [ $this, 'ajax_remove_custom_plugin' ] );
 
+		// 订阅管理 AJAX 处理
+		add_action( 'wp_ajax_wpbridge_get_subscription', [ $this, 'ajax_get_subscription' ] );
+		add_action( 'wp_ajax_wpbridge_refresh_subscription', [ $this, 'ajax_refresh_subscription' ] );
+
 		// Bridge Server AJAX 处理
 		add_action( 'wp_ajax_wpbridge_test_bridge_server', [ $this, 'ajax_test_bridge_server' ] );
 	}
@@ -547,6 +551,64 @@ class VendorAdmin {
 	}
 
 	/**
+	 * AJAX: 获取订阅状态
+	 *
+	 * @return void
+	 */
+	public function ajax_get_subscription(): void {
+		check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+		}
+
+		$sub_manager = $this->get_bridge_manager()->get_subscription_manager();
+
+		if ( ! $sub_manager ) {
+			wp_send_json_error( [ 'message' => __( '订阅管理器未初始化', 'wpbridge' ) ] );
+		}
+
+		$subscription = $sub_manager->get_subscription();
+
+		wp_send_json_success( [
+			'subscription' => $subscription,
+			'is_paid'      => $sub_manager->is_paid(),
+		] );
+	}
+
+	/**
+	 * AJAX: 刷新订阅状态
+	 *
+	 * @return void
+	 */
+	public function ajax_refresh_subscription(): void {
+		check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+		}
+
+		$sub_manager = $this->get_bridge_manager()->get_subscription_manager();
+
+		if ( ! $sub_manager ) {
+			wp_send_json_error( [ 'message' => __( '订阅管理器未初始化', 'wpbridge' ) ] );
+		}
+
+		$sub_manager->clear_cache();
+		$subscription = $sub_manager->get_subscription( true );
+
+		wp_send_json_success( [
+			'subscription' => $subscription,
+			'is_paid'      => $sub_manager->is_paid(),
+			'message'      => sprintf(
+				/* translators: %s: plan label */
+				__( '订阅状态已刷新：%s', 'wpbridge' ),
+				$subscription['label'] ?? '免费版'
+			),
+		] );
+	}
+
+	/**
 	 * AJAX: 测试 Bridge Server 连接
 	 *
 	 * @return void
@@ -608,13 +670,17 @@ class VendorAdmin {
 			}
 		}
 
+		$sub_manager  = $this->get_bridge_manager()->get_subscription_manager();
+		$subscription = $sub_manager ? $sub_manager->get_subscription() : null;
+
 		return [
 			'vendors'       => $vendors,
 			'presets'        => $presets,
 			'bridge_count'   => $bridge_count,
 			'custom'        => $this->settings->get( 'custom_plugins', [] ),
 			'all_plugins'   => $this->get_bridge_manager()->get_all_available_plugins(),
-			'stats'         => $this->get_bridge_manager()->get_stats(),
+			'stats'          => $this->get_bridge_manager()->get_stats(),
+			'subscription'   => $subscription,
 			'vendor_types'  => [
 				'woocommerce' => __( 'WooCommerce 商店', 'wpbridge' ),
 				'wc_am'       => __( 'WC API Manager', 'wpbridge' ),
