@@ -47,7 +47,8 @@ class PresetRegistry {
 				'icon'        => 'dashicons-cart',
 				'auth_fields' => [ 'email', 'license_key' ],
 				'is_preset'   => true,
-				'removable'   => false,
+				'removable'           => false,
+				'subscription_vendor' => true,
 			],
 			'custom-bridge-api'  => [
 				'name'           => 'Bridge API',

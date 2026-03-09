@@ -363,6 +363,19 @@ class VendorAdmin {
 			}
 		}
 
+		// 如果是订阅供应商，刷新订阅状态
+		if ( ! empty( $preset['subscription_vendor'] ) ) {
+			$sub_manager = $this->get_bridge_manager()->get_subscription_manager();
+			if ( $sub_manager ) {
+				$sub_manager->clear_cache();
+				$subscription = $sub_manager->get_subscription( true );
+				$result['subscription'] = [
+					'plan'  => $subscription['plan'] ?? 'free',
+					'label' => $subscription['label'] ?? '免费版',
+				];
+			}
+		}
+
 		$result['product_count'] = $product_count;
 		if ( $product_count > 0 ) {
 			$result['message'] = sprintf(
@@ -399,6 +412,14 @@ class VendorAdmin {
 		}
 
 		$result = $this->get_bridge_manager()->remove_vendor( $preset_id );
+
+		// 如果是订阅供应商，清除订阅缓存
+		if ( ! empty( $preset['subscription_vendor'] ) ) {
+			$sub_manager = $this->get_bridge_manager()->get_subscription_manager();
+			if ( $sub_manager ) {
+				$sub_manager->clear_cache();
+			}
+		}
 
 		// 清理加密存储的敏感数据
 		Encryption::delete_secure( "vendor_{$preset_id}_license_key" );
