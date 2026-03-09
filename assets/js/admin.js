@@ -2329,16 +2329,6 @@
         bindEvents: function() {
             var self = this;
 
-            // 插件分组折叠/展开
-            $(document).on('click', '.wpbridge-plugin-group-toggle', function() {
-                var $btn = $(this);
-                var $items = $btn.next('.wpbridge-plugin-group-items');
-                var expanded = $btn.attr('aria-expanded') === 'true';
-                $btn.attr('aria-expanded', !expanded);
-                $btn.find('.wpbridge-group-arrow').toggleClass('is-open');
-                $items.slideToggle(200);
-            });
-
             // 预设供应商 - 激活按钮
             $(document).on('click', '.wpbridge-activate-preset-btn', function() {
                 var presetId = $(this).closest('.wpbridge-vendor-preset-card').data('preset-id');
@@ -2409,40 +2399,6 @@
             $(document).on('click', '.wpbridge-test-vendor', function() {
                 var vendorId = $(this).data('vendor-id');
                 self.testVendor(vendorId, $(this));
-            });
-
-            // 同步供应商
-            $(document).on('click', '.wpbridge-sync-vendor', function() {
-                var vendorId = $(this).data('vendor-id');
-                self.syncVendor(vendorId, $(this));
-            });
-
-            // 切换供应商状态
-            $(document).on('change', '.wpbridge-vendor-toggle', function() {
-                var vendorId = $(this).data('vendor-id');
-                var enabled = $(this).is(':checked');
-                self.toggleVendor(vendorId, enabled);
-            });
-
-            // 同步全部
-            $(document).on('click', '#wpbridge-sync-all-btn', function() {
-                self.syncAllVendors($(this));
-            });
-
-            // 添加自定义插件按钮
-            $(document).on('click', '#wpbridge-add-custom-btn', function() {
-                self.showCustomModal();
-            });
-
-            // 保存自定义插件
-            $(document).on('click', '#wpbridge-save-custom', function() {
-                self.saveCustomPlugin();
-            });
-
-            // 删除自定义插件
-            $(document).on('click', '.wpbridge-remove-custom', function() {
-                var pluginSlug = $(this).data('plugin-slug');
-                self.removeCustomPlugin(pluginSlug, $(this));
             });
 
             // 关闭弹窗
@@ -2593,12 +2549,7 @@
             });
         },
 
-        // === 现有供应商操作（保持不变） ===
-
-        showCustomModal: function() {
-            $('#wpbridge-custom-form')[0].reset();
-            $('#wpbridge-custom-modal').show();
-        },
+        // === 现有供应商操作 ===
 
         removeVendor: function(vendorId, $btn) {
             Modal.confirm({
@@ -2661,165 +2612,6 @@
                 },
                 complete: function() {
                     $btn.prop('disabled', false).text(originalText);
-                }
-            });
-        },
-
-        syncVendor: function(vendorId, $btn) {
-            var originalText = $btn.text();
-            $btn.prop('disabled', true).text(wpbridge.i18n.syncing || '同步中...');
-
-            $.ajax({
-                url: wpbridge.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'wpbridge_sync_vendor_plugins',
-                    nonce: wpbridge.nonce,
-                    vendor_id: vendorId
-                },
-                success: function(response) {
-                    if (response.success) {
-                        Toast.success(response.data.message);
-                        // 更新插件数
-                        $btn.closest('tr').find('.wpbridge-plugin-count').text(response.data.count);
-                    } else {
-                        Toast.error(response.data.message || wpbridge.i18n.failed);
-                    }
-                },
-                error: function(jqXHR, textStatus) {
-                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
-                },
-                complete: function() {
-                    $btn.prop('disabled', false).text(originalText);
-                }
-            });
-        },
-
-        toggleVendor: function(vendorId, enabled) {
-            $.ajax({
-                url: wpbridge.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'wpbridge_toggle_vendor',
-                    nonce: wpbridge.nonce,
-                    vendor_id: vendorId,
-                    enabled: enabled ? 1 : 0
-                },
-                success: function(response) {
-                    if (response.success) {
-                        Toast.success(response.data.message);
-                    } else {
-                        Toast.error(response.data.message || wpbridge.i18n.failed);
-                    }
-                },
-                error: function(jqXHR, textStatus) {
-                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
-                }
-            });
-        },
-
-        syncAllVendors: function($btn) {
-            var originalHtml = $btn.html();
-            $btn.prop('disabled', true).html('<span class="dashicons dashicons-update wpbridge-spin"></span> ' + (wpbridge.i18n.syncing || '同步中...'));
-
-            $.ajax({
-                url: wpbridge.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'wpbridge_sync_vendor_plugins',
-                    nonce: wpbridge.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        Toast.success(response.data.message);
-                        location.reload();
-                    } else {
-                        Toast.error(response.data.message || wpbridge.i18n.failed);
-                    }
-                },
-                error: function(jqXHR, textStatus) {
-                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
-                },
-                complete: function() {
-                    $btn.prop('disabled', false).html(originalHtml);
-                }
-            });
-        },
-
-        saveCustomPlugin: function() {
-            var $form = $('#wpbridge-custom-form');
-            var $btn = $('#wpbridge-save-custom');
-
-            var data = {
-                action: 'wpbridge_add_custom_plugin',
-                nonce: wpbridge.nonce,
-                plugin_slug: $form.find('#custom_slug').val(),
-                name: $form.find('#custom_name').val(),
-                update_url: $form.find('#custom_url').val()
-            };
-
-            if (!data.plugin_slug) {
-                Toast.error(wpbridge.i18n.fill_required || '请填写必填字段');
-                return;
-            }
-
-            $btn.prop('disabled', true);
-
-            $.ajax({
-                url: wpbridge.ajax_url,
-                type: 'POST',
-                data: data,
-                success: function(response) {
-                    if (response.success) {
-                        Toast.success(response.data.message);
-                        $('#wpbridge-custom-modal').hide();
-                        location.reload();
-                    } else {
-                        Toast.error(response.data.message || wpbridge.i18n.failed);
-                    }
-                },
-                error: function(jqXHR, textStatus) {
-                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
-                },
-                complete: function() {
-                    $btn.prop('disabled', false);
-                }
-            });
-        },
-
-        removeCustomPlugin: function(pluginSlug, $btn) {
-            Modal.confirm({
-                title: wpbridge.i18n.remove_custom_title || '删除自定义插件',
-                message: wpbridge.i18n.confirm_remove_custom || '确定要删除此自定义插件吗？',
-                type: 'warning',
-                confirmText: wpbridge.i18n.delete_btn || '删除',
-                onConfirm: function() {
-                    $btn.prop('disabled', true);
-
-                    $.ajax({
-                        url: wpbridge.ajax_url,
-                        type: 'POST',
-                        data: {
-                            action: 'wpbridge_remove_custom_plugin',
-                            nonce: wpbridge.nonce,
-                            plugin_slug: pluginSlug
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                Toast.success(response.data.message);
-                                $btn.closest('tr').fadeOut(function() {
-                                    $(this).remove();
-                                });
-                            } else {
-                                Toast.error(response.data.message || wpbridge.i18n.failed);
-                                $btn.prop('disabled', false);
-                            }
-                        },
-                        error: function(jqXHR, textStatus) {
-                            Toast.error(ajaxErrorMessage(jqXHR, textStatus));
-                            $btn.prop('disabled', false);
-                        }
-                    });
                 }
             });
         }

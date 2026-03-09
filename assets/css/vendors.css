@@ -1,199 +1,14 @@
-/* vendors.css - Vendors Tab | @package WPBridge | @since 1.1.0 */
+/* vendors.css - Vendors Tab | @package WPBridge | @since 1.2.0 */
 
 /* ========================================
-   Vendors Tab - 供应商管理
+   Vendors Tab - 渠道管理
    ======================================== */
 
-/* 供应商页面容器 */
+/* 渠道页面容器 */
 .wpbridge-vendors-section {
     display: flex;
     flex-direction: column;
     gap: var(--wpbridge-space-6);
-}
-
-/* 统计卡片行 */
-.wpbridge-stats-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--wpbridge-space-4);
-}
-
-/* 覆盖 components.css 的 stat-card：vendors 用更紧凑的 padding + 横向布局 */
-.wpbridge-stats-row .wpbridge-stat-card {
-    padding: var(--wpbridge-space-4);
-    display: flex;
-    align-items: center;
-    gap: var(--wpbridge-space-3);
-}
-
-.wpbridge-stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--wpbridge-radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.wpbridge-stat-icon .dashicons {
-    font-size: 24px;
-    width: 24px;
-    height: 24px;
-    color: var(--wpbridge-white);
-}
-
-.wpbridge-stat-icon-primary {
-    background: var(--wpbridge-primary);
-}
-
-.wpbridge-stat-icon-success {
-    background: var(--wpbridge-success);
-}
-
-.wpbridge-stat-icon-info {
-    background: var(--wpbridge-info);
-}
-
-.wpbridge-stat-icon-warning {
-    background: var(--wpbridge-warning);
-}
-
-.wpbridge-stat-content {
-    flex: 1;
-    min-width: 0;
-}
-
-/* 覆盖 components.css：vendors 用更大更粗的数字 */
-.wpbridge-stats-row .wpbridge-stat-value {
-    font-size: 24px;
-    font-weight: 700;
-    line-height: 1.2;
-}
-
-.wpbridge-stat-label {
-    font-size: var(--wpbridge-text-sm);
-    color: var(--wpbridge-gray-500);
-    margin-top: 2px;
-}
-
-/* .wpbridge-section 系列已移至 components.css */
-
-/* 供应商表格 */
-.wpbridge-vendors-table,
-.wpbridge-custom-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.wpbridge-vendors-table th,
-.wpbridge-vendors-table td,
-.wpbridge-custom-table th,
-.wpbridge-custom-table td {
-    padding: var(--wpbridge-space-3) var(--wpbridge-space-4);
-    text-align: left;
-    border-bottom: 1px solid var(--wpbridge-gray-100);
-}
-
-.wpbridge-vendors-table th,
-.wpbridge-custom-table th {
-    font-size: var(--wpbridge-text-xs);
-    font-weight: 600;
-    color: var(--wpbridge-gray-500);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    background: var(--wpbridge-gray-50);
-}
-
-.wpbridge-vendors-table tr:last-child td,
-.wpbridge-custom-table tr:last-child td {
-    border-bottom: none;
-}
-
-.wpbridge-vendors-table tr:hover td,
-.wpbridge-custom-table tr:hover td {
-    background: var(--wpbridge-gray-50);
-}
-
-.wpbridge-vendor-name {
-    font-weight: 500;
-    color: var(--wpbridge-gray-800);
-}
-
-.wpbridge-vendor-url {
-    font-size: var(--wpbridge-text-xs);
-    color: var(--wpbridge-gray-500);
-    font-family: var(--wpbridge-font-mono);
-}
-
-/* 开关切换 — 限定在 vendors 区域，避免覆盖 components.css 的 toggle-track 实现 */
-.wpbridge-vendors-section .wpbridge-toggle {
-    position: relative;
-    display: inline-block;
-    width: 44px;
-    height: 24px;
-}
-
-.wpbridge-vendors-section .wpbridge-toggle input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.wpbridge-toggle-slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--wpbridge-gray-300);
-    transition: 0.3s;
-    border-radius: 24px;
-}
-
-.wpbridge-toggle-slider:before {
-    position: absolute;
-    content: "";
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
-    background-color: var(--wpbridge-white);
-    transition: 0.3s;
-    border-radius: 50%;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.wpbridge-vendors-section .wpbridge-toggle input:checked + .wpbridge-toggle-slider {
-    background-color: var(--wpbridge-success);
-}
-
-.wpbridge-vendors-section .wpbridge-toggle input:checked + .wpbridge-toggle-slider:before {
-    transform: translateX(20px);
-}
-
-.wpbridge-vendors-section .wpbridge-toggle input:disabled + .wpbridge-toggle-slider {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* 表格操作按钮 */
-.wpbridge-table-actions {
-    display: flex;
-    gap: var(--wpbridge-space-1);
-}
-
-.wpbridge-table-actions .wpbridge-btn-icon {
-    padding: var(--wpbridge-space-1);
-    min-width: 28px;
-    height: 28px;
-}
-
-.wpbridge-table-actions .wpbridge-btn-icon .dashicons {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
 }
 
 /* 空状态 */
@@ -219,95 +34,7 @@
     margin: 0 0 var(--wpbridge-space-4) 0;
 }
 
-/* 插件网格 */
-.wpbridge-plugins-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: var(--wpbridge-space-4);
-    padding: var(--wpbridge-space-4);
-}
-
-.wpbridge-plugin-card {
-    background: var(--wpbridge-white);
-    border: 1px solid var(--wpbridge-gray-200);
-    border-radius: var(--wpbridge-radius-md);
-    padding: var(--wpbridge-space-4);
-    transition: all var(--wpbridge-transition);
-}
-
-.wpbridge-plugin-card:hover {
-    border-color: var(--wpbridge-primary);
-    box-shadow: var(--wpbridge-shadow-md);
-}
-
-.wpbridge-plugin-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: var(--wpbridge-space-3);
-}
-
-.wpbridge-plugin-card-title {
-    font-size: var(--wpbridge-text-base);
-    font-weight: 600;
-    color: var(--wpbridge-gray-800);
-    margin: 0 0 var(--wpbridge-space-1) 0;
-}
-
-.wpbridge-plugin-card-slug {
-    font-size: var(--wpbridge-text-xs);
-    color: var(--wpbridge-gray-500);
-    font-family: var(--wpbridge-font-mono);
-}
-
-.wpbridge-plugin-card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--wpbridge-space-2);
-    margin-bottom: var(--wpbridge-space-3);
-}
-
-.wpbridge-plugin-card-version {
-    font-size: var(--wpbridge-text-xs);
-    color: var(--wpbridge-gray-600);
-    background: var(--wpbridge-gray-100);
-    padding: 2px 8px;
-    border-radius: var(--wpbridge-radius-sm);
-    font-family: var(--wpbridge-font-mono);
-}
-
-.wpbridge-plugin-card-actions {
-    display: flex;
-    gap: var(--wpbridge-space-2);
-}
-
-/* 来源徽章 */
-.wpbridge-source-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: var(--wpbridge-text-xs);
-    font-weight: 500;
-    padding: 2px 8px;
-    border-radius: var(--wpbridge-radius-sm);
-}
-
-.wpbridge-source-official {
-    background: rgba(59, 130, 246, 0.1);
-    color: #3b82f6;
-}
-
-.wpbridge-source-vendor {
-    background: rgba(139, 92, 246, 0.1);
-    color: #8b5cf6;
-}
-
-.wpbridge-source-custom {
-    background: rgba(245, 158, 11, 0.1);
-    color: #f59e0b;
-}
-
-/* 表单组 */
+/* 表单组（弹窗内） */
 .wpbridge-form-group {
     margin-bottom: var(--wpbridge-space-4);
 }
@@ -329,6 +56,7 @@
 }
 
 .wpbridge-form-group input[type="text"],
+.wpbridge-form-group input[type="email"],
 .wpbridge-form-group input[type="url"],
 .wpbridge-form-group input[type="password"],
 .wpbridge-form-group select,
@@ -434,7 +162,26 @@
     font-size: var(--wpbridge-text-sm);
     color: var(--wpbridge-gray-500);
     line-height: 1.5;
-    flex: 1;
+}
+
+.wpbridge-vendor-preset-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wpbridge-space-3);
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-vendor-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.wpbridge-vendor-meta-item .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
 }
 
 .wpbridge-vendor-preset-actions {
@@ -451,9 +198,7 @@
     margin-right: 2px;
 }
 
-/* .wpbridge-badge-preset 已移至 components.css */
-
-/* 预设状态标签 — 共用基础 */
+/* 预设状态标签 */
 .wpbridge-badge-active,
 .wpbridge-badge-inactive,
 .wpbridge-badge-coming-soon {
@@ -478,79 +223,6 @@
 .wpbridge-badge-coming-soon {
     background: var(--wpbridge-warning-light);
     color: var(--wpbridge-warning);
-}
-
-/* ========================================
-   Plugin Group (折叠列表)
-   ======================================== */
-
-.wpbridge-plugin-group {
-    border: 1px solid var(--wpbridge-border);
-    border-radius: var(--wpbridge-radius);
-    margin: var(--wpbridge-space-3) var(--wpbridge-space-4);
-}
-
-.wpbridge-plugin-group + .wpbridge-plugin-group {
-    margin-top: 0;
-    border-top: 0;
-    border-radius: 0 0 var(--wpbridge-radius) var(--wpbridge-radius);
-}
-
-.wpbridge-plugin-group:first-child + .wpbridge-plugin-group {
-    border-radius: 0;
-}
-
-.wpbridge-plugin-group:first-child {
-    border-radius: var(--wpbridge-radius) var(--wpbridge-radius) 0 0;
-}
-
-.wpbridge-plugin-group:last-child {
-    border-radius: 0 0 var(--wpbridge-radius) var(--wpbridge-radius);
-}
-
-.wpbridge-plugin-group:only-child {
-    border-radius: var(--wpbridge-radius);
-}
-
-.wpbridge-plugin-group-toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--wpbridge-space-2);
-    width: 100%;
-    padding: var(--wpbridge-space-3) var(--wpbridge-space-4);
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-align: left;
-    font-size: 13px;
-}
-
-.wpbridge-plugin-group-toggle:hover {
-    background: var(--wpbridge-bg-hover, #f6f7f7);
-}
-
-.wpbridge-group-arrow {
-    transition: transform 0.2s;
-}
-
-.wpbridge-group-arrow.is-open {
-    transform: rotate(90deg);
-}
-
-.wpbridge-group-count {
-    color: var(--wpbridge-text-muted);
-    margin-left: auto;
-    font-weight: normal;
-}
-
-.wpbridge-plugin-group-items {
-    border-top: 1px solid var(--wpbridge-border);
-}
-
-.wpbridge-plugin-group-items .wp-list-table {
-    margin: 0;
-    border: none;
-    box-shadow: none;
 }
 
 /* ── 订阅状态 ── */
