@@ -11,10 +11,7 @@ use WPBridge\UpdateSource\PluginUpdater;
 use WPBridge\UpdateSource\ThemeUpdater;
 use WPBridge\Admin\AdminPage;
 use WPBridge\Admin\VendorAdmin;
-use WPBridge\AIBridge\AIGateway;
 use WPBridge\Commercial\CommercialManager;
-use WPBridge\Notification\NotificationManager;
-use WPBridge\SourceGroup\GroupManager;
 use WPBridge\API\RestController;
 
 // 防止直接访问
@@ -77,13 +74,6 @@ class Plugin {
     private ?ThemeUpdater $theme_updater = null;
 
     /**
-     * AI 网关
-     *
-     * @var AIGateway|null
-     */
-    private ?AIGateway $ai_gateway = null;
-
-    /**
      * 商业插件管理器
      *
      * @var CommercialManager|null
@@ -91,32 +81,11 @@ class Plugin {
     private ?CommercialManager $commercial_manager = null;
 
     /**
-     * 通知管理器
-     *
-     * @var NotificationManager|null
-     */
-    private ?NotificationManager $notification_manager = null;
-
-    /**
-     * 源分组管理器
-     *
-     * @var GroupManager|null
-     */
-    private ?GroupManager $group_manager = null;
-
-    /**
      * REST API 控制器
      *
      * @var RestController|null
      */
     private ?RestController $rest_controller = null;
-
-    /**
-     * 商业插件检测器
-     *
-     * @var CommercialDetector|null
-     */
-    private ?CommercialDetector $commercial_detector = null;
 
     /**
      * 获取单例实例
@@ -141,29 +110,31 @@ class Plugin {
         $this->defaults_manager = new DefaultsManager();
         $this->item_manager     = new ItemSourceManager( $this->source_registry );
 
-        // 检查并执行迁移
-        $this->maybe_migrate();
+        // 检查旧版本数据迁移（一次性）
+        $this->maybe_migrate_legacy();
 
         $this->init_hooks();
     }
 
     /**
-     * 检查并执行数据迁移
+     * 一次性迁移旧版本数据
      */
-    private function maybe_migrate(): void {
-        $migration = new MigrationManager(
-            $this->source_registry,
-            $this->item_manager,
-            $this->defaults_manager
-        );
-
-        if ( $migration->needs_migration() ) {
-            $result = $migration->migrate();
-            if ( ! $result['success'] ) {
-                // 记录迁移失败
-                Logger::error( '数据迁移失败', [ 'log' => $result['log'] ] );
-            }
+    private function maybe_migrate_legacy(): void {
+        $migrated = get_option( 'wpbridge_migration_version', '' );
+        if ( version_compare( $migrated, '0.6.0', '>=' ) ) {
+            return;
         }
+
+        // 旧方案 A 的选项已不存在则无需迁移
+        $old_sources = get_option( 'wpbridge_sources' );
+        if ( false === $old_sources ) {
+            update_option( 'wpbridge_migration_version', WPBRIDGE_VERSION );
+            return;
+        }
+
+        // 标记迁移完成（旧数据保留，不影响新架构）
+        Logger::info( '旧版本数据检测完成，标记迁移版本', [ 'version' => WPBRIDGE_VERSION ] );
+        update_option( 'wpbridge_migration_version', WPBRIDGE_VERSION );
     }
 
     /**
@@ -182,17 +153,12 @@ class Plugin {
             add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
 
             // AJAX 处理
-            add_action( 'wp_ajax_wpbridge_set_plugin_type', [ $this, 'ajax_set_plugin_type' ] );
-            add_action( 'wp_ajax_wpbridge_refresh_commercial_detection', [ $this, 'ajax_refresh_commercial_detection' ] );
-            add_action( 'wp_ajax_wpbridge_prepare_refresh', [ $this, 'ajax_prepare_refresh' ] );
-            add_action( 'wp_ajax_wpbridge_refresh_batch', [ $this, 'ajax_refresh_batch' ] );
             add_action( 'wp_ajax_wpbridge_export_config', [ $this, 'ajax_export_config' ] );
             add_action( 'wp_ajax_wpbridge_import_config', [ $this, 'ajax_import_config' ] );
             add_action( 'wp_ajax_wpbridge_lock_version', [ $this, 'ajax_lock_version' ] );
             add_action( 'wp_ajax_wpbridge_unlock_version', [ $this, 'ajax_unlock_version' ] );
             add_action( 'wp_ajax_wpbridge_rollback', [ $this, 'ajax_rollback' ] );
             add_action( 'wp_ajax_wpbridge_get_backups', [ $this, 'ajax_get_backups' ] );
-            add_action( 'wp_ajax_wpbridge_get_changelog', [ $this, 'ajax_get_changelog' ] );
         }
 
         // 插件链接
@@ -216,12 +182,8 @@ class Plugin {
     public function init_updaters(): void {
         $this->plugin_updater       = new PluginUpdater( $this->settings );
         $this->theme_updater        = new ThemeUpdater( $this->settings );
-        $this->ai_gateway           = new AIGateway( $this->settings );
         $this->commercial_manager   = new CommercialManager( $this->settings );
-        $this->notification_manager = new NotificationManager( $this->settings );
-        $this->group_manager        = new GroupManager( $this->settings );
         $this->rest_controller      = new RestController( $this->settings );
-        $this->commercial_detector  = CommercialDetector::get_instance();
 
         // 初始化版本锁定
         VersionLock::get_instance();
@@ -231,28 +193,6 @@ class Plugin {
 
         // 初始化 Site Health 集成
         new SiteHealth( $this->settings );
-
-        // 注册 AI 适配器
-        $this->register_ai_adapters();
-    }
-
-    /**
-     * 注册 AI 适配器
-     */
-    private function register_ai_adapters(): void {
-        if ( null === $this->ai_gateway ) {
-            return;
-        }
-
-        $this->ai_gateway->register_adapter(
-            'yoast',
-            new \WPBridge\AIBridge\Adapters\YoastAdapter( $this->settings )
-        );
-
-        $this->ai_gateway->register_adapter(
-            'rankmath',
-            new \WPBridge\AIBridge\Adapters\RankMathAdapter( $this->settings )
-        );
     }
 
     /**
@@ -367,6 +307,13 @@ class Plugin {
                 'cancel_btn'           => __( '取消', 'wpbridge' ),
                 'delete_btn'           => __( '删除', 'wpbridge' ),
                 'copy'                 => __( '复制', 'wpbridge' ),
+                // 错误反馈
+                'error_timeout'        => __( '请求超时，请检查网络后重试', 'wpbridge' ),
+                'error_aborted'        => __( '请求已取消', 'wpbridge' ),
+                'error_offline'        => __( '网络已断开，请检查网络连接', 'wpbridge' ),
+                'error_forbidden'      => __( '权限不足，请刷新页面后重试', 'wpbridge' ),
+                'error_server'         => __( '服务器错误，请稍后重试', 'wpbridge' ),
+                'error_network'        => __( '无法连接服务器，请检查网络', 'wpbridge' ),
                 // 删除更新源
                 'confirm_delete_title' => __( '删除更新源', 'wpbridge' ),
                 // API Key
@@ -432,15 +379,6 @@ class Plugin {
     }
 
     /**
-     * 获取 AI 网关
-     *
-     * @return AIGateway|null
-     */
-    public function get_ai_gateway(): ?AIGateway {
-        return $this->ai_gateway;
-    }
-
-    /**
      * 获取商业插件管理器
      *
      * @return CommercialManager|null
@@ -450,171 +388,12 @@ class Plugin {
     }
 
     /**
-     * 获取通知管理器
-     *
-     * @return NotificationManager|null
-     */
-    public function get_notification_manager(): ?NotificationManager {
-        return $this->notification_manager;
-    }
-
-    /**
-     * 获取源分组管理器
-     *
-     * @return GroupManager|null
-     */
-    public function get_group_manager(): ?GroupManager {
-        return $this->group_manager;
-    }
-
-    /**
      * 获取 REST API 控制器
      *
      * @return RestController|null
      */
     public function get_rest_controller(): ?RestController {
         return $this->rest_controller;
-    }
-
-    /**
-     * 获取商业插件检测器
-     *
-     * @return CommercialDetector|null
-     */
-    public function get_commercial_detector(): ?CommercialDetector {
-        return $this->commercial_detector;
-    }
-
-    /**
-     * AJAX: 设置插件类型
-     */
-    public function ajax_set_plugin_type(): void {
-        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
-
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
-        }
-
-        $plugin_slug = isset( $_POST['plugin_slug'] ) ? sanitize_text_field( wp_unslash( $_POST['plugin_slug'] ) ) : '';
-        $plugin_type = isset( $_POST['plugin_type'] ) ? sanitize_text_field( wp_unslash( $_POST['plugin_type'] ) ) : '';
-
-        if ( empty( $plugin_slug ) ) {
-            wp_send_json_error( array( 'message' => __( '插件标识不能为空', 'wpbridge' ) ) );
-        }
-
-        if ( empty( $plugin_type ) ) {
-            wp_send_json_error( array( 'message' => __( '插件类型不能为空', 'wpbridge' ) ) );
-        }
-
-        $detector = CommercialDetector::get_instance();
-        $result   = $detector->set_user_mark( $plugin_slug, $plugin_type );
-
-        if ( $result ) {
-            wp_send_json_success( array(
-                'message' => __( '插件类型已保存', 'wpbridge' ),
-                'type'    => $plugin_type,
-                'label'   => CommercialDetector::get_type_label( $plugin_type ),
-            ) );
-        } else {
-            wp_send_json_error( array( 'message' => __( '保存失败', 'wpbridge' ) ) );
-        }
-    }
-
-    /**
-     * AJAX: 刷新商业插件检测
-     */
-    public function ajax_refresh_commercial_detection(): void {
-        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
-
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
-        }
-
-        $detector = CommercialDetector::get_instance();
-        $results  = $detector->refresh_all();
-
-        $stats = array(
-            'total'      => count( $results ),
-            'free'       => 0,
-            'commercial' => 0,
-            'private'    => 0,
-            'unknown'    => 0,
-        );
-
-        foreach ( $results as $result ) {
-            if ( isset( $stats[ $result['type'] ] ) ) {
-                $stats[ $result['type'] ]++;
-            }
-        }
-
-        wp_send_json_success( array(
-            'message' => sprintf(
-                __( '已重新检测 %d 个插件：%d 免费，%d 商业，%d 第三方', 'wpbridge' ),
-                $stats['total'],
-                $stats['free'],
-                $stats['commercial'],
-                $stats['unknown'] + $stats['private']
-            ),
-            'stats'   => $stats,
-        ) );
-    }
-
-    /**
-     * AJAX: 准备刷新检测（返回插件列表）
-     */
-    public function ajax_prepare_refresh(): void {
-        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
-
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
-        }
-
-        $detector = CommercialDetector::get_instance();
-        $data     = $detector->prepare_refresh();
-
-        wp_send_json_success( $data );
-    }
-
-    /**
-     * AJAX: 批量检测插件
-     */
-    public function ajax_refresh_batch(): void {
-        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
-
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
-        }
-
-        if ( empty( $_POST['plugins'] ) ) {
-            wp_send_json_error( array( 'message' => __( '插件列表为空', 'wpbridge' ) ) );
-        }
-
-        $plugins = json_decode( wp_unslash( $_POST['plugins'] ), true );
-
-        if ( ! is_array( $plugins ) ) {
-            wp_send_json_error( array( 'message' => __( '插件列表格式无效', 'wpbridge' ) ) );
-        }
-
-        // 验证并清理每个插件数据
-        $sanitized_plugins = array();
-        foreach ( $plugins as $plugin ) {
-            if ( ! isset( $plugin['slug'] ) || ! isset( $plugin['file'] ) ) {
-                continue;
-            }
-            $sanitized_plugins[] = array(
-                'slug' => sanitize_text_field( $plugin['slug'] ),
-                'file' => sanitize_text_field( $plugin['file'] ),
-            );
-        }
-
-        if ( empty( $sanitized_plugins ) ) {
-            wp_send_json_error( array( 'message' => __( '没有有效的插件数据', 'wpbridge' ) ) );
-        }
-
-        $detector = CommercialDetector::get_instance();
-        $results  = $detector->refresh_batch( $sanitized_plugins );
-
-        wp_send_json_success( array( 'results' => $results ) );
     }
 
     /**
@@ -799,40 +578,6 @@ class Plugin {
         wp_send_json_success( array(
             'backups' => $backups,
         ) );
-    }
-
-    /**
-     * AJAX: 获取更新日志
-     */
-    public function ajax_get_changelog(): void {
-        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
-
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
-        }
-
-        $slug        = isset( $_POST['slug'] ) ? sanitize_text_field( wp_unslash( $_POST['slug'] ) ) : '';
-        $type        = isset( $_POST['type'] ) ? sanitize_text_field( wp_unslash( $_POST['type'] ) ) : 'plugin';
-        $source_type = isset( $_POST['source_type'] ) ? sanitize_text_field( wp_unslash( $_POST['source_type'] ) ) : 'wporg';
-        $source_url  = isset( $_POST['source_url'] ) ? esc_url_raw( wp_unslash( $_POST['source_url'] ) ) : '';
-
-        if ( empty( $slug ) ) {
-            wp_send_json_error( array( 'message' => __( '参数不完整', 'wpbridge' ) ) );
-        }
-
-        $changelog_manager = ChangelogManager::get_instance();
-
-        if ( 'theme' === $type ) {
-            $changelog = $changelog_manager->get_theme_changelog( $slug, $source_type, $source_url );
-        } else {
-            $changelog = $changelog_manager->get_plugin_changelog( $slug, $source_type, $source_url );
-        }
-
-        if ( ! $changelog['success'] ) {
-            wp_send_json_error( array( 'message' => $changelog['error'] ?? __( '获取更新日志失败', 'wpbridge' ) ) );
-        }
-
-        wp_send_json_success( $changelog );
     }
 
     /**

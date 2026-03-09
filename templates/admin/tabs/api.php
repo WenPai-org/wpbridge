@@ -19,12 +19,20 @@ $rate_limit   = $api_settings['rate_limit'] ?? 100;
 $api_keys     = $api_settings['keys'] ?? [];
 ?>
 
+<?php if ( $is_feature_locked( 'bridge_api' ) ) : ?>
+    <div class="wpbridge-upgrade-notice">
+        <span class="dashicons dashicons-lock"></span>
+        <?php esc_html_e( 'Bridge API 需要 Pro 及以上订阅才能使用。', 'wpbridge' ); ?>
+    </div>
+<?php endif; ?>
+
+<div class="<?php echo $is_feature_locked( 'bridge_api' ) ? 'wpbridge-feature-locked' : ''; ?>">
 <form method="post" class="wpbridge-api-form">
     <?php wp_nonce_field( 'wpbridge_action', 'wpbridge_nonce' ); ?>
     <input type="hidden" name="wpbridge_action" value="save_api_settings">
 
     <!-- API 状态面板 -->
-    <div class="wpbridge-stats-panel" style="margin-bottom: 24px;">
+    <div class="wpbridge-stats-panel wpbridge-mb-4">
         <div class="wpbridge-stat-card">
             <div class="wpbridge-stat-card-header">
                 <span class="dashicons dashicons-rest-api"></span>
@@ -39,7 +47,7 @@ $api_keys     = $api_settings['keys'] ?? [];
                 <span class="dashicons dashicons-admin-network"></span>
                 <?php esc_html_e( 'API 端点', 'wpbridge' ); ?>
             </div>
-            <div style="font-size: 12px; font-family: var(--wpbridge-font-mono); color: var(--wpbridge-gray-600); word-break: break-all;">
+            <div class="wpbridge-text-mono">
                 <?php echo esc_html( rest_url( 'bridge/v1/' ) ); ?>
             </div>
         </div>
@@ -83,20 +91,19 @@ $api_keys     = $api_settings['keys'] ?? [];
                 <h3 class="wpbridge-settings-title"><?php esc_html_e( '速率限制', 'wpbridge' ); ?></h3>
                 <p class="wpbridge-settings-desc"><?php esc_html_e( '每个 IP 每分钟允许的最大请求数。', 'wpbridge' ); ?></p>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="wpbridge-inline-group">
                 <input type="number"
                        name="rate_limit"
                        value="<?php echo esc_attr( $rate_limit ); ?>"
                        min="10"
                        max="10000"
-                       class="wpbridge-form-input"
-                       style="max-width: 100px;">
-                <span style="color: var(--wpbridge-gray-500);"><?php esc_html_e( '次/分钟', 'wpbridge' ); ?></span>
+                       class="wpbridge-form-input wpbridge-form-input-sm">
+                <span class="wpbridge-text-muted"><?php esc_html_e( '次/分钟', 'wpbridge' ); ?></span>
             </div>
         </div>
     </div>
 
-    <div class="wpbridge-form-actions" style="margin-top: 24px;">
+    <div class="wpbridge-form-actions wpbridge-mt-6">
         <button type="submit" class="wpbridge-btn wpbridge-btn-primary">
             <span class="dashicons dashicons-saved"></span>
             <?php esc_html_e( '保存设置', 'wpbridge' ); ?>
@@ -105,8 +112,8 @@ $api_keys     = $api_settings['keys'] ?? [];
 </form>
 
 <!-- API Keys 管理 -->
-<div class="wpbridge-settings-panel" style="margin-top: 24px;">
-    <div class="wpbridge-sources-header" style="margin-bottom: 16px;">
+<div class="wpbridge-settings-panel wpbridge-mt-6">
+    <div class="wpbridge-sources-header wpbridge-mb-4">
         <h2 class="wpbridge-sources-title"><?php esc_html_e( 'API Keys', 'wpbridge' ); ?></h2>
         <button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-generate-api-key">
             <span class="dashicons dashicons-plus-alt2"></span>
@@ -115,7 +122,7 @@ $api_keys     = $api_settings['keys'] ?? [];
     </div>
 
     <?php if ( empty( $api_keys ) ) : ?>
-        <div class="wpbridge-empty" style="padding: 32px;">
+        <div class="wpbridge-empty">
             <span class="dashicons dashicons-admin-network"></span>
             <h3 class="wpbridge-empty-title"><?php esc_html_e( '暂无 API Key', 'wpbridge' ); ?></h3>
             <p class="wpbridge-empty-desc"><?php esc_html_e( '生成 API Key 以允许远程访问。', 'wpbridge' ); ?></p>
@@ -128,7 +135,7 @@ $api_keys     = $api_settings['keys'] ?? [];
                         <h3 class="wpbridge-settings-title">
                             <?php echo esc_html( $key_data['name'] ?? __( '未命名', 'wpbridge' ) ); ?>
                             <?php if ( ! empty( $key_data['key_prefix'] ) ) : ?>
-                                <code style="margin-left: 8px; font-size: 11px; color: var(--wpbridge-gray-500);">
+                                <code class="wpbridge-key-prefix">
                                     <?php echo esc_html( $key_data['key_prefix'] ); ?>
                                 </code>
                             <?php endif; ?>
@@ -170,16 +177,16 @@ $api_keys     = $api_settings['keys'] ?? [];
 </div>
 
 <!-- API 文档 -->
-<div class="wpbridge-settings-panel" style="margin-top: 24px;">
-    <h2 class="wpbridge-sources-title" style="margin-bottom: 16px;"><?php esc_html_e( 'API 文档', 'wpbridge' ); ?></h2>
+<div class="wpbridge-settings-panel wpbridge-mt-6">
+    <h2 class="wpbridge-sources-title wpbridge-mb-4"><?php esc_html_e( 'API 文档', 'wpbridge' ); ?></h2>
 
-    <div style="font-size: 13px; color: var(--wpbridge-gray-600);">
+    <div class="wpbridge-api-docs">
         <p><strong><?php esc_html_e( '认证方式', 'wpbridge' ); ?></strong></p>
         <p><?php esc_html_e( '在请求头中添加 API Key：', 'wpbridge' ); ?></p>
-        <code style="display: block; padding: 12px; background: var(--wpbridge-gray-100); margin: 8px 0;">X-WPBridge-API-Key: your_api_key</code>
+        <code class="wpbridge-code-block">X-WPBridge-API-Key: your_api_key</code>
 
-        <p style="margin-top: 16px;"><strong><?php esc_html_e( '可用端点', 'wpbridge' ); ?></strong></p>
-        <ul style="margin: 8px 0; padding-left: 20px;">
+        <p class="wpbridge-mt-4"><strong><?php esc_html_e( '可用端点', 'wpbridge' ); ?></strong></p>
+        <ul class="wpbridge-api-endpoints">
             <li><code>GET /wp-json/bridge/v1/status</code> - <?php esc_html_e( 'API 状态', 'wpbridge' ); ?></li>
             <li><code>GET /wp-json/bridge/v1/sources</code> - <?php esc_html_e( '获取更新源列表', 'wpbridge' ); ?></li>
             <li><code>GET /wp-json/bridge/v1/check/{source_id}</code> - <?php esc_html_e( '检查更新源状态', 'wpbridge' ); ?></li>
@@ -188,3 +195,4 @@ $api_keys     = $api_settings['keys'] ?? [];
         </ul>
     </div>
 </div>
+</div><!-- /.wpbridge-feature-locked -->

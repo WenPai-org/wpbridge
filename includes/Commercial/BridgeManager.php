@@ -43,13 +43,6 @@ class BridgeManager {
 	private RemoteConfig $remote_config;
 
 	/**
-	 * GPL 验证器
-	 *
-	 * @var GPLValidator
-	 */
-	private GPLValidator $gpl_validator;
-
-	/**
 	 * 供应商管理器
 	 *
 	 * @var VendorManager
@@ -79,7 +72,6 @@ class BridgeManager {
 	public function __construct( Settings $settings, RemoteConfig $remote_config ) {
 		$this->settings       = $settings;
 		$this->remote_config  = $remote_config;
-		$this->gpl_validator  = new GPLValidator();
 		$this->vendor_manager = new VendorManager( $settings );
 
 		// 初始化 Bridge Server 客户端
@@ -318,20 +310,7 @@ class BridgeManager {
 
 		$plugin_info = $all_available[ $plugin_slug ];
 
-		// 2. H5 修复: GPL 合规验证
-		$gpl_result = $this->gpl_validator->validate( $plugin_slug, $plugin_file );
-		if ( $gpl_result['is_gpl'] === false ) {
-			Logger::warning( 'GPL validation failed', [
-				'plugin' => $plugin_slug,
-				'result' => $gpl_result,
-			] );
-			return [
-				'success' => false,
-				'message' => __( '该插件不是 GPL 授权，无法桥接', 'wpbridge' ),
-				'code'    => 'not_gpl',
-				'license' => $gpl_result['license'],
-			];
-		}
+		// 3. 获取下载地址
 
 		if ( $gpl_result['is_gpl'] === null && $gpl_result['confidence'] < 50 ) {
 			// 无法确定，但置信度低，警告用户
@@ -511,14 +490,11 @@ class BridgeManager {
 			}
 
 			if ( isset( $available[ $slug ] ) ) {
-				$gpl_result = $this->gpl_validator->validate( $slug, $file );
-
 				$result[ $slug ] = [
 					'file'       => $file,
 					'name'       => $data['Name'],
 					'version'    => $data['Version'],
 					'is_bridged' => in_array( $slug, $bridged, true ),
-					'gpl_status' => $gpl_result,
 					'available'  => $available[ $slug ],
 				];
 			}

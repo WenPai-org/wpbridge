@@ -217,9 +217,7 @@
     max-width: 800px;
 }
 
-.wpbridge-section {
-    margin-bottom: var(--wpbridge-space-6);
-}
+/* .wpbridge-section 已移至 components.css */
 
 .wpbridge-section-title {
     display: flex;
@@ -229,10 +227,7 @@
     margin-bottom: var(--wpbridge-space-2);
 }
 
-.wpbridge-section-desc {
-    color: var(--wpbridge-text-secondary);
-    margin: 0;
-}
+/* .wpbridge-section-desc 已移至 components.css */
 
 .wpbridge-config-card {
     background: var(--wpbridge-bg);
@@ -301,11 +296,7 @@
     cursor: pointer;
 }
 
-.wpbridge-form-actions {
-    padding-top: var(--wpbridge-space-4);
-    border-top: 1px solid var(--wpbridge-border);
-    margin-top: var(--wpbridge-space-4);
-}
+/* .wpbridge-form-actions 已移至 components.css */
 
 /* ========================================
    Inline Config Panel - 内联配置面板 (P1)

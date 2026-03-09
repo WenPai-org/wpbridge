@@ -64,6 +64,49 @@ $health_percent  = $total_checked > 0 ? round( ( $healthy_count / $total_checked
 $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'warning' : 'success' );
 ?>
 
+<?php if ( $stats['total'] === 0 ) : ?>
+<!-- 新用户引导 -->
+<div class="wpbridge-welcome">
+    <div class="wpbridge-welcome-header">
+        <span class="dashicons dashicons-welcome-learn-more"></span>
+        <h2><?php esc_html_e( '欢迎使用 WPBridge', 'wpbridge' ); ?></h2>
+        <p><?php esc_html_e( '完成以下步骤，开始管理你的更新源。', 'wpbridge' ); ?></p>
+    </div>
+    <div class="wpbridge-welcome-steps">
+        <div class="wpbridge-welcome-step">
+            <span class="wpbridge-welcome-step-num">1</span>
+            <div class="wpbridge-welcome-step-content">
+                <h4><?php esc_html_e( '激活供应商', 'wpbridge' ); ?></h4>
+                <p><?php esc_html_e( '在供应商 Tab 中激活薇晓朵等预设供应商，自动获取已购产品更新。', 'wpbridge' ); ?></p>
+                <a href="#vendors" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm" data-tab-link="vendors">
+                    <?php esc_html_e( '前往供应商', 'wpbridge' ); ?>
+                </a>
+            </div>
+        </div>
+        <div class="wpbridge-welcome-step">
+            <span class="wpbridge-welcome-step-num">2</span>
+            <div class="wpbridge-welcome-step-content">
+                <h4><?php esc_html_e( '添加更新源', 'wpbridge' ); ?></h4>
+                <p><?php esc_html_e( '或手动添加自定义更新源，连接你的私有仓库或商业插件服务器。', 'wpbridge' ); ?></p>
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge&action=add' ) ); ?>" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm">
+                    <?php esc_html_e( '添加更新源', 'wpbridge' ); ?>
+                </a>
+            </div>
+        </div>
+        <div class="wpbridge-welcome-step">
+            <span class="wpbridge-welcome-step-num">3</span>
+            <div class="wpbridge-welcome-step-content">
+                <h4><?php esc_html_e( '配置项目', 'wpbridge' ); ?></h4>
+                <p><?php esc_html_e( '为已安装的插件和主题选择更新源，或使用默认规则自动匹配。', 'wpbridge' ); ?></p>
+                <a href="#projects" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm" data-tab-link="projects">
+                    <?php esc_html_e( '管理项目', 'wpbridge' ); ?>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- 状态摘要栏 -->
 <div class="wpbridge-status-bar">
     <div class="wpbridge-status-bar-item">

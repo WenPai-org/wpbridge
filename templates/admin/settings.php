@@ -103,7 +103,7 @@ if ( ! defined( 'ABSPATH' ) ) {
         </table>
 
         <p class="submit">
-            <input type="submit" class="button button-primary" value="<?php esc_attr_e( '保存设置', 'wpbridge' ); ?>">
+            <input type="submit" class="wpbridge-btn wpbridge-btn-primary" value="<?php esc_attr_e( '保存设置', 'wpbridge' ); ?>">
         </p>
     </form>
 

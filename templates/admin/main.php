@@ -17,7 +17,9 @@ use WPBridge\UpdateSource\SourceType;
 use WPBridge\UpdateSource\SourceManager;
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
+use WPBridge\Core\RemoteConfig;
 use WPBridge\Cache\HealthChecker;
+use WPBridge\Commercial\BridgeManager;
 
 // 获取数据
 $settings_obj   = new Settings();
@@ -26,6 +28,14 @@ $sources        = $source_manager->get_all();
 $stats          = $source_manager->get_stats();
 $settings       = $settings_obj->get_all();
 $logs           = Logger::get_logs();
+
+// 供应商 & 订阅（供 vendors/settings/api tab 共用）
+$remote_config  = RemoteConfig::get_instance();
+$bridge_manager = new BridgeManager( $settings_obj, $remote_config );
+$subscription   = $bridge_manager->get_subscription();
+$is_feature_locked = static function( string $feature ) use ( $subscription ): bool {
+    return ! in_array( $feature, $subscription['features'] ?? [], true );
+};
 
 // 健康检查
 $health_checker = new HealthChecker();
@@ -80,17 +90,17 @@ foreach ( $sources as $source ) {
                 <a href="#projects" class="wpbridge-tab" data-tab="projects">
                     <?php esc_html_e( '项目', 'wpbridge' ); ?>
                 </a>
-                <a href="#sources" class="wpbridge-tab" data-tab="sources">
-                    <?php esc_html_e( '更新源', 'wpbridge' ); ?>
-                </a>
                 <a href="#vendors" class="wpbridge-tab" data-tab="vendors">
                     <?php esc_html_e( '供应商', 'wpbridge' ); ?>
                 </a>
-                <a href="#diagnostics" class="wpbridge-tab" data-tab="diagnostics">
-                    <?php esc_html_e( '诊断', 'wpbridge' ); ?>
-                </a>
                 <a href="#settings" class="wpbridge-tab" data-tab="settings">
                     <?php esc_html_e( '设置', 'wpbridge' ); ?>
+                </a>
+                <a href="#sources" class="wpbridge-tab" data-tab="sources">
+                    <?php esc_html_e( '更新源', 'wpbridge' ); ?>
+                </a>
+                <a href="#diagnostics" class="wpbridge-tab" data-tab="diagnostics">
+                    <?php esc_html_e( '诊断', 'wpbridge' ); ?>
                 </a>
                 <a href="#api" class="wpbridge-tab" data-tab="api">
                     <?php esc_html_e( 'Bridge API', 'wpbridge' ); ?>
@@ -110,24 +120,24 @@ foreach ( $sources as $source ) {
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/projects.php'; ?>
             </div>
 
-            <!-- Tab: 更新源 -->
-            <div id="sources" class="wpbridge-tab-pane">
-                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/sources.php'; ?>
-            </div>
-
             <!-- Tab: 供应商 -->
             <div id="vendors" class="wpbridge-tab-pane">
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/vendors.php'; ?>
             </div>
 
-            <!-- Tab: 诊断 -->
-            <div id="diagnostics" class="wpbridge-tab-pane">
-                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/diagnostics.php'; ?>
-            </div>
-
             <!-- Tab: 设置 -->
             <div id="settings" class="wpbridge-tab-pane">
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/settings.php'; ?>
+            </div>
+
+            <!-- Tab: 更新源 -->
+            <div id="sources" class="wpbridge-tab-pane">
+                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/sources.php'; ?>
+            </div>
+
+            <!-- Tab: 诊断 -->
+            <div id="diagnostics" class="wpbridge-tab-pane">
+                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/diagnostics.php'; ?>
             </div>
 
             <!-- Tab: Bridge API -->

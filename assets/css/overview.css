@@ -327,3 +327,90 @@
 .wpbridge-info-value-muted {
     color: var(--wpbridge-gray-400);
 }
+
+/* ========================================
+   Welcome Guide - 新用户引导
+   ======================================== */
+
+.wpbridge-welcome {
+    background: linear-gradient(135deg, #f0f4ff 0%, #fff 50%, #f0fdf4 100%);
+    border: 1px solid var(--wpbridge-primary-light, #c7d2fe);
+    border-radius: var(--wpbridge-radius-md, 8px);
+    padding: var(--wpbridge-space-6);
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-welcome-header {
+    text-align: center;
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-welcome-header .dashicons {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    color: var(--wpbridge-primary);
+    margin-bottom: var(--wpbridge-space-2);
+}
+
+.wpbridge-welcome-header h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0 0 var(--wpbridge-space-2);
+}
+
+.wpbridge-welcome-header p {
+    font-size: 14px;
+    color: var(--wpbridge-gray-500);
+    margin: 0;
+}
+
+.wpbridge-welcome-steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--wpbridge-space-4);
+}
+
+.wpbridge-welcome-step {
+    background: var(--wpbridge-white);
+    border: 1px solid var(--wpbridge-gray-200);
+    border-radius: var(--wpbridge-radius-md, 8px);
+    padding: var(--wpbridge-space-5);
+    display: flex;
+    gap: var(--wpbridge-space-3);
+}
+
+.wpbridge-welcome-step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--wpbridge-primary);
+    color: var(--wpbridge-white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.wpbridge-welcome-step-content h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0 0 var(--wpbridge-space-1);
+}
+
+.wpbridge-welcome-step-content p {
+    font-size: 13px;
+    color: var(--wpbridge-gray-500);
+    margin: 0 0 var(--wpbridge-space-3);
+    line-height: 1.5;
+}
+
+@media (max-width: 782px) {
+    .wpbridge-welcome-steps {
+        grid-template-columns: 1fr;
+    }
+}

@@ -36,7 +36,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                 <h3 class="wpbridge-settings-title"><?php esc_html_e( '缓存时间', 'wpbridge' ); ?></h3>
                 <p class="wpbridge-settings-desc"><?php esc_html_e( '更新检查结果的缓存时间，较长的缓存时间可以减少请求次数。', 'wpbridge' ); ?></p>
             </div>
-            <select name="cache_ttl" class="wpbridge-form-select" style="max-width: 150px;">
+            <select name="cache_ttl" class="wpbridge-form-select wpbridge-form-input-md">
                 <option value="3600" <?php selected( $settings['cache_ttl'] ?? 43200, 3600 ); ?>>
                     <?php esc_html_e( '1 小时', 'wpbridge' ); ?>
                 </option>
@@ -58,15 +58,14 @@ if ( ! defined( 'ABSPATH' ) ) {
                 <h3 class="wpbridge-settings-title"><?php esc_html_e( '请求超时', 'wpbridge' ); ?></h3>
                 <p class="wpbridge-settings-desc"><?php esc_html_e( 'HTTP 请求的超时时间（5-60 秒），网络较慢时可适当增加。', 'wpbridge' ); ?></p>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="wpbridge-inline-group">
                 <input type="number"
                        name="request_timeout"
                        value="<?php echo esc_attr( $settings['request_timeout'] ?? 10 ); ?>"
                        min="5"
                        max="60"
-                       class="wpbridge-form-input"
-                       style="max-width: 80px;">
-                <span style="color: var(--wpbridge-gray-500);"><?php esc_html_e( '秒', 'wpbridge' ); ?></span>
+                       class="wpbridge-form-input wpbridge-form-input-sm">
+                <span class="wpbridge-text-muted"><?php esc_html_e( '秒', 'wpbridge' ); ?></span>
             </div>
         </div>
 
@@ -96,12 +95,19 @@ if ( ! defined( 'ABSPATH' ) ) {
     </div>
 
     <!-- Bridge Server 配置 -->
-    <div class="wpbridge-settings-panel" style="margin-top: 24px; border-top: 1px solid var(--wpbridge-gray-200); padding-top: 24px;">
-        <h3 style="margin: 0 0 16px; font-size: 14px; font-weight: 600; color: var(--wpbridge-gray-700);">
-            <span class="dashicons dashicons-cloud" style="margin-right: 4px;"></span>
+    <div class="wpbridge-settings-panel wpbridge-mt-6">
+        <h3 class="wpbridge-panel-title">
+            <span class="dashicons dashicons-cloud"></span>
             <?php esc_html_e( 'Bridge Server', 'wpbridge' ); ?>
+            <?php if ( $is_feature_locked( 'bridge_server' ) ) : ?>
+                <span class="wpbridge-lock-badge">
+                    <span class="dashicons dashicons-lock"></span>
+                    <?php esc_html_e( '需要 Pro', 'wpbridge' ); ?>
+                </span>
+            <?php endif; ?>
         </h3>
 
+        <div class="<?php echo $is_feature_locked( 'bridge_server' ) ? 'wpbridge-feature-locked' : ''; ?>">
         <div class="wpbridge-settings-row">
             <div class="wpbridge-settings-info">
                 <h3 class="wpbridge-settings-title"><?php esc_html_e( '服务端地址', 'wpbridge' ); ?></h3>
@@ -111,8 +117,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                    name="bridge_server_url"
                    value="<?php echo esc_attr( $settings['bridge_server_url'] ?? '' ); ?>"
                    placeholder="https://bridge.example.com"
-                   class="wpbridge-form-input"
-                   style="max-width: 300px;">
+                   class="wpbridge-form-input wpbridge-form-input-lg">
         </div>
 
         <div class="wpbridge-settings-row">
@@ -124,8 +129,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                    name="bridge_server_api_key"
                    value="<?php echo esc_attr( $settings['bridge_server_api_key'] ?? '' ); ?>"
                    placeholder="<?php esc_attr_e( '输入 API Key', 'wpbridge' ); ?>"
-                   class="wpbridge-form-input"
-                   style="max-width: 300px;">
+                   class="wpbridge-form-input wpbridge-form-input-lg">
         </div>
 
         <?php if ( ! empty( $settings['bridge_server_url'] ) ) : ?>
@@ -140,9 +144,10 @@ if ( ! defined( 'ABSPATH' ) ) {
             </button>
         </div>
         <?php endif; ?>
+        </div><!-- /.wpbridge-feature-locked -->
     </div>
 
-    <div class="wpbridge-form-actions" style="margin-top: 24px;">
+    <div class="wpbridge-form-actions wpbridge-mt-6">
         <button type="submit" class="wpbridge-btn wpbridge-btn-primary">
             <span class="dashicons dashicons-saved"></span>
             <?php esc_html_e( '保存设置', 'wpbridge' ); ?>
@@ -151,8 +156,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 </form>
 
 <!-- 配置导入导出 -->
-<div class="wpbridge-settings-panel" style="margin-top: 32px;">
-    <h2 class="wpbridge-section-title" style="margin-bottom: 16px;">
+<div class="wpbridge-settings-panel wpbridge-mt-8">
+    <h2 class="wpbridge-section-title wpbridge-mb-4">
         <span class="dashicons dashicons-database-export"></span>
         <?php esc_html_e( '配置导入导出', 'wpbridge' ); ?>
     </h2>
@@ -162,8 +167,8 @@ if ( ! defined( 'ABSPATH' ) ) {
             <h3 class="wpbridge-settings-title"><?php esc_html_e( '导出配置', 'wpbridge' ); ?></h3>
             <p class="wpbridge-settings-desc"><?php esc_html_e( '将当前配置导出为 JSON 文件，用于备份或迁移到其他站点。', 'wpbridge' ); ?></p>
         </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-            <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--wpbridge-gray-600);">
+        <div class="wpbridge-inline-group">
+            <label class="wpbridge-import-export-label">
                 <input type="checkbox" id="wpbridge-export-secrets">
                 <?php esc_html_e( '包含敏感信息', 'wpbridge' ); ?>
             </label>
@@ -179,8 +184,8 @@ if ( ! defined( 'ABSPATH' ) ) {
             <h3 class="wpbridge-settings-title"><?php esc_html_e( '导入配置', 'wpbridge' ); ?></h3>
             <p class="wpbridge-settings-desc"><?php esc_html_e( '从 JSON 文件导入配置。可选择合并或覆盖现有配置。', 'wpbridge' ); ?></p>
         </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-            <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--wpbridge-gray-600);">
+        <div class="wpbridge-inline-group">
+            <label class="wpbridge-import-export-label">
                 <input type="checkbox" id="wpbridge-import-merge" checked>
                 <?php esc_html_e( '合并配置', 'wpbridge' ); ?>
             </label>

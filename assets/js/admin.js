@@ -106,6 +106,34 @@
     };
 
     /**
+     * AJAX 错误处理 - 提供具体的错误信息
+     */
+    function ajaxErrorMessage(jqXHR, textStatus) {
+        if (textStatus === 'timeout') {
+            return wpbridge.i18n.error_timeout || '请求超时，请检查网络后重试';
+        }
+        if (textStatus === 'abort') {
+            return wpbridge.i18n.error_aborted || '请求已取消';
+        }
+        if (!navigator.onLine) {
+            return wpbridge.i18n.error_offline || '网络已断开，请检查网络连接';
+        }
+        if (jqXHR && jqXHR.status) {
+            if (jqXHR.status === 403) {
+                return wpbridge.i18n.error_forbidden || '权限不足，请刷新页面后重试';
+            }
+            if (jqXHR.status === 500) {
+                return wpbridge.i18n.error_server || '服务器错误，请稍后重试';
+            }
+            if (jqXHR.status === 0) {
+                return wpbridge.i18n.error_network || '无法连接服务器，请检查网络';
+            }
+            return (wpbridge.i18n.failed || '操作失败') + ' (' + jqXHR.status + ')';
+        }
+        return wpbridge.i18n.failed || '操作失败';
+    }
+
+    /**
      * 模态框系统 - 替代浏览器原生 confirm/prompt/alert
      */
     var Modal = {
@@ -179,7 +207,7 @@
             });
 
             // ESC 关闭
-            $(document).one('keydown.wpbridge-modal', function(e) {
+            $(document).on('keydown.wpbridge-modal', function(e) {
                 if (e.key === 'Escape') {
                     Modal.close($modal);
                     options.onCancel();
@@ -286,7 +314,7 @@
             });
 
             // ESC 关闭
-            $(document).one('keydown.wpbridge-modal', function(e) {
+            $(document).on('keydown.wpbridge-modal', function(e) {
                 if (e.key === 'Escape') {
                     Modal.close($modal);
                     options.onCancel();
@@ -369,7 +397,7 @@
             });
 
             // ESC 关闭
-            $(document).one('keydown.wpbridge-modal', function(e) {
+            $(document).on('keydown.wpbridge-modal', function(e) {
                 if (e.key === 'Escape') {
                     Modal.close($modal);
                     options.onConfirm();
@@ -494,8 +522,8 @@
                         $toggle.prop('checked', !enabled);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                     $toggle.prop('checked', !enabled);
                 }
             });
@@ -547,8 +575,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $button.prop('disabled', false);
@@ -589,8 +617,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $button.prop('disabled', false);
@@ -661,8 +689,8 @@
                                 Toast.error(response.data.message || wpbridge.i18n.failed);
                             }
                         },
-                        error: function() {
-                            Toast.error(wpbridge.i18n.failed);
+                        error: function(jqXHR, textStatus) {
+                            Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                         },
                         complete: function() {
                             $button.prop('disabled', false);
@@ -703,8 +731,8 @@
                                 $button.prop('disabled', false);
                             }
                         },
-                        error: function() {
-                            Toast.error(wpbridge.i18n.failed);
+                        error: function(jqXHR, textStatus) {
+                            Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                             $button.prop('disabled', false);
                         }
                     });
@@ -758,8 +786,8 @@
                                 Toast.error(response.data.message || wpbridge.i18n.failed);
                             }
                         },
-                        error: function() {
-                            Toast.error(wpbridge.i18n.failed);
+                        error: function(jqXHR, textStatus) {
+                            Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                         },
                         complete: function() {
                             $button.prop('disabled', false);
@@ -904,8 +932,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $select.prop('disabled', false);
@@ -979,8 +1007,8 @@
                                 Toast.error(response.data.message || wpbridge.i18n.failed);
                             }
                         },
-                        error: function() {
-                            Toast.error(wpbridge.i18n.failed);
+                        error: function(jqXHR, textStatus) {
+                            Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                         }
                     });
                 }
@@ -1025,8 +1053,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $button.prop('disabled', false);
@@ -1079,8 +1107,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $select.prop('disabled', false);
@@ -1160,8 +1188,8 @@
                         $icon.attr('class', originalClass);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                     $btn.prop('disabled', false);
                     $icon.attr('class', originalClass);
                 }
@@ -1211,8 +1239,8 @@
                         onFinally();
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                     onFinally();
                 }
             });
@@ -1424,8 +1452,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $button.prop('disabled', false);
@@ -1475,8 +1503,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $button.prop('disabled', false);
@@ -1651,7 +1679,7 @@
                             failed++;
                         }
                     },
-                    error: function() {
+                    error: function(jqXHR, textStatus) {
                         failed++;
                     },
                     complete: function() {
@@ -1720,8 +1748,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $button.prop('disabled', false);
@@ -1924,8 +1952,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $btn.prop('disabled', false).html(originalHtml);
@@ -1987,7 +2015,7 @@
                             Toast.error(response.data.message || wpbridge.i18n.import_failed);
                         }
                     },
-                    error: function() {
+                    error: function(jqXHR, textStatus) {
                         Toast.error(wpbridge.i18n.import_failed || '导入失败');
                     },
                     complete: function() {
@@ -2079,8 +2107,8 @@
                         $btn.prop('disabled', false).html(originalHtml);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                     $btn.prop('disabled', false).html(originalHtml);
                 }
             });
@@ -2110,8 +2138,8 @@
                         $btn.prop('disabled', false).html(originalHtml);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                     $btn.prop('disabled', false).html(originalHtml);
                 }
             });
@@ -2176,7 +2204,7 @@
                         self.renderError(response.data.message || wpbridge.i18n.changelog_error);
                     }
                 },
-                error: function() {
+                error: function(jqXHR, textStatus) {
                     self.renderError(wpbridge.i18n.changelog_error || '获取更新日志失败');
                 }
             });
@@ -2328,6 +2356,39 @@
                 self.deactivatePreset(presetId, $(this));
             });
 
+            // 刷新订阅状态
+            $(document).on('click', '.wpbridge-refresh-subscription', function(e) {
+                e.preventDefault();
+                var $btn = $(this);
+                if ($btn.hasClass('is-loading')) return;
+                $btn.addClass('is-loading');
+                $.ajax({
+                    url: wpbridge.ajax_url,
+                    method: 'POST',
+                    data: {
+                        action: 'wpbridge_refresh_subscription',
+                        nonce: wpbridge.nonce
+                    },
+                    success: function(response) {
+                        if (response.success && response.data && response.data.subscription) {
+                            var sub = response.data.subscription;
+                            var label = sub.label || sub.plan || 'free';
+                            var isFree = sub.plan === 'free';
+                            $btn.siblings('.wpbridge-subscription-badge')
+                                .text(label)
+                                .toggleClass('is-free', isFree);
+                            Toast.success(wpbridge.i18n.subscriptionRefreshed || '订阅状态已刷新');
+                        }
+                    },
+                    error: function(jqXHR, textStatus) {
+                        Toast.error(wpbridge.i18n.subscriptionRefreshFailed || '刷新失败');
+                    },
+                    complete: function() {
+                        $btn.removeClass('is-loading');
+                    }
+                });
+            });
+
             // Bridge API - 添加按钮
             $(document).on('click', '.wpbridge-add-bridge-vendor-btn', function() {
                 self.showBridgeVendorModal();
@@ -2440,8 +2501,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $btn.prop('disabled', false);
@@ -2475,8 +2536,8 @@
                                 $btn.prop('disabled', false);
                             }
                         },
-                        error: function() {
-                            Toast.error(wpbridge.i18n.failed);
+                        error: function(jqXHR, textStatus) {
+                            Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                             $btn.prop('disabled', false);
                         }
                     });
@@ -2523,8 +2584,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $btn.prop('disabled', false);
@@ -2567,8 +2628,8 @@
                                 $btn.prop('disabled', false);
                             }
                         },
-                        error: function() {
-                            Toast.error(wpbridge.i18n.failed);
+                        error: function(jqXHR, textStatus) {
+                            Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                             $btn.prop('disabled', false);
                         }
                     });
@@ -2595,8 +2656,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $btn.prop('disabled', false).text(originalText);
@@ -2625,8 +2686,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $btn.prop('disabled', false).text(originalText);
@@ -2651,8 +2712,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 }
             });
         },
@@ -2676,8 +2737,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $btn.prop('disabled', false).html(originalHtml);
@@ -2717,8 +2778,8 @@
                         Toast.error(response.data.message || wpbridge.i18n.failed);
                     }
                 },
-                error: function() {
-                    Toast.error(wpbridge.i18n.failed);
+                error: function(jqXHR, textStatus) {
+                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                 },
                 complete: function() {
                     $btn.prop('disabled', false);
@@ -2754,8 +2815,8 @@
                                 $btn.prop('disabled', false);
                             }
                         },
-                        error: function() {
-                            Toast.error(wpbridge.i18n.failed);
+                        error: function(jqXHR, textStatus) {
+                            Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                             $btn.prop('disabled', false);
                         }
                     });

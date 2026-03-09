@@ -18,10 +18,9 @@
     gap: var(--wpbridge-space-4);
 }
 
-.wpbridge-stat-card {
-    background: var(--wpbridge-white);
+/* 覆盖 components.css 的 stat-card：vendors 用更紧凑的 padding + 横向布局 */
+.wpbridge-stats-row .wpbridge-stat-card {
     padding: var(--wpbridge-space-4);
-    box-shadow: var(--wpbridge-shadow);
     display: flex;
     align-items: center;
     gap: var(--wpbridge-space-3);
@@ -65,10 +64,10 @@
     min-width: 0;
 }
 
-.wpbridge-stat-value {
+/* 覆盖 components.css：vendors 用更大更粗的数字 */
+.wpbridge-stats-row .wpbridge-stat-value {
     font-size: 24px;
     font-weight: 700;
-    color: var(--wpbridge-gray-900);
     line-height: 1.2;
 }
 
@@ -78,47 +77,7 @@
     margin-top: 2px;
 }
 
-/* 通用区块样式 */
-.wpbridge-section {
-    background: var(--wpbridge-white);
-    box-shadow: var(--wpbridge-shadow);
-}
-
-.wpbridge-section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--wpbridge-space-4);
-    border-bottom: 1px solid var(--wpbridge-gray-200);
-}
-
-.wpbridge-section-header h3 {
-    display: flex;
-    align-items: center;
-    gap: var(--wpbridge-space-2);
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--wpbridge-gray-800);
-    margin: 0;
-}
-
-.wpbridge-section-header h3 .dashicons {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-    color: var(--wpbridge-primary);
-}
-
-.wpbridge-section-desc {
-    font-size: var(--wpbridge-text-sm);
-    color: var(--wpbridge-gray-500);
-    margin: 0;
-}
-
-.wpbridge-section-actions {
-    display: flex;
-    gap: var(--wpbridge-space-2);
-}
+/* .wpbridge-section 系列已移至 components.css */
 
 /* 供应商表格 */
 .wpbridge-vendors-table,
@@ -167,15 +126,15 @@
     font-family: var(--wpbridge-font-mono);
 }
 
-/* 开关切换 */
-.wpbridge-toggle {
+/* 开关切换 — 限定在 vendors 区域，避免覆盖 components.css 的 toggle-track 实现 */
+.wpbridge-vendors-section .wpbridge-toggle {
     position: relative;
     display: inline-block;
     width: 44px;
     height: 24px;
 }
 
-.wpbridge-toggle input {
+.wpbridge-vendors-section .wpbridge-toggle input {
     opacity: 0;
     width: 0;
     height: 0;
@@ -206,15 +165,15 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.wpbridge-toggle input:checked + .wpbridge-toggle-slider {
+.wpbridge-vendors-section .wpbridge-toggle input:checked + .wpbridge-toggle-slider {
     background-color: var(--wpbridge-success);
 }
 
-.wpbridge-toggle input:checked + .wpbridge-toggle-slider:before {
+.wpbridge-vendors-section .wpbridge-toggle input:checked + .wpbridge-toggle-slider:before {
     transform: translateX(20px);
 }
 
-.wpbridge-toggle input:disabled + .wpbridge-toggle-slider {
+.wpbridge-vendors-section .wpbridge-toggle input:disabled + .wpbridge-toggle-slider {
     opacity: 0.5;
     cursor: not-allowed;
 }
@@ -492,40 +451,11 @@
     margin-right: 2px;
 }
 
-/* 预设状态标签 */
-.wpbridge-badge-preset {
-    display: inline-flex;
-    align-items: center;
-    font-size: var(--wpbridge-text-xs);
-    font-weight: 500;
-    padding: 2px 8px;
-    border-radius: var(--wpbridge-radius-sm);
-    background: rgba(99, 102, 241, 0.1);
-    color: #6366f1;
-}
+/* .wpbridge-badge-preset 已移至 components.css */
 
-.wpbridge-badge-active {
-    display: inline-flex;
-    align-items: center;
-    font-size: var(--wpbridge-text-xs);
-    font-weight: 500;
-    padding: 2px 8px;
-    border-radius: var(--wpbridge-radius-sm);
-    background: var(--wpbridge-success-light);
-    color: var(--wpbridge-success);
-}
-
-.wpbridge-badge-inactive {
-    display: inline-flex;
-    align-items: center;
-    font-size: var(--wpbridge-text-xs);
-    font-weight: 500;
-    padding: 2px 8px;
-    border-radius: var(--wpbridge-radius-sm);
-    background: var(--wpbridge-gray-100);
-    color: var(--wpbridge-gray-500);
-}
-
+/* 预设状态标签 — 共用基础 */
+.wpbridge-badge-active,
+.wpbridge-badge-inactive,
 .wpbridge-badge-coming-soon {
     display: inline-flex;
     align-items: center;
@@ -533,6 +463,19 @@
     font-weight: 500;
     padding: 2px 8px;
     border-radius: var(--wpbridge-radius-sm);
+}
+
+.wpbridge-badge-active {
+    background: var(--wpbridge-success-light);
+    color: var(--wpbridge-success);
+}
+
+.wpbridge-badge-inactive {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-badge-coming-soon {
     background: var(--wpbridge-warning-light);
     color: var(--wpbridge-warning);
 }
@@ -608,4 +551,86 @@
     margin: 0;
     border: none;
     box-shadow: none;
+}
+
+/* ── 订阅状态 ── */
+.wpbridge-subscription-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    font-size: 13px;
+    color: var(--wpbridge-gray-600);
+}
+
+.wpbridge-subscription-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--wpbridge-primary-50, #eef2ff);
+    color: var(--wpbridge-primary-600, #4f46e5);
+}
+
+.wpbridge-subscription-badge.is-free {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-refresh-subscription {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--wpbridge-gray-400);
+    padding: 2px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.wpbridge-refresh-subscription:hover {
+    color: var(--wpbridge-primary-600, #4f46e5);
+}
+
+.wpbridge-refresh-subscription.is-loading .dashicons {
+    animation: wpbridge-spin 1s linear infinite;
+}
+
+/* ── 功能门控 ── */
+.wpbridge-feature-locked {
+    opacity: 0.5;
+    pointer-events: none;
+    user-select: none;
+}
+
+.wpbridge-upgrade-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: var(--wpbridge-warning-50, #fffbeb);
+    border: 1px solid var(--wpbridge-warning-200, #fde68a);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--wpbridge-warning-700, #b45309);
+}
+
+.wpbridge-upgrade-notice .dashicons {
+    color: var(--wpbridge-warning-500, #f59e0b);
+}
+
+.wpbridge-lock-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-500);
+    vertical-align: middle;
 }

@@ -24,9 +24,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
     <?php if ( empty( $logs ) ) : ?>
         <div class="wpbridge-logs-empty">
-            <span class="dashicons dashicons-media-text" style="font-size: 32px; width: 32px; height: 32px; color: var(--wpbridge-gray-300);"></span>
+            <span class="dashicons dashicons-media-text wpbridge-logs-empty-icon"></span>
             <p><?php esc_html_e( '暂无日志记录', 'wpbridge' ); ?></p>
-            <p style="font-size: 12px; color: var(--wpbridge-gray-400);">
+            <p class="wpbridge-logs-empty-hint">
                 <?php esc_html_e( '启用调试模式后，日志将显示在这里。', 'wpbridge' ); ?>
             </p>
         </div>
@@ -43,7 +43,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                     <span class="wpbridge-log-message">
                         <?php echo esc_html( $log['message'] ); ?>
                         <?php if ( ! empty( $log['context'] ) ) : ?>
-                            <code style="display: block; margin-top: 4px; font-size: 11px; color: var(--wpbridge-gray-500);">
+                            <code class="wpbridge-log-context">
                                 <?php echo esc_html( wp_json_encode( $log['context'], JSON_UNESCAPED_UNICODE ) ); ?>
                             </code>
                         <?php endif; ?>
@@ -54,7 +54,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     <?php endif; ?>
 </div>
 
-<div style="margin-top: 16px; padding: 16px; background: var(--wpbridge-info-light); font-size: 13px;">
+<div class="wpbridge-logs-tip">
     <strong><?php esc_html_e( '提示', 'wpbridge' ); ?>:</strong>
     <?php esc_html_e( '日志仅在启用调试模式时记录。生产环境建议关闭调试模式以提高性能。', 'wpbridge' ); ?>
 </div>

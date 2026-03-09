@@ -35,7 +35,7 @@ use WPBridge\UpdateSource\SourceType;
             <span class="wpbridge-stat-label"><?php esc_html_e( '已启用', 'wpbridge' ); ?></span>
         </div>
         <div class="wpbridge-stat-item">
-            <button type="button" class="button wpbridge-clear-cache">
+            <button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-clear-cache">
                 <?php esc_html_e( '清除缓存', 'wpbridge' ); ?>
             </button>
         </div>
@@ -98,17 +98,17 @@ use WPBridge\UpdateSource\SourceType;
                         </td>
                         <td class="column-actions">
                             <button type="button"
-                                    class="button button-small wpbridge-test-source"
+                                    class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-test-source"
                                     data-source-id="<?php echo esc_attr( $source->id ); ?>">
                                 <?php esc_html_e( '测试', 'wpbridge' ); ?>
                             </button>
                             <a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge&action=edit&source=' . $source->id ) ); ?>"
-                               class="button button-small">
+                               class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm">
                                 <?php esc_html_e( '编辑', 'wpbridge' ); ?>
                             </a>
                             <?php if ( ! $source->is_preset ) : ?>
                                 <button type="button"
-                                        class="button button-small button-link-delete wpbridge-delete-source"
+                                        class="wpbridge-btn wpbridge-btn-danger wpbridge-btn-sm wpbridge-delete-source"
                                         data-source-id="<?php echo esc_attr( $source->id ); ?>">
                                     <?php esc_html_e( '删除', 'wpbridge' ); ?>
                                 </button>

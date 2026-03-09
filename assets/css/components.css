@@ -111,8 +111,14 @@
 }
 
 .wpbridge-badge-preset {
-    background: var(--wpbridge-info-light);
-    color: var(--wpbridge-info);
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--wpbridge-text-xs);
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: var(--wpbridge-radius-sm);
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
 }
 
 .wpbridge-badge-type {
@@ -361,6 +367,52 @@
     gap: var(--wpbridge-space-3);
     padding-top: var(--wpbridge-space-4);
     border-top: 1px solid var(--wpbridge-gray-200);
+    margin-top: var(--wpbridge-space-4);
+}
+
+/* ========================================
+   Section - 通用区块
+   ======================================== */
+.wpbridge-section {
+    background: var(--wpbridge-white);
+    box-shadow: var(--wpbridge-shadow);
+    margin-bottom: var(--wpbridge-space-6);
+}
+
+.wpbridge-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--wpbridge-space-4);
+    border-bottom: 1px solid var(--wpbridge-gray-200);
+}
+
+.wpbridge-section-header h3 {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-800);
+    margin: 0;
+}
+
+.wpbridge-section-header h3 .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-section-desc {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-500);
+    margin: 0;
+}
+
+.wpbridge-section-actions {
+    display: flex;
+    gap: var(--wpbridge-space-2);
 }
 
 /* ========================================
@@ -481,6 +533,32 @@
     color: var(--wpbridge-gray-500);
 }
 
+.wpbridge-logs-empty-icon {
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+    color: var(--wpbridge-gray-300);
+}
+
+.wpbridge-logs-empty-hint {
+    font-size: 12px;
+    color: var(--wpbridge-gray-400);
+}
+
+.wpbridge-log-context {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-logs-tip {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--wpbridge-info-light);
+    font-size: 13px;
+}
+
 /* ========================================
    Notice Notifications - WordPress 原生通知样式
    ======================================== */
@@ -557,4 +635,122 @@
 
 .wpbridge-spin {
     animation: wpbridge-spin 1s linear infinite;
+}
+
+/* ========================================
+   Utility Classes - 工具类
+   ======================================== */
+
+/* 内联布局 */
+.wpbridge-inline-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* section-desc 带内边距（用于 section-header 下方补充说明） */
+.wpbridge-section-desc-padded {
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-4) 0;
+}
+
+/* 面板标题（带图标） */
+.wpbridge-panel-title {
+    margin: 0 0 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--wpbridge-gray-700);
+}
+
+.wpbridge-panel-title .dashicons {
+    margin-right: 4px;
+}
+
+/* 表单输入宽度限制 */
+.wpbridge-form-input-sm {
+    max-width: 80px;
+}
+
+.wpbridge-form-input-md {
+    max-width: 150px;
+}
+
+.wpbridge-form-input-lg {
+    max-width: 300px;
+}
+
+/* 辅助文字 */
+.wpbridge-text-muted {
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-text-mono {
+    font-size: 12px;
+    font-family: var(--wpbridge-font-mono);
+    color: var(--wpbridge-gray-600);
+    word-break: break-all;
+}
+
+/* 间距 */
+.wpbridge-mt-4 {
+    margin-top: 16px;
+}
+
+.wpbridge-mt-6 {
+    margin-top: 24px;
+}
+
+.wpbridge-mt-8 {
+    margin-top: 32px;
+}
+
+.wpbridge-mb-4 {
+    margin-top: 16px;
+}
+
+/* 代码块 */
+.wpbridge-code-block {
+    display: block;
+    padding: 12px;
+    background: var(--wpbridge-gray-100);
+    margin: 8px 0;
+}
+
+/* 锁定图标尺寸 */
+.wpbridge-lock-badge .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+/* 表格列宽 */
+.wpbridge-col-40 { width: 40%; }
+.wpbridge-col-25 { width: 25%; }
+.wpbridge-col-20 { width: 20%; }
+.wpbridge-col-15 { width: 15%; }
+
+/* 导入/导出区块 */
+.wpbridge-import-export-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--wpbridge-gray-600);
+}
+
+/* API Key 前缀 */
+.wpbridge-key-prefix {
+    margin-left: 8px;
+    font-size: 11px;
+    color: var(--wpbridge-gray-500);
+}
+
+/* API 文档 */
+.wpbridge-api-docs {
+    font-size: 13px;
+    color: var(--wpbridge-gray-600);
+}
+
+.wpbridge-api-endpoints {
+    margin: 8px 0;
+    padding-left: 20px;
 }

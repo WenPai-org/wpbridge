@@ -102,13 +102,6 @@ $current_theme_slug = $current_theme->get_stylesheet();
                     <div class="wpbridge-project-meta">
                         <span class="wpbridge-project-version">v<?php echo esc_html( $theme->get( 'Version' ) ); ?></span>
                         <span class="wpbridge-project-slug"><?php echo esc_html( $theme_slug ); ?></span>
-                        <a href="#" class="wpbridge-view-changelog"
-                           data-slug="<?php echo esc_attr( $theme_slug ); ?>"
-                           data-type="theme"
-                           data-source-type="wporg"
-                           title="<?php esc_attr_e( '查看更新日志', 'wpbridge' ); ?>">
-                            <span class="dashicons dashicons-list-view"></span>
-                        </a>
                         <?php if ( $theme->get( 'Author' ) ) : ?>
                             <span class="wpbridge-project-author"><?php echo esc_html( $theme->get( 'Author' ) ); ?></span>
                         <?php endif; ?>

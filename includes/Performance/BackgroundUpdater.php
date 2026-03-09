@@ -10,6 +10,7 @@ namespace WPBridge\Performance;
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
 use WPBridge\UpdateSource\SourceManager;
+use WPBridge\UpdateSource\SourceModel;
 use WPBridge\Cache\CacheManager;
 
 // 防止直接访问
@@ -31,29 +32,16 @@ class BackgroundUpdater {
     const CRON_HOOK = 'wpbridge_update_sources';
 
     /**
-     * 设置实例
-     *
      * @var Settings
      */
     private Settings $settings;
 
     /**
-     * 源管理器
-     *
      * @var SourceManager
      */
     private SourceManager $source_manager;
 
     /**
-     * 并行请求管理器
-     *
-     * @var ParallelRequestManager
-     */
-    private ParallelRequestManager $parallel_manager;
-
-    /**
-     * 缓存管理器
-     *
      * @var CacheManager
      */
     private CacheManager $cache;
@@ -64,10 +52,9 @@ class BackgroundUpdater {
      * @param Settings $settings 设置实例
      */
     public function __construct( Settings $settings ) {
-        $this->settings         = $settings;
-        $this->source_manager   = new SourceManager( $settings );
-        $this->parallel_manager = new ParallelRequestManager( $settings->get_request_timeout() );
-        $this->cache            = new CacheManager();
+        $this->settings       = $settings;
+        $this->source_manager = new SourceManager( $settings );
+        $this->cache          = new CacheManager();
 
         $this->init_hooks();
     }
@@ -113,15 +100,13 @@ class BackgroundUpdater {
             return;
         }
 
-        // 使用并行请求检查所有源
-        $results = $this->parallel_manager->check_multiple_sources( $sources );
+        $results = $this->check_multiple_sources( $sources );
 
         $success_count = 0;
         $fail_count    = 0;
 
         foreach ( $results as $source_id => $data ) {
             if ( null !== $data ) {
-                // 缓存结果
                 $this->cache->set(
                     'source_data_' . $source_id,
                     $data,
@@ -137,6 +122,59 @@ class BackgroundUpdater {
             'success' => $success_count,
             'failed'  => $fail_count,
         ] );
+    }
+
+    /**
+     * 并行检查多个更新源
+     *
+     * @param SourceModel[] $sources 源列表
+     * @return array<string, array|null>
+     */
+    private function check_multiple_sources( array $sources ): array {
+        $requests = [];
+
+        foreach ( $sources as $source ) {
+            $requests[ $source->id ] = [
+                'url'     => $source->get_check_url(),
+                'type'    => \WpOrg\Requests\Requests::GET,
+                'headers' => $source->get_headers(),
+            ];
+        }
+
+        $timeout = $this->settings->get_request_timeout();
+
+        $responses = \WpOrg\Requests\Requests::request_multiple(
+            $requests,
+            [
+                'timeout'          => $timeout,
+                'connect_timeout'  => 5,
+                'follow_redirects' => true,
+                'redirects'        => 3,
+            ]
+        );
+
+        $results = [];
+
+        foreach ( $responses as $source_id => $response ) {
+            if ( $response instanceof \WpOrg\Requests\Exception ) {
+                Logger::warning( '请求失败', [
+                    'source' => $source_id,
+                    'error'  => $response->getMessage(),
+                ] );
+                $results[ $source_id ] = null;
+                continue;
+            }
+
+            if ( ! $response->success ) {
+                $results[ $source_id ] = null;
+                continue;
+            }
+
+            $data = json_decode( $response->body, true );
+            $results[ $source_id ] = ( json_last_error() === JSON_ERROR_NONE ) ? $data : null;
+        }
+
+        return $results;
     }
 
     /**
