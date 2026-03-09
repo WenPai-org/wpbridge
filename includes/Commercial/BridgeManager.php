@@ -64,6 +64,13 @@ class BridgeManager {
 	private ?BridgeClient $bridge_client = null;
 
 	/**
+	 * 订阅管理器
+	 *
+	 * @var SubscriptionManager|null
+	 */
+	private ?SubscriptionManager $subscription_manager = null;
+
+	/**
 	 * 构造函数
 	 *
 	 * @param Settings     $settings      设置实例
@@ -80,6 +87,9 @@ class BridgeManager {
 
 		// 初始化已配置的供应商
 		$this->init_vendors();
+
+		// 初始化订阅管理器
+		$this->subscription_manager = new SubscriptionManager( $settings, $this->vendor_manager );
 	}
 
 	/**
@@ -271,6 +281,15 @@ class BridgeManager {
 	}
 
 	/**
+	 * 获取订阅管理器
+	 *
+	 * @return SubscriptionManager|null
+	 */
+	public function get_subscription_manager(): ?SubscriptionManager {
+		return $this->subscription_manager;
+	}
+
+	/**
 	 * 获取已启用桥接的插件
 	 *
 	 * @return array
@@ -397,21 +416,24 @@ class BridgeManager {
 	private function check_subscription_limit(): array {
 		$subscription = $this->get_subscription();
 
-		// Agency 计划无限制
-		if ( $subscription['plan'] === 'agency' ) {
+		$plugins_limit = $subscription['plugins_limit'] ?? 0;
+
+		// 无限制
+		if ( $plugins_limit === PHP_INT_MAX ) {
 			return [ 'allowed' => true ];
 		}
 
 		$current_count = count( $this->get_bridged_plugins() );
-		$limit         = $subscription['plugins_limit'] ?? 5;
 
-		if ( $current_count >= $limit ) {
+		if ( $current_count >= $plugins_limit ) {
+			$plan_label = $subscription['label'] ?? $subscription['plan'] ?? 'free';
 			return [
 				'allowed' => false,
 				'message' => sprintf(
-					/* translators: %d: plugin limit */
-					__( '已达到插件数量限制 (%d)，请升级订阅', 'wpbridge' ),
-					$limit
+					/* translators: 1: current plan label, 2: plugin limit */
+					__( '当前 %1$s 计划最多桥接 %2$d 个插件，请升级订阅', 'wpbridge' ),
+					$plan_label,
+					$plugins_limit
 				),
 			];
 		}
@@ -422,19 +444,24 @@ class BridgeManager {
 	/**
 	 * 获取订阅信息
 	 *
+	 * 委托给 SubscriptionManager，从商城 WC AM API 获取真实订阅状态
+	 *
+	 * @param bool $force_refresh 强制刷新缓存
 	 * @return array
 	 */
-	public function get_subscription(): array {
-		$default = [
-			'plan'          => 'free',
-			'plugins_limit' => 0,
-			'site_limit'    => 1,
-			'status'        => 'active',
-			'expires_at'    => null,
-		];
+	public function get_subscription( bool $force_refresh = false ): array {
+		if ( null === $this->subscription_manager ) {
+			return [
+				'plan'            => 'free',
+				'label'           => '免费版',
+				'plugins_limit'   => 0,
+				'daily_downloads' => 0,
+				'features'        => [],
+				'status'          => 'active',
+			];
+		}
 
-		$subscription = $this->settings->get( 'subscription', [] );
-		return array_merge( $default, $subscription );
+		return $this->subscription_manager->get_subscription( $force_refresh );
 	}
 
 	/**
@@ -447,13 +474,18 @@ class BridgeManager {
 		$bridged      = $this->get_bridged_plugins();
 		$available    = $this->get_available_plugins();
 
+		$plugins_limit = $subscription['plugins_limit'] ?? 0;
+
 		return [
 			'bridged_count'   => count( $bridged ),
 			'available_count' => count( $available ),
-			'plan'            => $subscription['plan'],
-			'plugins_limit'   => $subscription['plugins_limit'],
+			'plan'            => $subscription['plan'] ?? 'free',
+			'plan_label'      => $subscription['label'] ?? '免费版',
+			'plugins_limit'   => $plugins_limit,
 			'plugins_used'    => count( $bridged ),
-			'can_add_more'    => $subscription['plan'] === 'agency' || count( $bridged ) < $subscription['plugins_limit'],
+			'can_add_more'    => $plugins_limit === PHP_INT_MAX || count( $bridged ) < $plugins_limit,
+			'features'        => $subscription['features'] ?? [],
+			'is_paid'         => ( $subscription['plan'] ?? 'free' ) !== 'free',
 		];
 	}
 
