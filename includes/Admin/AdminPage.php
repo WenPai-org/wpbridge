@@ -207,8 +207,52 @@ class AdminPage {
         $source->name      = sanitize_text_field( $_POST['name'] ?? '' );
         $source->type      = sanitize_text_field( $_POST['type'] ?? SourceType::JSON );
         $source->api_url   = esc_url_raw( $_POST['api_url'] ?? '' );
+
+        // "Git 仓库" 选项：根据 URL 自动识别具体平台
+        if ( $source->type === 'git' ) {
+            $host = wp_parse_url( $source->api_url, PHP_URL_HOST );
+            if ( $host && strpos( $host, 'github.com' ) !== false ) {
+                $source->type = SourceType::GITHUB;
+            } elseif ( $host && strpos( $host, 'gitlab.com' ) !== false ) {
+                $source->type = SourceType::GITLAB;
+            } elseif ( $host && strpos( $host, 'gitee.com' ) !== false ) {
+                $source->type = SourceType::GITEE;
+            } else {
+                $source->type = SourceType::GITHUB; // 默认按 GitHub API 处理
+            }
+        }
         $source->slug      = sanitize_text_field( $_POST['slug'] ?? '' );
         $source->item_type = sanitize_text_field( $_POST['item_type'] ?? 'plugin' );
+
+        // 匹配模式
+        $match_mode = sanitize_text_field( $_POST['match_mode'] ?? 'auto' );
+        if ( $match_mode === 'auto' ) {
+            // 清零，完全由 URL 推断
+            $source->slug      = '';
+            $source->item_type = 'plugin';
+
+            $path = trim( wp_parse_url( $source->api_url, PHP_URL_PATH ) ?? '', '/' );
+            // Git 仓库格式: user/repo → slug = repo
+            if ( preg_match( '#([^/]+)/([^/]+?)(?:\.git)?$#', $path, $m ) ) {
+                $slug_candidate = sanitize_title( $m[2] );
+                if ( ! empty( $slug_candidate ) ) {
+                    $source->slug = $slug_candidate;
+                }
+            }
+            // 从 slug 推断是否为主题（含 theme 关键词）
+            $slug_lower = strtolower( $source->slug . ' ' . ( $_POST['name'] ?? '' ) );
+            $source->item_type = ( strpos( $slug_lower, 'theme' ) !== false ) ? 'theme' : 'plugin';
+        }
+
+        // 名称为空时从 URL 自动生成
+        if ( empty( $source->name ) ) {
+            if ( ! empty( $source->slug ) ) {
+                $source->name = ucwords( str_replace( [ '-', '_' ], ' ', $source->slug ) );
+            } else {
+                $parsed_host  = wp_parse_url( $source->api_url, PHP_URL_HOST );
+                $source->name = $parsed_host ?: __( '自定义源', 'wpbridge' );
+            }
+        }
 
         // 加密存储 auth_token
         $raw_token = sanitize_text_field( $_POST['auth_token'] ?? '' );
@@ -230,11 +274,6 @@ class AdminPage {
             'fallback'  => 90,  // 最后选择
         ];
         $source->priority = $priority_map[ $priority_level ] ?? 50;
-
-        // 兼容旧的数字优先级（如果直接传入）
-        if ( isset( $_POST['priority'] ) && is_numeric( $_POST['priority'] ) ) {
-            $source->priority = (int) $_POST['priority'];
-        }
 
         // 验证
         $errors = $source->validate();
@@ -810,6 +849,20 @@ class AdminPage {
         $scheme = wp_parse_url( $url, PHP_URL_SCHEME );
         if ( ! in_array( $scheme, [ 'http', 'https' ], true ) ) {
             wp_send_json_error( [ 'message' => __( 'URL 必须使用 http 或 https 协议', 'wpbridge' ) ] );
+        }
+
+        // "Git 仓库" 选项：根据 URL 自动识别具体平台
+        if ( $type === 'git' ) {
+            $host = wp_parse_url( $url, PHP_URL_HOST );
+            if ( $host && strpos( $host, 'github.com' ) !== false ) {
+                $type = 'github';
+            } elseif ( $host && strpos( $host, 'gitlab.com' ) !== false ) {
+                $type = 'gitlab';
+            } elseif ( $host && strpos( $host, 'gitee.com' ) !== false ) {
+                $type = 'gitee';
+            } else {
+                $type = 'github';
+            }
         }
 
         // 验证源类型白名单
