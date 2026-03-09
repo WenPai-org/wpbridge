@@ -40,7 +40,8 @@ class SubscriptionManager {
 	/**
 	 * 产品 → 订阅等级映射
 	 *
-	 * 等级优先级: all_access > pro_enterprise > pro > free
+	 * 等级优先级: all_access(100) > pro_enterprise(50) > pro(10) > free(0)
+	 * 41706 为 variable 父产品，41708/41709 为变体，均需映射
 	 */
 	private const PRODUCT_PLANS = [
 		41705 => [
@@ -59,7 +60,15 @@ class SubscriptionManager {
 			'daily_downloads' => 50,
 			'features'        => [ 'bridge_api', 'bridge_server' ],
 		],
-		41707 => [
+		41708 => [
+			'plan'            => 'pro',
+			'label'           => 'Pro 个人版',
+			'priority'        => 10,
+			'plugins_limit'   => PHP_INT_MAX,
+			'daily_downloads' => 50,
+			'features'        => [ 'bridge_api', 'bridge_server' ],
+		],
+		41709 => [
 			'plan'            => 'pro_enterprise',
 			'label'           => 'Pro 企业版',
 			'priority'        => 50,
