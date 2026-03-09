@@ -197,3 +197,29 @@ if ( ! defined( 'ABSPATH' ) ) {
         </div>
     </div>
 </div>
+
+<!-- 诊断工具（折叠） -->
+<div class="wpbridge-settings-panel wpbridge-mt-8">
+    <h2 class="wpbridge-section-title wpbridge-mb-4 wpbridge-collapsible-header" onclick="var p=this.nextElementSibling;p.style.display=p.style.display==='none'?'':'none';this.classList.toggle('is-collapsed');">
+        <span class="dashicons dashicons-admin-tools"></span>
+        <?php esc_html_e( '诊断工具', 'wpbridge' ); ?>
+        <span class="dashicons dashicons-arrow-down-alt2 wpbridge-collapse-icon"></span>
+    </h2>
+    <div class="wpbridge-collapsible-content" style="display: none;">
+        <?php include WPBRIDGE_PATH . 'templates/admin/tabs/diagnostics.php'; ?>
+    </div>
+</div>
+
+<!-- 调试日志（仅调试模式下显示） -->
+<?php if ( ! empty( $settings['debug_mode'] ) ) : ?>
+<div class="wpbridge-settings-panel wpbridge-mt-8">
+    <h2 class="wpbridge-section-title wpbridge-mb-4 wpbridge-collapsible-header" onclick="var p=this.nextElementSibling;p.style.display=p.style.display==='none'?'':'none';this.classList.toggle('is-collapsed');">
+        <span class="dashicons dashicons-editor-code"></span>
+        <?php esc_html_e( '调试日志', 'wpbridge' ); ?>
+        <span class="dashicons dashicons-arrow-down-alt2 wpbridge-collapse-icon"></span>
+    </h2>
+    <div class="wpbridge-collapsible-content" style="display: none;">
+        <?php include WPBRIDGE_PATH . 'templates/admin/tabs/logs.php'; ?>
+    </div>
+</div>
+<?php endif; ?>

@@ -754,3 +754,25 @@
     margin: 8px 0;
     padding-left: 20px;
 }
+
+/* 折叠区块 */
+.wpbridge-collapsible-header {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.wpbridge-collapsible-header:hover {
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-collapse-icon {
+    margin-left: auto;
+    transition: transform 0.2s;
+}
+
+.wpbridge-collapsible-header.is-collapsed .wpbridge-collapse-icon {
+    transform: rotate(-90deg);
+}

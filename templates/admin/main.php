@@ -91,22 +91,13 @@ foreach ( $sources as $source ) {
                     <?php esc_html_e( '项目', 'wpbridge' ); ?>
                 </a>
                 <a href="#vendors" class="wpbridge-tab" data-tab="vendors">
-                    <?php esc_html_e( '供应商', 'wpbridge' ); ?>
+                    <?php esc_html_e( '渠道', 'wpbridge' ); ?>
                 </a>
                 <a href="#settings" class="wpbridge-tab" data-tab="settings">
                     <?php esc_html_e( '设置', 'wpbridge' ); ?>
                 </a>
-                <a href="#sources" class="wpbridge-tab" data-tab="sources">
-                    <?php esc_html_e( '更新源', 'wpbridge' ); ?>
-                </a>
-                <a href="#diagnostics" class="wpbridge-tab" data-tab="diagnostics">
-                    <?php esc_html_e( '诊断', 'wpbridge' ); ?>
-                </a>
                 <a href="#api" class="wpbridge-tab" data-tab="api">
                     <?php esc_html_e( 'Bridge API', 'wpbridge' ); ?>
-                </a>
-                <a href="#logs" class="wpbridge-tab" data-tab="logs">
-                    <?php esc_html_e( '日志', 'wpbridge' ); ?>
                 </a>
             </nav>
 
@@ -120,34 +111,19 @@ foreach ( $sources as $source ) {
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/projects.php'; ?>
             </div>
 
-            <!-- Tab: 供应商 -->
+            <!-- Tab: 渠道（原供应商 + 更新源） -->
             <div id="vendors" class="wpbridge-tab-pane">
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/vendors.php'; ?>
             </div>
 
-            <!-- Tab: 设置 -->
+            <!-- Tab: 设置（含诊断 + 日志） -->
             <div id="settings" class="wpbridge-tab-pane">
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/settings.php'; ?>
-            </div>
-
-            <!-- Tab: 更新源 -->
-            <div id="sources" class="wpbridge-tab-pane">
-                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/sources.php'; ?>
-            </div>
-
-            <!-- Tab: 诊断 -->
-            <div id="diagnostics" class="wpbridge-tab-pane">
-                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/diagnostics.php'; ?>
             </div>
 
             <!-- Tab: Bridge API -->
             <div id="api" class="wpbridge-tab-pane">
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/api.php'; ?>
-            </div>
-
-            <!-- Tab: 日志 -->
-            <div id="logs" class="wpbridge-tab-pane">
-                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/logs.php'; ?>
             </div>
         </div>
     </div>

@@ -352,6 +352,81 @@ $active_vendors = array_filter( $vendors, function( $v ) {
 	</div>
 </div>
 
+<!-- E. 自定义更新源 -->
+<div class="wpbridge-section wpbridge-mt-6">
+	<div class="wpbridge-section-header">
+		<h3>
+			<span class="dashicons dashicons-cloud"></span>
+			<?php esc_html_e( '自定义更新源', 'wpbridge' ); ?>
+		</h3>
+		<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge&action=add' ) ); ?>" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm">
+			<span class="dashicons dashicons-plus-alt2"></span>
+			<?php esc_html_e( '添加', 'wpbridge' ); ?>
+		</a>
+	</div>
+
+	<p class="wpbridge-section-desc wpbridge-section-desc-padded">
+		<?php esc_html_e( '手动配置自定义更新源，连接私有仓库或自托管服务器。', 'wpbridge' ); ?>
+	</p>
+
+	<?php
+	// 只显示非预设的自定义源
+	$custom_sources = array_filter( $sources, function( $s ) { return ! $s->is_preset; } );
+	?>
+	<?php if ( empty( $custom_sources ) ) : ?>
+		<div class="wpbridge-empty-state">
+			<span class="dashicons dashicons-cloud"></span>
+			<p><?php esc_html_e( '暂无自定义更新源', 'wpbridge' ); ?></p>
+		</div>
+	<?php else : ?>
+		<table class="wp-list-table widefat fixed striped">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( '名称', 'wpbridge' ); ?></th>
+					<th><?php esc_html_e( 'URL', 'wpbridge' ); ?></th>
+					<th><?php esc_html_e( '状态', 'wpbridge' ); ?></th>
+					<th><?php esc_html_e( '操作', 'wpbridge' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $custom_sources as $source ) : ?>
+					<tr data-source-id="<?php echo esc_attr( $source->id ); ?>">
+						<td>
+							<strong><?php echo esc_html( $source->name ?: $source->id ); ?></strong>
+						</td>
+						<td class="wpbridge-text-mono"><?php echo esc_html( $source->api_url ); ?></td>
+						<td>
+							<label class="wpbridge-toggle">
+								<input type="checkbox" class="wpbridge-toggle-source"
+									<?php checked( $source->enabled ); ?>
+									data-source-id="<?php echo esc_attr( $source->id ); ?>">
+								<span class="wpbridge-toggle-track"></span>
+							</label>
+						</td>
+						<td>
+							<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge&action=edit&source=' . $source->id ) ); ?>"
+							   class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm">
+								<?php esc_html_e( '编辑', 'wpbridge' ); ?>
+							</a>
+							<button type="button" class="wpbridge-btn wpbridge-btn-danger wpbridge-btn-sm wpbridge-delete-source"
+								data-source-id="<?php echo esc_attr( $source->id ); ?>">
+								<?php esc_html_e( '删除', 'wpbridge' ); ?>
+							</button>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
+	<?php endif; ?>
+</div>
+
+<!-- 删除确认表单 -->
+<form id="wpbridge-delete-form" method="post" style="display: none;">
+	<?php wp_nonce_field( 'wpbridge_action', 'wpbridge_nonce' ); ?>
+	<input type="hidden" name="wpbridge_action" value="delete_source">
+	<input type="hidden" name="source_id" id="wpbridge-delete-source-id" value="">
+</form>
+
 <!-- 预设激活弹窗 -->
 <div id="wpbridge-preset-modal" class="wpbridge-modal" style="display:none;">
 	<div class="wpbridge-modal-content">

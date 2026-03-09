@@ -218,7 +218,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
                 <div class="wpbridge-metric-sub"><?php esc_html_e( '暂无检查数据', 'wpbridge' ); ?></div>
             <?php endif; ?>
         </div>
-        <a href="#diagnostics" class="wpbridge-metric-link" data-tab-link="diagnostics" aria-label="<?php esc_attr_e( '运行诊断', 'wpbridge' ); ?>">
+        <a href="#settings" class="wpbridge-metric-link" data-tab-link="settings" aria-label="<?php esc_attr_e( '运行诊断', 'wpbridge' ); ?>">
             <span class="dashicons dashicons-arrow-right-alt2"></span>
         </a>
     </div>
@@ -242,7 +242,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
                         <span class="wpbridge-action-desc"><?php esc_html_e( '配置新的自定义更新源', 'wpbridge' ); ?></span>
                     </span>
                 </a>
-                <a href="#diagnostics" class="wpbridge-action-item" data-tab-link="diagnostics">
+                <a href="#settings" class="wpbridge-action-item" data-tab-link="settings">
                     <span class="wpbridge-action-icon">
                         <span class="dashicons dashicons-admin-tools"></span>
                     </span>
