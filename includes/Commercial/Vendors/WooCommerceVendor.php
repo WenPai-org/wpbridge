@@ -149,7 +149,8 @@ class WooCommerceVendor extends AbstractVendor {
 			$valid = $response !== null;
 		}
 
-		$this->set_cache( $cache_key, $valid, 43200 );
+		// 成功缓存 12 小时，失败只缓存 5 分钟（避免临时网络问题长期阻塞）
+		$this->set_cache( $cache_key, $valid, $valid ? 43200 : 300 );
 
 		return $valid;
 	}
@@ -172,7 +173,8 @@ class WooCommerceVendor extends AbstractVendor {
 		// WC AM 模式：通过 product_list + information 获取
 		if ( $this->config['auth_mode'] === 'wc_am' ) {
 			$result = $this->get_plugins_via_wc_am();
-			$this->set_cache( $cache_key, $result );
+			// 空结果短缓存 5 分钟，正常结果用默认 TTL
+			$this->set_cache( $cache_key, $result, empty( $result['plugins'] ) ? 300 : 0 );
 			return $result;
 		}
 
@@ -642,11 +644,20 @@ class WooCommerceVendor extends AbstractVendor {
 				$version ?: '0.0.0'
 			);
 
-			if ( ! empty( $response['success'] ) && ! empty( $response['data']['package']['package'] ) ) {
-				return $response['data']['package']['package'];
+			// 从响应中提取 package URL（Kestrel 可能返回多种结构）
+			$package = $this->extract_package_url( $response );
+
+			if ( $package !== null ) {
+				return $package;
 			}
 
-			// package 为空通常是因为产品未激活，尝试自动激活后重试
+			// 首次失败 — 记录响应，尝试自动激活后重试
+			Logger::error( 'WC AM download: first attempt failed', [
+				'slug'        => $slug,
+				'product_id'  => $product_id,
+				'response'    => $response,
+			] );
+
 			$this->wc_am_activate( $product_id, $version ?: '0.0.0' );
 
 			$response = $this->wc_am_update(
@@ -656,9 +667,17 @@ class WooCommerceVendor extends AbstractVendor {
 				$version ?: '0.0.0'
 			);
 
-			if ( ! empty( $response['success'] ) && ! empty( $response['data']['package']['package'] ) ) {
-				return $response['data']['package']['package'];
+			$package = $this->extract_package_url( $response );
+
+			if ( $package !== null ) {
+				return $package;
 			}
+
+			Logger::error( 'WC AM download: retry after activate also failed', [
+				'slug'        => $slug,
+				'product_id'  => $product_id,
+				'response'    => $response,
+			] );
 
 			return null;
 		}
@@ -679,6 +698,42 @@ class WooCommerceVendor extends AbstractVendor {
 			$params,
 			trailingslashit( $this->config['api_url'] ) . ltrim( $this->config['download_endpoint'], '/' )
 		);
+	}
+
+	/**
+	 * 从 WC AM update 响应中提取 package URL
+	 *
+	 * Kestrel API Manager 和标准 WC AM 返回结构不同：
+	 * - 标准: data.package.package (string)
+	 * - Kestrel: data.package (string) 或 package (string)
+	 *
+	 * @param array|null $response API 响应
+	 * @return string|null
+	 */
+	protected function extract_package_url( ?array $response ): ?string {
+		if ( empty( $response ) ) {
+			return null;
+		}
+
+		// 路径 1: data.package.package（标准 WC AM v2）
+		$url = $response['data']['package']['package'] ?? null;
+		if ( is_string( $url ) && ! empty( $url ) ) {
+			return $url;
+		}
+
+		// 路径 2: data.package（Kestrel 简化结构）
+		$url = $response['data']['package'] ?? null;
+		if ( is_string( $url ) && ! empty( $url ) ) {
+			return $url;
+		}
+
+		// 路径 3: package（顶层）
+		$url = $response['package'] ?? null;
+		if ( is_string( $url ) && ! empty( $url ) ) {
+			return $url;
+		}
+
+		return null;
 	}
 
 	/**
