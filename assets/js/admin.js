@@ -1571,9 +1571,6 @@
                 self.testSingleSource($(this));
             });
         },
-                Toast.success(wpbridge.i18n.diagnostics_complete || '诊断完成');
-            });
-        },
 
         testAllSources: function($button, callback) {
             var self = this;
