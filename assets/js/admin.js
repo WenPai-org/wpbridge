@@ -11,6 +11,16 @@
     'use strict';
 
     /**
+     * 公共工具函数
+     */
+    function escapeHtml(text) {
+        if (!text) return '';
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    /**
      * Toast 通知系统 - 使用 WordPress 原生 notice 样式
      */
     var Toast = {
@@ -171,18 +181,18 @@
                     '<div class="wpbridge-modal-header">' +
                         '<h3 class="wpbridge-modal-title">' +
                             '<span class="dashicons ' + (iconClass[options.type] || iconClass.warning) + '"></span> ' +
-                            this.escapeHtml(options.title) +
+                            escapeHtml(options.title) +
                         '</h3>' +
                     '</div>' +
                     '<div class="wpbridge-modal-body">' +
-                        '<p class="wpbridge-modal-message">' + this.escapeHtml(options.message) + '</p>' +
+                        '<p class="wpbridge-modal-message">' + escapeHtml(options.message) + '</p>' +
                     '</div>' +
                     '<div class="wpbridge-modal-footer">' +
                         '<button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-modal-cancel">' +
-                            this.escapeHtml(options.cancelText) +
+                            escapeHtml(options.cancelText) +
                         '</button>' +
                         '<button type="button" class="wpbridge-btn wpbridge-btn-' + (options.type === 'danger' ? 'danger' : 'primary') + ' wpbridge-modal-confirm-btn">' +
-                            this.escapeHtml(options.confirmText) +
+                            escapeHtml(options.confirmText) +
                         '</button>' +
                     '</div>' +
                 '</div>';
@@ -254,22 +264,22 @@
                     '<div class="wpbridge-modal-header">' +
                         '<h3 class="wpbridge-modal-title">' +
                             '<span class="dashicons dashicons-edit"></span> ' +
-                            this.escapeHtml(options.title) +
+                            escapeHtml(options.title) +
                         '</h3>' +
                     '</div>' +
                     '<div class="wpbridge-modal-body">' +
-                        (options.message ? '<p class="wpbridge-modal-message">' + this.escapeHtml(options.message) + '</p>' : '') +
+                        (options.message ? '<p class="wpbridge-modal-message">' + escapeHtml(options.message) + '</p>' : '') +
                         '<input type="' + options.inputType + '" class="wpbridge-form-input wpbridge-modal-input" ' +
-                            'placeholder="' + this.escapeHtml(options.placeholder) + '" ' +
-                            'value="' + this.escapeHtml(options.defaultValue) + '">' +
+                            'placeholder="' + escapeHtml(options.placeholder) + '" ' +
+                            'value="' + escapeHtml(options.defaultValue) + '">' +
                         '<p class="wpbridge-modal-error" style="display: none; color: #dc3545; margin-top: 8px;"></p>' +
                     '</div>' +
                     '<div class="wpbridge-modal-footer">' +
                         '<button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-modal-cancel">' +
-                            this.escapeHtml(options.cancelText) +
+                            escapeHtml(options.cancelText) +
                         '</button>' +
                         '<button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-modal-confirm-btn">' +
-                            this.escapeHtml(options.confirmText) +
+                            escapeHtml(options.confirmText) +
                         '</button>' +
                     '</div>' +
                 '</div>';
@@ -351,7 +361,7 @@
             var copySection = '';
             if (options.copyable && options.copyText) {
                 copySection = '<div class="wpbridge-modal-copy-section">' +
-                    '<input type="text" class="wpbridge-form-input wpbridge-modal-copy-input" readonly value="' + this.escapeHtml(options.copyText) + '">' +
+                    '<input type="text" class="wpbridge-form-input wpbridge-modal-copy-input" readonly value="' + escapeHtml(options.copyText) + '">' +
                     '<button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-modal-copy-btn">' +
                         '<span class="dashicons dashicons-clipboard"></span> ' + (wpbridge.i18n.copy || '复制') +
                     '</button>' +
@@ -363,7 +373,7 @@
                     '<div class="wpbridge-modal-header">' +
                         '<h3 class="wpbridge-modal-title">' +
                             '<span class="dashicons dashicons-info"></span> ' +
-                            this.escapeHtml(options.title) +
+                            escapeHtml(options.title) +
                         '</h3>' +
                     '</div>' +
                     '<div class="wpbridge-modal-body">' +
@@ -372,7 +382,7 @@
                     '</div>' +
                     '<div class="wpbridge-modal-footer">' +
                         '<button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-modal-confirm-btn">' +
-                            this.escapeHtml(options.confirmText) +
+                            escapeHtml(options.confirmText) +
                         '</button>' +
                     '</div>' +
                 '</div>';
@@ -417,16 +427,6 @@
             $(document).off('keydown.wpbridge-modal');
             $modal.remove();
             $('body').removeClass('wpbridge-modal-open');
-        },
-
-        /**
-         * HTML 转义
-         */
-        escapeHtml: function(text) {
-            if (!text) return '';
-            var div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
         }
     };
 
@@ -1584,6 +1584,8 @@
             var passed = 0;
             var warnings = 0;
             var failed = 0;
+            var concurrency = 3;
+            var queue = [];
 
             if (total === 0) {
                 if (callback) callback();
@@ -1593,19 +1595,29 @@
             $button.prop('disabled', true);
             $button.find('.dashicons').removeClass('dashicons-update').addClass('dashicons-update wpbridge-spin');
 
+            // 构建任务队列
             $items.each(function() {
-                var $item = $(this);
+                queue.push($(this));
+            });
+
+            function onItemDone() {
+                completed++;
+                if (completed === total) {
+                    $button.prop('disabled', false);
+                    $button.find('.dashicons').removeClass('wpbridge-spin');
+                    if (callback) callback();
+                } else {
+                    runNext();
+                }
+            }
+
+            function testItem($item) {
                 var sourceId = $item.data('source-id');
                 var $testBtn = $item.find('.wpbridge-test-single-source');
 
                 // 跳过已禁用的源
                 if ($testBtn.prop('disabled')) {
-                    completed++;
-                    if (completed === total) {
-                        $button.prop('disabled', false);
-                        $button.find('.dashicons').removeClass('wpbridge-spin');
-                        if (callback) callback();
-                    }
+                    onItemDone();
                     return;
                 }
 
@@ -1657,21 +1669,26 @@
                             failed++;
                         }
                     },
-                    error: function(jqXHR, textStatus) {
+                    error: function() {
                         failed++;
                     },
                     complete: function() {
                         $item.removeClass('testing');
-                        completed++;
-
-                        if (completed === total) {
-                            $button.prop('disabled', false);
-                            $button.find('.dashicons').removeClass('wpbridge-spin');
-                            if (callback) callback();
-                        }
+                        onItemDone();
                     }
                 });
-            });
+            }
+
+            function runNext() {
+                if (queue.length > 0) {
+                    testItem(queue.shift());
+                }
+            }
+
+            // 启动初始并发
+            for (var i = 0; i < Math.min(concurrency, queue.length); i++) {
+                testItem(queue.shift());
+            }
         },
 
         testSingleSource: function($button) {
@@ -2095,19 +2112,19 @@
             html += '<div class="wpbridge-changelog-header">';
             html += '<div class="wpbridge-changelog-meta">';
             if (data.name) {
-                html += '<span class="wpbridge-changelog-name">' + this.escapeHtml(data.name) + '</span>';
+                html += '<span class="wpbridge-changelog-name">' + escapeHtml(data.name) + '</span>';
             }
             if (data.version) {
-                html += '<span class="wpbridge-badge wpbridge-badge-info">v' + this.escapeHtml(data.version) + '</span>';
+                html += '<span class="wpbridge-badge wpbridge-badge-info">v' + escapeHtml(data.version) + '</span>';
             }
             if (data.source) {
-                html += '<span class="wpbridge-badge wpbridge-badge-secondary">' + this.escapeHtml(data.source) + '</span>';
+                html += '<span class="wpbridge-badge wpbridge-badge-secondary">' + escapeHtml(data.source) + '</span>';
             }
             html += '</div>';
             if (data.last_updated) {
                 html += '<div class="wpbridge-changelog-updated">' +
                     (wpbridge.i18n.last_updated || '最后更新') + ': ' +
-                    this.escapeHtml(data.last_updated) +
+                    escapeHtml(data.last_updated) +
                 '</div>';
             }
             html += '</div>';
@@ -2117,7 +2134,7 @@
                 html += '<div class="wpbridge-changelog-versions">';
                 html += '<strong>' + (wpbridge.i18n.recent_versions || '最近版本') + ':</strong> ';
                 html += data.versions.slice(0, 5).map(function(v) {
-                    return '<span class="wpbridge-version-tag">' + this.escapeHtml(v) + '</span>';
+                    return '<span class="wpbridge-version-tag">' + escapeHtml(v) + '</span>';
                 }, this).join(' ');
                 html += '</div>';
             }
@@ -2143,7 +2160,7 @@
 
             var html = '<div class="wpbridge-changelog-error">' +
                 '<span class="dashicons dashicons-warning"></span> ' +
-                this.escapeHtml(message) +
+                escapeHtml(message) +
             '</div>';
 
             this.modal.find('.wpbridge-modal-body').html(html);
@@ -2156,12 +2173,6 @@
                 $('body').removeClass('wpbridge-modal-open');
             }
             $('.wpbridge-modal-overlay').remove();
-        },
-
-        escapeHtml: function(text) {
-            var div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
         }
     };
 
