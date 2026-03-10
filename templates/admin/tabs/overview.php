@@ -213,7 +213,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
                 <div class="wpbridge-metric-sub"><?php esc_html_e( '暂无检查数据', 'wpbridge' ); ?></div>
             <?php endif; ?>
         </div>
-        <a href="#diagnostics" class="wpbridge-metric-link" data-tab-link="diagnostics" aria-label="<?php esc_attr_e( '运行诊断', 'wpbridge' ); ?>">
+        <a href="#projects" class="wpbridge-metric-link" data-tab-link="projects" aria-label="<?php esc_attr_e( '查看更新源', 'wpbridge' ); ?>">
             <span class="dashicons dashicons-arrow-right-alt2"></span>
         </a>
     </div>
@@ -245,7 +245,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
         </div>
         <div class="wpbridge-panel-body">
             <div class="wpbridge-action-list">
-                <a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge&action=add' ) ); ?>" class="wpbridge-action-item">
+                <a href="#projects" class="wpbridge-action-item" data-tab-link="projects">
                     <span class="wpbridge-action-icon">
                         <span class="dashicons dashicons-plus-alt2"></span>
                     </span>
@@ -254,13 +254,13 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
                         <span class="wpbridge-action-desc"><?php esc_html_e( '配置新的自定义更新源', 'wpbridge' ); ?></span>
                     </span>
                 </a>
-                <a href="#diagnostics" class="wpbridge-action-item" data-tab-link="diagnostics">
+                <a href="#settings" class="wpbridge-action-item" data-tab-link="settings">
                     <span class="wpbridge-action-icon">
                         <span class="dashicons dashicons-admin-tools"></span>
                     </span>
                     <span class="wpbridge-action-text">
-                        <span class="wpbridge-action-title"><?php esc_html_e( '诊断工具', 'wpbridge' ); ?></span>
-                        <span class="wpbridge-action-desc"><?php esc_html_e( '检查源连通性和系统环境', 'wpbridge' ); ?></span>
+                        <span class="wpbridge-action-title"><?php esc_html_e( '维护工具', 'wpbridge' ); ?></span>
+                        <span class="wpbridge-action-desc"><?php esc_html_e( '清除缓存、调试日志、导入导出', 'wpbridge' ); ?></span>
                     </span>
                 </a>
                 <a href="#api" class="wpbridge-action-item" data-tab-link="api">
