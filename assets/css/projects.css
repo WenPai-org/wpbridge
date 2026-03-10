@@ -44,7 +44,7 @@
 .wpbridge-subtab-count {
     background: rgba(255, 255, 255, 0.2);
     padding: 2px 8px;
-    border-radius: 10px;
+    border-radius: var(--wpbridge-radius);
     font-size: var(--wpbridge-text-xs);
 }
 
@@ -176,7 +176,7 @@
     font-family: monospace;
     background: var(--wpbridge-bg-secondary);
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: var(--wpbridge-radius);
 }
 
 .wpbridge-project-source {
@@ -457,7 +457,7 @@
     padding: 4px 10px;
     font-size: 12px;
     font-weight: 500;
-    border-radius: 4px;
+    border-radius: var(--wpbridge-radius);
 }
 
 .wpbridge-status-badge .dashicons {
@@ -649,7 +649,7 @@
 
 .wpbridge-add-source-card {
     border: 1px solid var(--wpbridge-gray-200);
-    border-radius: var(--wpbridge-radius-lg, 12px);
+    border-radius: var(--wpbridge-radius-lg);
     background: var(--wpbridge-white);
     overflow: hidden;
 }
@@ -720,4 +720,53 @@
     padding: var(--wpbridge-space-3) var(--wpbridge-space-5);
     background: var(--wpbridge-gray-50);
     border-top: 1px solid var(--wpbridge-gray-100);
+}
+
+/* 源测试状态（从 diagnostics.css 迁移） */
+.wpbridge-source-test-status {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+}
+
+.wpbridge-source-test-time {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+    font-family: var(--wpbridge-font-mono);
+}
+
+.wpbridge-badge-type {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-600);
+    font-size: var(--wpbridge-text-xs);
+}
+
+/* 源列表容器 */
+.wpbridge-source-list {
+    border: 1px solid var(--wpbridge-gray-200);
+    border-radius: var(--wpbridge-radius-lg);
+    overflow: hidden;
+    background: var(--wpbridge-white, #fff);
+}
+
+/* 源分组标题 */
+.wpbridge-source-group-header {
+    padding: var(--wpbridge-space-2) var(--wpbridge-space-5);
+    background: var(--wpbridge-gray-50);
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+    font-size: var(--wpbridge-text-xs);
+    font-weight: 600;
+    color: var(--wpbridge-gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.wpbridge-source-group + .wpbridge-source-group .wpbridge-source-group-header {
+    border-top: 1px solid var(--wpbridge-gray-200);
+}
+
+/* 禁用状态 */
+.wpbridge-source-list-item.wpbridge-source-disabled .wpbridge-source-list-name,
+.wpbridge-source-list-item.wpbridge-source-disabled .wpbridge-source-list-url {
+    opacity: 0.5;
 }

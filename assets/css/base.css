@@ -28,6 +28,7 @@
     padding: var(--wpbridge-space-4) var(--wpbridge-space-6);
     background: #fff;
     box-shadow: var(--wpbridge-shadow);
+    border-radius: 0;
 }
 
 .wpbridge-header-left {
@@ -53,6 +54,7 @@
     color: var(--wpbridge-gray-500);
     background: var(--wpbridge-gray-100);
     padding: 2px 8px;
+    border-radius: var(--wpbridge-radius-sm);
     margin-left: var(--wpbridge-space-2);
 }
 
@@ -111,6 +113,7 @@
 .wpbridge-tabs-card {
     background: #fff;
     box-shadow: var(--wpbridge-shadow);
+    border-radius: var(--wpbridge-radius-lg);
     overflow: hidden;
 }
 
@@ -144,8 +147,20 @@
     display: none;
     padding: var(--wpbridge-space-6);
     overflow: hidden;
+    animation: wpbridge-tab-fadein 0.2s ease;
 }
 
 .wpbridge-tab-pane-active {
     display: block;
+}
+
+@keyframes wpbridge-tab-fadein {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

@@ -1554,11 +1554,15 @@
         bindEvents: function() {
             var self = this;
 
-            // Tab 链接跳转
+            // Tab 链接跳转（支持 data-subtab 联动）
             $(document).on('click', '[data-tab-link]', function(e) {
                 e.preventDefault();
                 var tabId = $(this).data('tab-link');
+                var subtab = $(this).data('subtab');
                 Tabs.switchTo(tabId);
+                if (subtab && Projects && Projects.switchSubtab) {
+                    Projects.switchSubtab(subtab);
+                }
             });
 
             // 测试全部更新源

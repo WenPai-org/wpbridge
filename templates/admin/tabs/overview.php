@@ -94,7 +94,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
             <div class="wpbridge-welcome-step-content">
                 <h4><?php esc_html_e( '添加更新源', 'wpbridge' ); ?></h4>
                 <p><?php esc_html_e( '或手动添加自定义更新源，连接你的私有仓库或商业插件服务器。', 'wpbridge' ); ?></p>
-                <a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge&action=add' ) ); ?>" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm">
+                <a href="#projects" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm" data-tab-link="projects" data-subtab="sources">
                     <?php esc_html_e( '添加更新源', 'wpbridge' ); ?>
                 </a>
             </div>
@@ -125,7 +125,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
     </p>
     <div class="wpbridge-overview-hero-actions">
         <a href="#vendors" class="wpbridge-overview-hero-btn wpbridge-overview-hero-btn--primary" data-tab-link="vendors"><?php esc_html_e( '连接供应商', 'wpbridge' ); ?></a>
-        <a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge&action=add' ) ); ?>" class="wpbridge-overview-hero-btn wpbridge-overview-hero-btn--secondary"><?php esc_html_e( '添加更新源', 'wpbridge' ); ?></a>
+        <a href="#projects" class="wpbridge-overview-hero-btn wpbridge-overview-hero-btn--secondary" data-tab-link="projects" data-subtab="sources"><?php esc_html_e( '添加更新源', 'wpbridge' ); ?></a>
     </div>
 </div>
 
@@ -171,7 +171,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
                 <span class="wpbridge-metric-highlight"><?php echo esc_html( $stats['enabled'] ); ?></span> <?php esc_html_e( '已启用', 'wpbridge' ); ?>
             </div>
         </div>
-        <a href="#vendors" class="wpbridge-metric-link" data-tab-link="vendors" aria-label="<?php esc_attr_e( '管理更新源', 'wpbridge' ); ?>">
+        <a href="#projects" class="wpbridge-metric-link" data-tab-link="projects" data-subtab="sources" aria-label="<?php esc_attr_e( '管理更新源', 'wpbridge' ); ?>">
             <span class="dashicons dashicons-arrow-right-alt2"></span>
         </a>
     </div>
@@ -213,7 +213,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
                 <div class="wpbridge-metric-sub"><?php esc_html_e( '暂无检查数据', 'wpbridge' ); ?></div>
             <?php endif; ?>
         </div>
-        <a href="#projects" class="wpbridge-metric-link" data-tab-link="projects" aria-label="<?php esc_attr_e( '查看更新源', 'wpbridge' ); ?>">
+        <a href="#projects" class="wpbridge-metric-link" data-tab-link="projects" data-subtab="sources" aria-label="<?php esc_attr_e( '查看更新源', 'wpbridge' ); ?>">
             <span class="dashicons dashicons-arrow-right-alt2"></span>
         </a>
     </div>
@@ -245,7 +245,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
         </div>
         <div class="wpbridge-panel-body">
             <div class="wpbridge-action-list">
-                <a href="#projects" class="wpbridge-action-item" data-tab-link="projects">
+                <a href="#projects" class="wpbridge-action-item" data-tab-link="projects" data-subtab="sources">
                     <span class="wpbridge-action-icon">
                         <span class="dashicons dashicons-plus-alt2"></span>
                     </span>
