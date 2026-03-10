@@ -29,7 +29,17 @@ $custom_sources = array_filter( $sources, fn( $s ) => ! $s->is_preset && ! $s->i
 $preset_sources = array_filter( $sources, fn( $s ) => $s->is_preset );
 
 // 统计
-$total_count = count( $preset_sources ) + count( $custom_sources ) + count( $vendor_sources );
+$total_count   = count( $preset_sources ) + count( $custom_sources ) + count( $vendor_sources );
+$enabled_count = 0;
+foreach ( $preset_sources as $s ) {
+    if ( $s->enabled ) $enabled_count++;
+}
+foreach ( $custom_sources as $s ) {
+    if ( $s->enabled ) $enabled_count++;
+}
+foreach ( $vendor_sources as $vs ) {
+    if ( ! empty( $vs['enabled'] ) ) $enabled_count++;
+}
 
 // 渲染单个源行的测试状态
 $render_test_status = function( string $source_id, bool $enabled ) use ( $health_status ) {
@@ -56,9 +66,10 @@ $render_test_status = function( string $source_id, bool $enabled ) use ( $health
             <span class="wpbridge-toolbar-info">
                 <?php
                 printf(
-                    /* translators: %d: source count */
-                    esc_html__( '共 %d 个更新源', 'wpbridge' ),
-                    $total_count
+                    /* translators: 1: total count, 2: enabled count */
+                    esc_html__( '共 %1$d 个更新源，%2$d 个已启用', 'wpbridge' ),
+                    $total_count,
+                    $enabled_count
                 );
                 ?>
             </span>
@@ -104,7 +115,7 @@ $render_test_status = function( string $source_id, bool $enabled ) use ( $health
             <div class="wpbridge-add-source-footer">
                 <button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm" id="wpbridge-submit-source">
                     <span class="dashicons dashicons-saved"></span>
-                    <?php esc_html_e( '添加更新源', 'wpbridge' ); ?>
+                    <?php esc_html_e( '添加', 'wpbridge' ); ?>
                 </button>
                 <button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm" id="wpbridge-cancel-add-source">
                     <?php esc_html_e( '取消', 'wpbridge' ); ?>
@@ -114,112 +125,125 @@ $render_test_status = function( string $source_id, bool $enabled ) use ( $health
     </div>
 
     <!-- 源列表 -->
-    <div class="wpbridge-project-list">
+    <div class="wpbridge-source-list">
         <?php if ( $total_count === 0 ) : ?>
             <div class="wpbridge-empty">
                 <span class="dashicons dashicons-cloud"></span>
                 <h3><?php esc_html_e( '暂无更新源', 'wpbridge' ); ?></h3>
-                <p><?php esc_html_e( '添加自定义更新源来连接私有仓库或自托管服务器', 'wpbridge' ); ?></p>
+                <p><?php esc_html_e( '点击「添加更新源」连接私有仓库或自托管服务器，或在供应商 Tab 中激活预设供应商。', 'wpbridge' ); ?></p>
             </div>
         <?php else : ?>
 
             <?php // ── 预设源 ── ?>
-            <?php foreach ( $preset_sources as $source ) : ?>
-                <div class="wpbridge-source-list-item" data-source-id="<?php echo esc_attr( $source->id ); ?>">
-                    <div class="wpbridge-source-list-info">
-                        <div class="wpbridge-source-list-name">
-                            <?php echo esc_html( $source->name ); ?>
-                            <span class="wpbridge-badge"><?php esc_html_e( '预设', 'wpbridge' ); ?></span>
-                            <span class="wpbridge-badge wpbridge-badge-type"><?php echo esc_html( SourceType::get_label( $source->type ) ); ?></span>
+            <?php if ( ! empty( $preset_sources ) ) : ?>
+                <div class="wpbridge-source-group">
+                    <div class="wpbridge-source-group-header"><?php esc_html_e( '预设源', 'wpbridge' ); ?></div>
+                    <?php foreach ( $preset_sources as $source ) : ?>
+                        <div class="wpbridge-source-list-item <?php echo $source->enabled ? '' : 'wpbridge-source-disabled'; ?>" data-source-id="<?php echo esc_attr( $source->id ); ?>">
+                            <div class="wpbridge-source-list-info">
+                                <div class="wpbridge-source-list-name">
+                                    <?php echo esc_html( $source->name ); ?>
+                                    <span class="wpbridge-badge wpbridge-badge-type"><?php echo esc_html( SourceType::get_label( $source->type ) ); ?></span>
+                                </div>
+                                <div class="wpbridge-source-list-meta">
+                                    <span class="wpbridge-source-list-url"><?php echo esc_html( $source->api_url ); ?></span>
+                                    <span class="wpbridge-source-test-status"><?php $render_test_status( $source->id, $source->enabled ); ?></span>
+                                </div>
+                            </div>
+                            <div class="wpbridge-source-list-actions">
+                                <button type="button"
+                                        class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-test-single-source"
+                                        data-source-id="<?php echo esc_attr( $source->id ); ?>"
+                                        <?php disabled( ! $source->enabled ); ?>
+                                        title="<?php esc_attr_e( '测试连通性', 'wpbridge' ); ?>">
+                                    <span class="dashicons dashicons-admin-site-alt3"></span>
+                                </button>
+                                <label class="wpbridge-toggle wpbridge-toggle-sm">
+                                    <input type="checkbox" class="wpbridge-toggle-source"
+                                           <?php checked( $source->enabled ); ?>
+                                           data-source-id="<?php echo esc_attr( $source->id ); ?>">
+                                    <span class="wpbridge-toggle-track"></span>
+                                </label>
+                            </div>
                         </div>
-                        <div class="wpbridge-source-list-meta">
-                            <span class="wpbridge-source-list-url"><?php echo esc_html( $source->api_url ); ?></span>
-                            <span class="wpbridge-source-test-status"><?php $render_test_status( $source->id, $source->enabled ); ?></span>
-                        </div>
-                    </div>
-                    <div class="wpbridge-source-list-actions">
-                        <button type="button"
-                                class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-test-single-source"
-                                data-source-id="<?php echo esc_attr( $source->id ); ?>"
-                                <?php disabled( ! $source->enabled ); ?>
-                                title="<?php esc_attr_e( '测试连通性', 'wpbridge' ); ?>">
-                            <span class="dashicons dashicons-admin-site-alt3"></span>
-                        </button>
-                        <label class="wpbridge-toggle wpbridge-toggle-sm">
-                            <input type="checkbox" class="wpbridge-toggle-source"
-                                   <?php checked( $source->enabled ); ?>
-                                   data-source-id="<?php echo esc_attr( $source->id ); ?>">
-                            <span class="wpbridge-toggle-track"></span>
-                        </label>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
-            <?php endforeach; ?>
+            <?php endif; ?>
 
             <?php // ── 供应商源 ── ?>
-            <?php foreach ( $vendor_sources as $vs ) : ?>
-                <div class="wpbridge-source-list-item" data-source-id="<?php echo esc_attr( $vs['source_key'] ); ?>">
-                    <div class="wpbridge-source-list-info">
-                        <div class="wpbridge-source-list-name">
-                            <?php echo esc_html( $vs['name'] ?? '' ); ?>
-                            <span class="wpbridge-badge wpbridge-badge-vendor"><?php esc_html_e( '供应商', 'wpbridge' ); ?></span>
+            <?php if ( ! empty( $vendor_sources ) ) : ?>
+                <div class="wpbridge-source-group">
+                    <div class="wpbridge-source-group-header"><?php esc_html_e( '供应商', 'wpbridge' ); ?></div>
+                    <?php foreach ( $vendor_sources as $vs ) : ?>
+                        <div class="wpbridge-source-list-item" data-source-id="<?php echo esc_attr( $vs['source_key'] ); ?>">
+                            <div class="wpbridge-source-list-info">
+                                <div class="wpbridge-source-list-name">
+                                    <?php echo esc_html( $vs['name'] ?? '' ); ?>
+                                    <span class="wpbridge-badge wpbridge-badge-vendor"><?php esc_html_e( '供应商', 'wpbridge' ); ?></span>
+                                </div>
+                                <div class="wpbridge-source-list-meta">
+                                    <span class="wpbridge-source-list-url"><?php echo esc_html( $vs['api_url'] ?? '' ); ?></span>
+                                </div>
+                            </div>
+                            <div class="wpbridge-source-list-actions">
+                                <label class="wpbridge-toggle wpbridge-toggle-sm">
+                                    <input type="checkbox" class="wpbridge-toggle-source"
+                                           <?php checked( ! empty( $vs['enabled'] ) ); ?>
+                                           data-source-id="<?php echo esc_attr( $vs['source_key'] ); ?>">
+                                    <span class="wpbridge-toggle-track"></span>
+                                </label>
+                                <span class="wpbridge-source-list-hint"><?php esc_html_e( '由供应商管理', 'wpbridge' ); ?></span>
+                            </div>
                         </div>
-                        <div class="wpbridge-source-list-meta">
-                            <span class="wpbridge-source-list-url"><?php echo esc_html( $vs['api_url'] ?? '' ); ?></span>
-                        </div>
-                    </div>
-                    <div class="wpbridge-source-list-actions">
-                        <label class="wpbridge-toggle wpbridge-toggle-sm">
-                            <input type="checkbox" class="wpbridge-toggle-source"
-                                   <?php checked( ! empty( $vs['enabled'] ) ); ?>
-                                   data-source-id="<?php echo esc_attr( $vs['source_key'] ); ?>">
-                            <span class="wpbridge-toggle-track"></span>
-                        </label>
-                        <span class="wpbridge-source-list-hint"><?php esc_html_e( '由供应商管理', 'wpbridge' ); ?></span>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
-            <?php endforeach; ?>
+            <?php endif; ?>
 
             <?php // ── 自定义源 ── ?>
-            <?php foreach ( $custom_sources as $source ) : ?>
-                <div class="wpbridge-source-list-item" data-source-id="<?php echo esc_attr( $source->id ); ?>">
-                    <div class="wpbridge-source-list-info">
-                        <div class="wpbridge-source-list-name">
-                            <?php echo esc_html( $source->name ?: $source->id ); ?>
-                            <span class="wpbridge-badge wpbridge-badge-custom"><?php esc_html_e( '自定义', 'wpbridge' ); ?></span>
-                            <span class="wpbridge-badge wpbridge-badge-type"><?php echo esc_html( SourceType::get_label( $source->type ) ); ?></span>
+            <?php if ( ! empty( $custom_sources ) ) : ?>
+                <div class="wpbridge-source-group">
+                    <div class="wpbridge-source-group-header"><?php esc_html_e( '自定义源', 'wpbridge' ); ?></div>
+                    <?php foreach ( $custom_sources as $source ) : ?>
+                        <div class="wpbridge-source-list-item <?php echo $source->enabled ? '' : 'wpbridge-source-disabled'; ?>" data-source-id="<?php echo esc_attr( $source->id ); ?>">
+                            <div class="wpbridge-source-list-info">
+                                <div class="wpbridge-source-list-name">
+                                    <?php echo esc_html( $source->name ?: $source->id ); ?>
+                                    <span class="wpbridge-badge wpbridge-badge-type"><?php echo esc_html( SourceType::get_label( $source->type ) ); ?></span>
+                                </div>
+                                <div class="wpbridge-source-list-meta">
+                                    <span class="wpbridge-source-list-url"><?php echo esc_html( $source->api_url ); ?></span>
+                                    <span class="wpbridge-source-test-status"><?php $render_test_status( $source->id, $source->enabled ); ?></span>
+                                </div>
+                            </div>
+                            <div class="wpbridge-source-list-actions">
+                                <button type="button"
+                                        class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-test-single-source"
+                                        data-source-id="<?php echo esc_attr( $source->id ); ?>"
+                                        <?php disabled( ! $source->enabled ); ?>
+                                        title="<?php esc_attr_e( '测试连通性', 'wpbridge' ); ?>">
+                                    <span class="dashicons dashicons-admin-site-alt3"></span>
+                                </button>
+                                <label class="wpbridge-toggle wpbridge-toggle-sm">
+                                    <input type="checkbox" class="wpbridge-toggle-source"
+                                           <?php checked( $source->enabled ); ?>
+                                           data-source-id="<?php echo esc_attr( $source->id ); ?>">
+                                    <span class="wpbridge-toggle-track"></span>
+                                </label>
+                                <a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge&action=edit&source=' . $source->id ) ); ?>"
+                                   class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm"
+                                   title="<?php esc_attr_e( '编辑', 'wpbridge' ); ?>">
+                                    <span class="dashicons dashicons-edit"></span>
+                                </a>
+                                <button type="button" class="wpbridge-btn wpbridge-btn-danger wpbridge-btn-sm wpbridge-delete-source"
+                                        data-source-id="<?php echo esc_attr( $source->id ); ?>"
+                                        title="<?php esc_attr_e( '删除', 'wpbridge' ); ?>">
+                                    <span class="dashicons dashicons-trash"></span>
+                                </button>
+                            </div>
                         </div>
-                        <div class="wpbridge-source-list-meta">
-                            <span class="wpbridge-source-list-url"><?php echo esc_html( $source->api_url ); ?></span>
-                            <span class="wpbridge-source-test-status"><?php $render_test_status( $source->id, $source->enabled ); ?></span>
-                        </div>
-                    </div>
-                    <div class="wpbridge-source-list-actions">
-                        <button type="button"
-                                class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-test-single-source"
-                                data-source-id="<?php echo esc_attr( $source->id ); ?>"
-                                <?php disabled( ! $source->enabled ); ?>
-                                title="<?php esc_attr_e( '测试连通性', 'wpbridge' ); ?>">
-                            <span class="dashicons dashicons-admin-site-alt3"></span>
-                        </button>
-                        <label class="wpbridge-toggle wpbridge-toggle-sm">
-                            <input type="checkbox" class="wpbridge-toggle-source"
-                                   <?php checked( $source->enabled ); ?>
-                                   data-source-id="<?php echo esc_attr( $source->id ); ?>">
-                            <span class="wpbridge-toggle-track"></span>
-                        </label>
-                        <a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge&action=edit&source=' . $source->id ) ); ?>"
-                           class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm"
-                           title="<?php esc_attr_e( '编辑', 'wpbridge' ); ?>">
-                            <span class="dashicons dashicons-edit"></span>
-                        </a>
-                        <button type="button" class="wpbridge-btn wpbridge-btn-danger wpbridge-btn-sm wpbridge-delete-source"
-                                data-source-id="<?php echo esc_attr( $source->id ); ?>"
-                                title="<?php esc_attr_e( '删除', 'wpbridge' ); ?>">
-                            <span class="dashicons dashicons-trash"></span>
-                        </button>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
-            <?php endforeach; ?>
+            <?php endif; ?>
 
         <?php endif; ?>
     </div>

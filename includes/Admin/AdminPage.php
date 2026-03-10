@@ -485,6 +485,20 @@ class AdminPage {
             wp_send_json_error( [ 'message' => __( '请输入更新源地址', 'wpbridge' ) ] );
         }
 
+        // 重复源检测
+        $existing = $this->source_manager->get_all();
+        foreach ( $existing as $src ) {
+            if ( isset( $src->api_url ) && untrailingslashit( $src->api_url ) === untrailingslashit( $api_url ) ) {
+                wp_send_json_error( [
+                    'message' => sprintf(
+                        /* translators: %s: existing source name */
+                        __( '该地址已存在更新源「%s」，请勿重复添加', 'wpbridge' ),
+                        $src->name
+                    ),
+                ] );
+            }
+        }
+
         // 自动识别类型
         $host = wp_parse_url( $api_url, PHP_URL_HOST );
         $path = wp_parse_url( $api_url, PHP_URL_PATH ) ?? '';

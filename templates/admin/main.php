@@ -87,17 +87,17 @@ foreach ( $sources as $source ) {
                 <a href="#overview" class="wpbridge-tab wpbridge-tab-active" data-tab="overview">
                     <?php esc_html_e( '概览', 'wpbridge' ); ?>
                 </a>
-                <a href="#projects" class="wpbridge-tab" data-tab="projects">
-                    <?php esc_html_e( '更新管理', 'wpbridge' ); ?>
-                </a>
                 <a href="#vendors" class="wpbridge-tab" data-tab="vendors">
                     <?php esc_html_e( '供应商', 'wpbridge' ); ?>
                 </a>
-                <a href="#settings" class="wpbridge-tab" data-tab="settings">
-                    <?php esc_html_e( '设置', 'wpbridge' ); ?>
+                <a href="#projects" class="wpbridge-tab" data-tab="projects">
+                    <?php esc_html_e( '更新管理', 'wpbridge' ); ?>
                 </a>
                 <a href="#api" class="wpbridge-tab" data-tab="api">
                     <?php esc_html_e( 'Bridge API', 'wpbridge' ); ?>
+                </a>
+                <a href="#settings" class="wpbridge-tab" data-tab="settings">
+                    <?php esc_html_e( '设置', 'wpbridge' ); ?>
                 </a>
             </nav>
 
@@ -106,14 +106,19 @@ foreach ( $sources as $source ) {
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/overview.php'; ?>
             </div>
 
-            <!-- Tab: 项目 -->
+            <!-- Tab: 供应商 -->
+            <div id="vendors" class="wpbridge-tab-pane">
+                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/vendors.php'; ?>
+            </div>
+
+            <!-- Tab: 更新管理 -->
             <div id="projects" class="wpbridge-tab-pane">
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/projects.php'; ?>
             </div>
 
-            <!-- Tab: 渠道（原供应商 + 更新源） -->
-            <div id="vendors" class="wpbridge-tab-pane">
-                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/vendors.php'; ?>
+            <!-- Tab: Bridge API -->
+            <div id="api" class="wpbridge-tab-pane">
+                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/api.php'; ?>
             </div>
 
             <!-- Tab: 设置（含调试日志） -->
@@ -128,11 +133,6 @@ foreach ( $sources as $source ) {
                     <?php include WPBRIDGE_PATH . 'templates/admin/tabs/logs.php'; ?>
                 </div>
                 <?php endif; ?>
-            </div>
-
-            <!-- Tab: Bridge API -->
-            <div id="api" class="wpbridge-tab-pane">
-                <?php include WPBRIDGE_PATH . 'templates/admin/tabs/api.php'; ?>
             </div>
         </div>
     </div>

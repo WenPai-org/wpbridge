@@ -35,8 +35,8 @@ $installed_plugins = get_plugins();
 $installed_themes = wp_get_themes();
 
 // 当前子 Tab - 白名单验证
-$allowed_subtabs = [ 'plugins', 'themes', 'sources' ];
-$current_subtab = 'plugins';
+$allowed_subtabs = [ 'sources', 'plugins', 'themes' ];
+$current_subtab = 'sources';
 // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- 仅用于 UI 显示
 if ( isset( $_GET['subtab'] ) && in_array( $_GET['subtab'], $allowed_subtabs, true ) ) {
     $current_subtab = $_GET['subtab'];
@@ -45,6 +45,10 @@ if ( isset( $_GET['subtab'] ) && in_array( $_GET['subtab'], $allowed_subtabs, tr
 
 <!-- 子 Tab 导航 -->
 <div class="wpbridge-subtabs">
+    <a href="#" class="wpbridge-subtab <?php echo $current_subtab === 'sources' ? 'wpbridge-subtab-active' : ''; ?>" data-subtab="sources">
+        <span class="dashicons dashicons-cloud"></span>
+        <?php esc_html_e( '更新源', 'wpbridge' ); ?>
+    </a>
     <a href="#" class="wpbridge-subtab <?php echo $current_subtab === 'plugins' ? 'wpbridge-subtab-active' : ''; ?>" data-subtab="plugins">
         <span class="dashicons dashicons-admin-plugins"></span>
         <?php esc_html_e( '插件', 'wpbridge' ); ?>
@@ -55,10 +59,11 @@ if ( isset( $_GET['subtab'] ) && in_array( $_GET['subtab'], $allowed_subtabs, tr
         <?php esc_html_e( '主题', 'wpbridge' ); ?>
         <span class="wpbridge-subtab-count"><?php echo count( $installed_themes ); ?></span>
     </a>
-    <a href="#" class="wpbridge-subtab <?php echo $current_subtab === 'sources' ? 'wpbridge-subtab-active' : ''; ?>" data-subtab="sources">
-        <span class="dashicons dashicons-cloud"></span>
-        <?php esc_html_e( '更新源', 'wpbridge' ); ?>
-    </a>
+</div>
+
+<!-- 更新源 -->
+<div id="subtab-sources" class="wpbridge-subtab-pane <?php echo $current_subtab === 'sources' ? 'wpbridge-subtab-pane-active' : ''; ?>">
+    <?php include WPBRIDGE_PATH . 'templates/admin/partials/sources-list.php'; ?>
 </div>
 
 <!-- 插件列表 -->
@@ -69,9 +74,4 @@ if ( isset( $_GET['subtab'] ) && in_array( $_GET['subtab'], $allowed_subtabs, tr
 <!-- 主题列表 -->
 <div id="subtab-themes" class="wpbridge-subtab-pane <?php echo $current_subtab === 'themes' ? 'wpbridge-subtab-pane-active' : ''; ?>">
     <?php include WPBRIDGE_PATH . 'templates/admin/partials/project-list-themes.php'; ?>
-</div>
-
-<!-- 更新源 -->
-<div id="subtab-sources" class="wpbridge-subtab-pane <?php echo $current_subtab === 'sources' ? 'wpbridge-subtab-pane-active' : ''; ?>">
-    <?php include WPBRIDGE_PATH . 'templates/admin/partials/sources-list.php'; ?>
 </div>
