@@ -80,9 +80,6 @@ use WPBridge\UpdateSource\SourceType;
                     <div class="wpbridge-source-test-info">
                         <div class="wpbridge-source-test-name">
                             <?php echo esc_html( $source->name ?: $source->id ); ?>
-                            <?php if ( $source->is_preset ) : ?>
-                                <span class="wpbridge-badge wpbridge-badge-preset"><?php esc_html_e( '预置', 'wpbridge' ); ?></span>
-                            <?php endif; ?>
                         </div>
                         <div class="wpbridge-source-test-url"><?php echo esc_html( $source->api_url ); ?></div>
                     </div>
@@ -277,19 +274,6 @@ use WPBridge\UpdateSource\SourceType;
                 <span class="wpbridge-check-value"><?php echo $debug_mode ? esc_html__( '已启用', 'wpbridge' ) : esc_html__( '已禁用', 'wpbridge' ); ?></span>
             </div>
             <span class="wpbridge-check-requirement"><?php esc_html_e( '生产环境建议禁用', 'wpbridge' ); ?></span>
-        </div>
-
-        <?php
-        // 缓存降级检查
-        $fallback_enabled = ! empty( $settings['fallback_enabled'] );
-        ?>
-        <div class="wpbridge-check-item <?php echo $fallback_enabled ? 'passed' : 'warning'; ?>">
-            <span class="wpbridge-check-icon dashicons <?php echo $fallback_enabled ? 'dashicons-yes-alt' : 'dashicons-warning'; ?>"></span>
-            <div class="wpbridge-check-info">
-                <span class="wpbridge-check-label"><?php esc_html_e( '缓存降级', 'wpbridge' ); ?></span>
-                <span class="wpbridge-check-value"><?php echo $fallback_enabled ? esc_html__( '已启用', 'wpbridge' ) : esc_html__( '已禁用', 'wpbridge' ); ?></span>
-            </div>
-            <span class="wpbridge-check-requirement"><?php esc_html_e( '建议启用', 'wpbridge' ); ?></span>
         </div>
 
         <?php

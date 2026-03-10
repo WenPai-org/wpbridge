@@ -12,6 +12,8 @@ namespace WPBridge\Admin;
 
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
+use WPBridge\Core\SourceRegistry;
+use WPBridge\Core\ItemSourceManager;
 use WPBridge\Commercial\BridgeManager;
 use WPBridge\Commercial\Vendors\PresetRegistry;
 use WPBridge\Security\Encryption;
@@ -76,8 +78,14 @@ class VendorAdmin {
 		add_action( 'wp_ajax_wpbridge_get_subscription', [ $this, 'ajax_get_subscription' ] );
 		add_action( 'wp_ajax_wpbridge_refresh_subscription', [ $this, 'ajax_refresh_subscription' ] );
 
+		// 插件安装 AJAX 处理
+		add_action( 'wp_ajax_wpbridge_install_plugin', [ $this, 'ajax_install_plugin' ] );
+
 		// Bridge Server AJAX 处理
 		add_action( 'wp_ajax_wpbridge_test_bridge_server', [ $this, 'ajax_test_bridge_server' ] );
+
+		// 供应商更新绑定 AJAX 处理
+		add_action( 'wp_ajax_wpbridge_bind_vendor_update', [ $this, 'ajax_bind_vendor_update' ] );
 	}
 
 	/**
@@ -271,6 +279,8 @@ class VendorAdmin {
 				return;
 			}
 
+			// 清除缓存后重新拉取
+			$vendor->clear_all_cache();
 			$result = $vendor->get_plugins();
 			$count  = $result['total'] ?? count( $result['plugins'] ?? [] );
 			wp_send_json_success( [
@@ -282,7 +292,10 @@ class VendorAdmin {
 				'count'   => $count,
 			] );
 		} else {
-			// 同步所有供应商
+			// 同步所有供应商：先清缓存
+			foreach ( $vendor_manager->get_vendors() as $v ) {
+				$v->clear_all_cache();
+			}
 			$all_plugins = $vendor_manager->get_all_plugins();
 			wp_send_json_success( [
 				'message' => sprintf(
@@ -389,6 +402,9 @@ class VendorAdmin {
 			);
 		}
 
+		// 注册为更新源
+		$this->register_vendor_source( $preset_id, $preset['name'], $preset['api_url'] ?? '' );
+
 		wp_send_json_success( $result );
 	}
 
@@ -428,6 +444,9 @@ class VendorAdmin {
 		// 清理加密存储的敏感数据
 		Encryption::delete_secure( "vendor_{$preset_id}_license_key" );
 		Encryption::delete_secure( "vendor_{$preset_id}_api_key" );
+
+		// 删除对应的更新源
+		$this->unregister_vendor_source( $preset_id );
 
 		if ( $result['success'] ) {
 			wp_send_json_success( $result );
@@ -483,6 +502,10 @@ class VendorAdmin {
 
 		if ( $result['success'] ) {
 			$result['vendor_id'] = $vendor_id;
+
+			// 注册为更新源
+			$this->register_vendor_source( $vendor_id, $name, $api_url );
+
 			wp_send_json_success( $result );
 		} else {
 			wp_send_json_error( $result );
@@ -634,6 +657,132 @@ class VendorAdmin {
 	}
 
 	/**
+	 * AJAX: 安装供应商插件
+	 *
+	 * @return void
+	 */
+	public function ajax_install_plugin(): void {
+		check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'install_plugins' ) ) {
+			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+		}
+
+		// 商业包体较大，延长执行时间
+		set_time_limit( 600 );
+
+		$plugin_slug = sanitize_key( $_POST['plugin_slug'] ?? '' );
+		$vendor_id   = sanitize_key( $_POST['vendor_id'] ?? '' );
+
+		if ( empty( $plugin_slug ) ) {
+			wp_send_json_error( [ 'message' => __( '插件 slug 不能为空', 'wpbridge' ) ] );
+		}
+
+		$vendor_manager = $this->get_bridge_manager()->get_vendor_manager();
+		$download_url   = $vendor_manager->get_download_url( $plugin_slug, $vendor_id );
+
+		if ( empty( $download_url ) ) {
+			wp_send_json_error( [ 'message' => __( '无法获取下载地址，请检查授权是否有效', 'wpbridge' ) ] );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+		require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
+		require_once ABSPATH . 'wp-admin/includes/theme-install.php';
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/misc.php';
+
+		// 先下载到本地临时文件
+		$tmpfile = download_url( $download_url, 600 );
+		if ( is_wp_error( $tmpfile ) ) {
+			wp_send_json_error( [ 'message' => __( '下载失败：', 'wpbridge' ) . $tmpfile->get_error_message() ] );
+		}
+
+		// 检查 zip 内容判断是插件还是主题
+		$is_theme = $this->detect_package_is_theme( $tmpfile );
+		$skin     = new \WP_Ajax_Upgrader_Skin();
+
+		if ( $is_theme ) {
+			if ( ! current_user_can( 'install_themes' ) ) {
+				@unlink( $tmpfile );
+				wp_send_json_error( [ 'message' => __( '没有安装主题的权限', 'wpbridge' ) ] );
+			}
+			$upgrader = new \Theme_Upgrader( $skin );
+		} else {
+			$upgrader = new \Plugin_Upgrader( $skin );
+		}
+
+		// 用 upgrader_pre_download 钩子让 Upgrader 直接使用已下载的本地文件
+		$use_local = function () use ( $tmpfile ) {
+			return $tmpfile;
+		};
+		add_filter( 'upgrader_pre_download', $use_local );
+		$result = $upgrader->install( $download_url );
+		remove_filter( 'upgrader_pre_download', $use_local );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( [ 'message' => $result->get_error_message() ] );
+		}
+
+		if ( $result === false ) {
+			$errors = $skin->get_errors();
+			$msg    = is_wp_error( $errors ) ? $errors->get_error_message() : __( '安装失败', 'wpbridge' );
+			wp_send_json_error( [ 'message' => $msg ] );
+		}
+
+		$installed_file = $is_theme ? $upgrader->theme_info() : $upgrader->plugin_info();
+		$type_label     = $is_theme ? __( '主题', 'wpbridge' ) : __( '插件', 'wpbridge' );
+
+		Logger::info( 'Package installed via vendor', [
+			'slug'      => $plugin_slug,
+			'vendor_id' => $vendor_id,
+			'type'      => $is_theme ? 'theme' : 'plugin',
+			'file'      => $installed_file,
+		] );
+
+		wp_send_json_success( [
+			'message'     => sprintf(
+				/* translators: 1: type label, 2: slug */
+				__( '%1$s %2$s 安装成功', 'wpbridge' ),
+				$type_label,
+				$plugin_slug
+			),
+			'plugin_file' => $installed_file,
+			'type'        => $is_theme ? 'theme' : 'plugin',
+		] );
+	}
+
+	/**
+	 * 检测 zip 包是主题还是插件
+	 *
+	 * 主题包含 style.css（带 Theme Name 头），插件包含 .php 文件（带 Plugin Name 头）
+	 *
+	 * @param string $zip_path zip 文件路径
+	 * @return bool true = 主题，false = 插件
+	 */
+	private function detect_package_is_theme( string $zip_path ): bool {
+		$zip = new \ZipArchive();
+		if ( $zip->open( $zip_path ) !== true ) {
+			return false;
+		}
+
+		$is_theme = false;
+		for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+			$name = $zip->getNameIndex( $i );
+			// 只检查顶层目录下的 style.css
+			if ( preg_match( '#^[^/]+/style\.css$#', $name ) ) {
+				$content = $zip->getFromIndex( $i );
+				if ( $content !== false && preg_match( '/Theme Name\s*:/i', $content ) ) {
+					$is_theme = true;
+					break;
+				}
+			}
+		}
+
+		$zip->close();
+		return $is_theme;
+	}
+
+	/**
 	 * 渲染供应商设置页面
 	 *
 	 * @return void
@@ -690,5 +839,157 @@ class VendorAdmin {
 			'field_placeholders' => PresetRegistry::get_auth_field_placeholders(),
 			'status_labels'      => PresetRegistry::get_status_labels(),
 		];
+	}
+
+	/**
+	 * AJAX: 绑定/解绑供应商更新
+	 *
+	 * @return void
+	 */
+	public function ajax_bind_vendor_update(): void {
+		check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+		}
+
+		$slug      = sanitize_text_field( wp_unslash( $_POST['plugin_slug'] ?? '' ) );
+		$vendor_id = sanitize_key( $_POST['vendor_id'] ?? '' );
+		$item_type = sanitize_key( $_POST['item_type'] ?? 'plugin' );
+		$enabled   = (int) ( $_POST['enabled'] ?? 0 ) === 1;
+
+		if ( empty( $slug ) || empty( $vendor_id ) ) {
+			wp_send_json_error( [ 'message' => __( '参数不完整', 'wpbridge' ) ] );
+		}
+
+		// 根据类型构建 item_key
+		if ( $item_type === 'theme' ) {
+			// 主题：大小写不敏感查找实际目录名
+			$theme = wp_get_theme( $slug );
+			if ( ! $theme->exists() ) {
+				// 遍历已安装主题做大小写不敏感匹配
+				$found_slug = '';
+				foreach ( wp_get_themes() as $ts => $to ) {
+					if ( strtolower( $ts ) === strtolower( $slug ) ) {
+						$found_slug = $ts;
+						break;
+					}
+				}
+				if ( empty( $found_slug ) ) {
+					wp_send_json_error( [ 'message' => __( '未找到已安装的主题', 'wpbridge' ) ] );
+				}
+				$slug = $found_slug;
+			}
+			$item_key = 'theme:' . $slug;
+		} else {
+			// 插件：解析 plugin_file
+			$plugin_file = $this->resolve_plugin_file( $slug );
+			if ( empty( $plugin_file ) ) {
+				wp_send_json_error( [ 'message' => __( '未找到已安装的插件', 'wpbridge' ) ] );
+			}
+			$item_key = 'plugin:' . $plugin_file;
+		}
+
+		$source_key = 'vendor_' . $vendor_id;
+
+		$source_registry = new SourceRegistry();
+		$item_manager    = new ItemSourceManager( $source_registry );
+
+		if ( $enabled ) {
+			// 确保源存在
+			if ( ! $source_registry->get( $source_key ) ) {
+				wp_send_json_error( [ 'message' => __( '供应商更新源不存在，请先激活供应商', 'wpbridge' ) ] );
+			}
+			$result = $item_manager->set_source( $item_key, $source_key, 50 );
+		} else {
+			$result = $item_manager->delete( $item_key );
+		}
+
+		if ( $result ) {
+			wp_send_json_success( [
+				'message' => $enabled
+					? __( '已启用供应商更新', 'wpbridge' )
+					: __( '已恢复默认更新源', 'wpbridge' ),
+			] );
+		} else {
+			wp_send_json_error( [ 'message' => __( '操作失败', 'wpbridge' ) ] );
+		}
+	}
+
+	/**
+	 * 注册供应商为更新源
+	 *
+	 * @param string $vendor_id   供应商 ID
+	 * @param string $vendor_name 供应商名称
+	 * @param string $api_url     API 地址
+	 * @return void
+	 */
+	private function register_vendor_source( string $vendor_id, string $vendor_name, string $api_url ): void {
+		$source_key = 'vendor_' . $vendor_id;
+		$source_registry = new SourceRegistry();
+
+		// 如果已存在，跳过
+		if ( $source_registry->get( $source_key ) ) {
+			return;
+		}
+
+		$source_registry->add( [
+			'source_key'       => $source_key,
+			'name'             => $vendor_name . __( ' (供应商)', 'wpbridge' ),
+			'type'             => SourceRegistry::TYPE_VENDOR,
+			'api_url'          => $api_url ?: 'vendor://' . $vendor_id,
+			'enabled'          => true,
+			'is_preset'        => false,
+			'default_priority' => 50,
+			'metadata'         => [ 'vendor_id' => $vendor_id ],
+		] );
+
+		Logger::info( '供应商已注册为更新源', [
+			'vendor_id'  => $vendor_id,
+			'source_key' => $source_key,
+		] );
+	}
+
+	/**
+	 * 删除供应商对应的更新源
+	 *
+	 * @param string $vendor_id 供应商 ID
+	 * @return void
+	 */
+	private function unregister_vendor_source( string $vendor_id ): void {
+		$source_key = 'vendor_' . $vendor_id;
+		$source_registry = new SourceRegistry();
+
+		if ( $source_registry->get( $source_key ) ) {
+			$source_registry->delete( $source_key );
+
+			Logger::info( '供应商更新源已删除', [
+				'vendor_id'  => $vendor_id,
+				'source_key' => $source_key,
+			] );
+		}
+	}
+
+	/**
+	 * 根据 slug 解析 plugin_file
+	 *
+	 * @param string $slug 插件 slug
+	 * @return string 插件文件路径（plugin_basename 格式），未找到返回空字符串
+	 */
+	private function resolve_plugin_file( string $slug ): string {
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$installed = get_plugins();
+
+		foreach ( $installed as $file => $data ) {
+			$dir_slug = dirname( $file );
+			if ( $dir_slug === $slug || basename( $file, '.php' ) === $slug ) {
+				return $file;
+			}
+		}
+
+		return '';
 	}
 }

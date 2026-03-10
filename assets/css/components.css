@@ -14,6 +14,8 @@
     background: #fff;
     padding: var(--wpbridge-space-5);
     box-shadow: var(--wpbridge-shadow);
+    min-width: 0;
+    overflow: hidden;
 }
 
 .wpbridge-stat-card-header {
@@ -704,7 +706,25 @@
 }
 
 .wpbridge-mb-4 {
-    margin-top: 16px;
+    margin-bottom: 16px;
+}
+
+.wpbridge-mb-6 {
+    margin-bottom: 24px;
+}
+
+/* 端点 URL */
+.wpbridge-endpoint-url {
+    display: inline-block;
+    padding: 6px 12px;
+    background: var(--wpbridge-gray-50);
+    border: 1px solid var(--wpbridge-gray-200);
+    border-radius: var(--wpbridge-radius);
+    font-family: var(--wpbridge-font-mono, monospace);
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-700);
+    word-break: break-all;
+    user-select: all;
 }
 
 /* 代码块 */
@@ -775,4 +795,34 @@
 
 .wpbridge-collapsible-header.is-collapsed .wpbridge-collapse-icon {
     transform: rotate(-90deg);
+}
+
+/* ========================================
+   Info Box - 信息提示框
+   ======================================== */
+.wpbridge-info-box {
+    background: var(--wpbridge-info-light, #eff6ff);
+    border: 1px solid var(--wpbridge-info, #3b82f6);
+    border-radius: var(--wpbridge-radius);
+    padding: var(--wpbridge-space-4) var(--wpbridge-space-5);
+    font-size: var(--wpbridge-text-sm);
+    line-height: 1.6;
+    color: var(--wpbridge-gray-700);
+}
+
+.wpbridge-info-box p {
+    margin: 0 0 var(--wpbridge-space-2) 0;
+}
+
+.wpbridge-info-box p:last-child {
+    margin-bottom: 0;
+}
+
+.wpbridge-info-box ol {
+    margin: var(--wpbridge-space-2) 0 0 var(--wpbridge-space-5);
+    padding: 0;
+}
+
+.wpbridge-info-box ol li {
+    margin-bottom: var(--wpbridge-space-1);
 }

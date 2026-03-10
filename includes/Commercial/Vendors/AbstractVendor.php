@@ -43,7 +43,7 @@ abstract class AbstractVendor implements VendorInterface {
 	 *
 	 * @var int
 	 */
-	protected int $cache_ttl = 3600;
+	protected int $cache_ttl = 86400;
 
 	/**
 	 * 构造函数
@@ -192,7 +192,29 @@ abstract class AbstractVendor implements VendorInterface {
 			$cache_key = $this->cache_prefix . $this->get_id() . '_' . md5( $key );
 			delete_transient( $cache_key );
 		}
-		// 清除所有缓存需要遍历，暂不实现
+	}
+
+	/**
+	 * 清除该供应商的所有 transient 缓存
+	 *
+	 * @return int 删除条数
+	 */
+	public function clear_all_cache(): int {
+		global $wpdb;
+
+		$prefix = $this->cache_prefix . $this->get_id() . '_';
+
+		// WordPress transient 在 options 表中以 _transient_ 前缀存储
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$count = (int) $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+				'_transient_' . $wpdb->esc_like( $prefix ) . '%',
+				'_transient_timeout_' . $wpdb->esc_like( $prefix ) . '%'
+			)
+		);
+
+		return intdiv( $count, 2 );
 	}
 
 	/**

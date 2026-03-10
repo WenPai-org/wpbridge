@@ -111,6 +111,7 @@
 .wpbridge-tabs-card {
     background: #fff;
     box-shadow: var(--wpbridge-shadow);
+    overflow: hidden;
 }
 
 .wpbridge-tab-list {
@@ -142,6 +143,7 @@
 .wpbridge-tab-pane {
     display: none;
     padding: var(--wpbridge-space-6);
+    overflow: hidden;
 }
 
 .wpbridge-tab-pane-active {

@@ -77,6 +77,7 @@ class AdminPage {
         add_action( 'wp_ajax_wpbridge_save_defaults', [ $this, 'ajax_save_defaults' ] );
         add_action( 'wp_ajax_wpbridge_quick_setup_source', [ $this, 'ajax_quick_setup_source' ] );
         add_action( 'wp_ajax_wpbridge_save_item_config', [ $this, 'ajax_save_item_config' ] );
+        add_action( 'wp_ajax_wpbridge_add_source', [ $this, 'ajax_add_source' ] );
     }
 
     /**
@@ -109,6 +110,9 @@ class AdminPage {
 
         switch ( $action ) {
             case 'add':
+                // 添加功能已改为内联表单，重定向到更新源 subtab
+                wp_safe_redirect( admin_url( 'admin.php?page=wpbridge#projects' ) );
+                exit;
             case 'edit':
                 $this->render_editor_page();
                 break;
@@ -219,6 +223,14 @@ class AdminPage {
                 $source->type = SourceType::GITEE;
             } else {
                 $source->type = SourceType::GITHUB; // 默认按 GitHub API 处理
+            }
+        }
+
+        // Bridge Server 类型自动补全 URL
+        if ( $source->type === SourceType::BRIDGE_SERVER ) {
+            $path = wp_parse_url( $source->api_url, PHP_URL_PATH ) ?? '';
+            if ( strpos( $path, '/wp-json/bridge/v1' ) === false ) {
+                $source->api_url = trailingslashit( $source->api_url ) . 'wp-json/bridge/v1/';
             }
         }
         $source->slug      = sanitize_text_field( $_POST['slug'] ?? '' );
@@ -343,10 +355,10 @@ class AdminPage {
         // 保留现有的 api 设置
         $current  = $this->settings->get_all();
         $settings = [
-            'debug_mode'       => ! empty( $_POST['debug_mode'] ),
+            'debug_mode'       => ( $_POST['debug_mode'] ?? '' ) === '1' || ( $_POST['debug_mode'] ?? '' ) === 'on',
             'cache_ttl'        => $cache_ttl,
             'request_timeout'  => $request_timeout,
-            'fallback_enabled' => ! empty( $_POST['fallback_enabled'] ),
+            'backup_enabled'   => ! empty( $_POST['backup_enabled'] ),
             'api'              => $current['api'] ?? [],
         ];
 
@@ -454,6 +466,101 @@ class AdminPage {
         \WPBridge\Core\Plugin::clear_all_cache();
 
         wp_send_json_success( [ 'message' => __( '缓存已清除', 'wpbridge' ) ] );
+    }
+
+    /**
+     * AJAX: 添加更新源（简化版，仅 URL + token）
+     */
+    public function ajax_add_source(): void {
+        check_ajax_referer( 'wpbridge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+        }
+
+        $api_url   = esc_url_raw( wp_unslash( $_POST['api_url'] ?? '' ) );
+        $raw_token = sanitize_text_field( wp_unslash( $_POST['auth_token'] ?? '' ) );
+
+        if ( empty( $api_url ) ) {
+            wp_send_json_error( [ 'message' => __( '请输入更新源地址', 'wpbridge' ) ] );
+        }
+
+        // 自动识别类型
+        $host = wp_parse_url( $api_url, PHP_URL_HOST );
+        $path = wp_parse_url( $api_url, PHP_URL_PATH ) ?? '';
+        if ( strpos( $path, '/wp-json/bridge/v1' ) !== false ) {
+            $type = SourceType::BRIDGE_SERVER;
+        } elseif ( $host && strpos( $host, 'github.com' ) !== false ) {
+            $type = SourceType::GITHUB;
+        } elseif ( $host && strpos( $host, 'gitlab.com' ) !== false ) {
+            $type = SourceType::GITLAB;
+        } elseif ( $host && strpos( $host, 'gitee.com' ) !== false ) {
+            $type = SourceType::GITEE;
+        } elseif ( $host && strpos( $host, 'feicode.com' ) !== false ) {
+            $type = 'wenpai_git';
+        } elseif ( preg_match( '/\.zip$/i', wp_parse_url( $api_url, PHP_URL_PATH ) ?? '' ) ) {
+            $type = SourceType::ZIP;
+        } else {
+            $type = SourceType::JSON;
+        }
+
+        $source           = new SourceModel();
+        $source->type     = $type;
+        $source->api_url  = $api_url;
+        $source->enabled  = true;
+        $source->priority = 50;
+
+        // 自动提取 slug
+        $path = trim( wp_parse_url( $api_url, PHP_URL_PATH ) ?? '', '/' );
+        if ( preg_match( '#([^/]+)/([^/]+?)(?:\.git)?$#', $path, $m ) ) {
+            $slug_candidate = sanitize_title( $m[2] );
+            if ( ! empty( $slug_candidate ) ) {
+                $source->slug = $slug_candidate;
+            }
+        }
+
+        // 自动生成名称
+        if ( $type === SourceType::BRIDGE_SERVER ) {
+            $source->name = $host ? sprintf( __( 'Bridge: %s', 'wpbridge' ), $host ) : __( 'Bridge Server', 'wpbridge' );
+        } elseif ( ! empty( $source->slug ) ) {
+            $source->name = ucwords( str_replace( [ '-', '_' ], ' ', $source->slug ) );
+        } else {
+            $source->name = $host ?: __( '自定义源', 'wpbridge' );
+        }
+
+        // 推断 item_type
+        $slug_lower = strtolower( $source->slug . ' ' . $source->name );
+        $source->item_type = ( strpos( $slug_lower, 'theme' ) !== false ) ? 'theme' : 'plugin';
+
+        // 加密 token
+        if ( ! empty( $raw_token ) ) {
+            $source->auth_token = Encryption::encrypt( $raw_token );
+        }
+
+        // 验证
+        $errors = $source->validate();
+        if ( ! empty( $errors ) ) {
+            wp_send_json_error( [ 'message' => implode( ', ', $errors ) ] );
+        }
+
+        // 保存
+        $result = $this->source_manager->save( $source );
+        if ( ! $result ) {
+            wp_send_json_error( [ 'message' => __( '保存失败', 'wpbridge' ) ] );
+        }
+
+        wp_send_json_success( [
+            'message' => sprintf(
+                /* translators: %s: source name */
+                __( '已添加更新源：%s', 'wpbridge' ),
+                $source->name
+            ),
+            'source'  => [
+                'id'   => $source->id,
+                'name' => $source->name,
+                'type' => $source->type,
+            ],
+        ] );
     }
 
     /**

@@ -499,6 +499,75 @@
             $(document).on('click', '.wpbridge-clear-cache', function() {
                 self.clearCache($(this));
             });
+
+            // 调试模式 toggle → 同步 hidden 字段 + 提交表单
+            $(document).on('change', '.wpbridge-toggle-debug', function() {
+                var enabled = $(this).is(':checked') ? '1' : '0';
+                $('#wpbridge-debug-hidden').val(enabled);
+                $('.wpbridge-settings-form').submit();
+            });
+
+            // 添加更新源：展开/收起
+            $(document).on('click', '#wpbridge-show-add-source', function() {
+                $('#wpbridge-add-source-form').slideDown(200);
+                $('#wpbridge-new-source-url').focus();
+                $(this).hide();
+            });
+
+            $(document).on('click', '#wpbridge-cancel-add-source', function() {
+                $('#wpbridge-add-source-form').slideUp(200);
+                $('#wpbridge-new-source-url').val('');
+                $('#wpbridge-new-source-token').val('');
+                $('#wpbridge-show-add-source').show();
+            });
+
+            // 添加更新源：提交
+            $(document).on('click', '#wpbridge-submit-source', function() {
+                var $btn = $(this);
+                var url = $('#wpbridge-new-source-url').val().trim();
+                var token = $('#wpbridge-new-source-token').val().trim();
+
+                if (!url) {
+                    Toast.error(wpbridge.i18n.url_required || '请输入更新源地址');
+                    return;
+                }
+
+                $btn.prop('disabled', true).text(wpbridge.i18n.saving || '添加中...');
+
+                $.ajax({
+                    url: wpbridge.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'wpbridge_add_source',
+                        nonce: wpbridge.nonce,
+                        api_url: url,
+                        auth_token: token
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            Toast.success(response.data.message);
+                            // 刷新页面显示新源
+                            location.reload();
+                        } else {
+                            Toast.error(response.data.message || wpbridge.i18n.failed);
+                        }
+                    },
+                    error: function(jqXHR, textStatus) {
+                        Toast.error(ajaxErrorMessage(jqXHR, textStatus));
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).text('添加');
+                    }
+                });
+            });
+
+            // 回车提交
+            $(document).on('keypress', '#wpbridge-new-source-url, #wpbridge-new-source-token', function(e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    $('#wpbridge-submit-source').click();
+                }
+            });
         },
 
         toggleSource: function($toggle) {
@@ -861,21 +930,6 @@
                 self.debouncedFilter('themes', $(this).val());
             });
 
-            // 默认规则覆盖切换
-            $(document).on('change', '#plugin_override', function() {
-                $('#wpbridge-plugin-sources').toggle($(this).is(':checked'));
-            });
-
-            $(document).on('change', '#theme_override', function() {
-                $('#wpbridge-theme-sources').toggle($(this).is(':checked'));
-            });
-
-            // 默认规则表单提交
-            $(document).on('submit', '#wpbridge-defaults-form', function(e) {
-                e.preventDefault();
-                self.saveDefaults($(this));
-            });
-
             // P2: 插件类型手动标记
             $(document).on('change', '.wpbridge-plugin-type-select', function() {
                 self.setPluginType($(this));
@@ -1034,30 +1088,6 @@
                     $item.show();
                 } else {
                     $item.hide();
-                }
-            });
-        },
-
-        saveDefaults: function($form) {
-            var $button = $form.find('button[type="submit"]');
-            $button.prop('disabled', true);
-
-            $.ajax({
-                url: wpbridge.ajax_url,
-                type: 'POST',
-                data: $form.serialize() + '&action=wpbridge_save_defaults&nonce=' + wpbridge.nonce,
-                success: function(response) {
-                    if (response.success) {
-                        Toast.success(response.data.message);
-                    } else {
-                        Toast.error(response.data.message || wpbridge.i18n.failed);
-                    }
-                },
-                error: function(jqXHR, textStatus) {
-                    Toast.error(ajaxErrorMessage(jqXHR, textStatus));
-                },
-                complete: function() {
-                    $button.prop('disabled', false);
                 }
             });
         },
@@ -1599,7 +1629,7 @@
 
         testAllSources: function($button, callback) {
             var self = this;
-            var $items = $('.wpbridge-source-test-item');
+            var $items = $('.wpbridge-source-test-item, .wpbridge-source-list-item');
             var total = $items.length;
             var completed = 0;
             var passed = 0;
@@ -1699,7 +1729,7 @@
 
         testSingleSource: function($button) {
             var sourceId = $button.data('source-id');
-            var $item = $button.closest('.wpbridge-source-test-item');
+            var $item = $button.closest('.wpbridge-source-test-item, .wpbridge-source-list-item');
 
             $button.prop('disabled', true);
             $button.find('.dashicons').removeClass('dashicons-admin-site-alt3').addClass('dashicons-update wpbridge-spin');
@@ -2384,6 +2414,83 @@
                 self.showBridgeVendorModal();
             });
 
+            // 可用插件 - 来源筛选
+            $(document).on('click', '.wpbridge-plugin-filter-tab', function() {
+                var $tab = $(this);
+                var filter = $tab.data('filter');
+                var $list = $('.wpbridge-plugin-list');
+                $tab.addClass('is-active').siblings().removeClass('is-active');
+                // 筛选时展开全部（隐藏"显示更多"）
+                $list.addClass('is-expanded');
+                $('.wpbridge-plugin-list-more').addClass('is-hidden');
+                if (filter === 'all') {
+                    $('.wpbridge-plugin-list-item').removeClass('is-hidden');
+                    // 恢复截断状态
+                    if ($('.wpbridge-plugin-list-item.is-overflow').length > 0) {
+                        $list.removeClass('is-expanded');
+                        $('.wpbridge-plugin-list-more').removeClass('is-hidden');
+                    }
+                } else {
+                    $('.wpbridge-plugin-list-item').each(function() {
+                        $(this).toggleClass('is-hidden', $(this).data('group') !== filter);
+                    });
+                }
+            });
+
+            // 可用插件 - 显示更多
+            $(document).on('click', '.wpbridge-show-more-plugins', function() {
+                $('.wpbridge-plugin-list').addClass('is-expanded');
+                $(this).closest('.wpbridge-plugin-list-more').addClass('is-hidden');
+            });
+
+            // 可用插件 - 安装
+            $(document).on('click', '.wpbridge-install-plugin', function() {
+                var $btn = $(this);
+                if ($btn.hasClass('is-installing')) return;
+
+                var slug = $btn.data('slug');
+                var vendorId = $btn.data('vendor-id') || '';
+
+                $btn.addClass('is-installing');
+                $btn.find('.dashicons').removeClass('dashicons-download').addClass('dashicons-update');
+
+                $.ajax({
+                    url: wpbridge.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'wpbridge_install_plugin',
+                        nonce: wpbridge.nonce,
+                        plugin_slug: slug,
+                        vendor_id: vendorId
+                    },
+                    timeout: 300000,
+                    success: function(response) {
+                        if (response.success) {
+                            Toast.success(response.data.message);
+                            $btn.removeClass('wpbridge-install-plugin is-installing');
+                            $btn.find('.dashicons').removeClass('dashicons-update').addClass('dashicons-yes-alt');
+                            $btn.prop('disabled', true).attr('title', wpbridge.i18n.installed || '已安装');
+                            // 在名称后插入已安装标签
+                            var $main = $btn.closest('.wpbridge-plugin-list-main');
+                            if (!$main.find('.wpbridge-plugin-list-installed').length) {
+                                $main.find('.wpbridge-plugin-list-version').after(
+                                    '<span class="wpbridge-plugin-list-installed">' + (wpbridge.i18n.installed || '已安装') + '</span>'
+                                );
+                            }
+                        } else {
+                            Toast.error(response.data.message || wpbridge.i18n.install_failed || '安装失败');
+                            $btn.removeClass('is-installing');
+                            $btn.find('.dashicons').removeClass('dashicons-update').addClass('dashicons-download');
+                        }
+                    },
+                    error: function(jqXHR, textStatus) {
+                        Toast.error(ajaxErrorMessage(jqXHR, textStatus));
+                        $btn.removeClass('is-installing');
+                        $btn.find('.dashicons').removeClass('dashicons-update').addClass('dashicons-download');
+                    }
+                });
+            });
+
             // Bridge API - 保存
             $(document).on('click', '#wpbridge-save-bridge', function() {
                 self.saveBridgeVendor();
@@ -2399,6 +2506,46 @@
             $(document).on('click', '.wpbridge-test-vendor', function() {
                 var vendorId = $(this).data('vendor-id');
                 self.testVendor(vendorId, $(this));
+            });
+
+            // 接管更新 Toggle
+            $(document).on('change', '.wpbridge-bind-vendor-update', function() {
+                var $cb = $(this);
+                var slug = $cb.data('slug');
+                var vendorId = $cb.data('vendor-id');
+                var itemType = $cb.data('item-type') || 'plugin';
+                var enabled = $cb.is(':checked') ? 1 : 0;
+
+                $cb.prop('disabled', true);
+
+                $.ajax({
+                    url: wpbridge.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'wpbridge_bind_vendor_update',
+                        nonce: wpbridge.nonce,
+                        plugin_slug: slug,
+                        vendor_id: vendorId,
+                        item_type: itemType,
+                        enabled: enabled
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            Toast.success(response.data.message);
+                        } else {
+                            Toast.error(response.data.message || wpbridge.i18n.failed);
+                            // 回滚 checkbox 状态
+                            $cb.prop('checked', !$cb.is(':checked'));
+                        }
+                    },
+                    error: function(jqXHR, textStatus) {
+                        Toast.error(ajaxErrorMessage(jqXHR, textStatus));
+                        $cb.prop('checked', !$cb.is(':checked'));
+                    },
+                    complete: function() {
+                        $cb.prop('disabled', false);
+                    }
+                });
             });
 
             // 关闭弹窗

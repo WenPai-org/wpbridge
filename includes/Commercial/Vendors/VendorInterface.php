@@ -109,4 +109,11 @@ interface VendorInterface {
 	 * @return bool
 	 */
 	public function verify_credentials(): bool;
+
+	/**
+	 * 清除该供应商的所有缓存
+	 *
+	 * @return int 删除条数
+	 */
+	public function clear_all_cache(): int;
 }

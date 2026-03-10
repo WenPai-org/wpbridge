@@ -88,10 +88,10 @@ foreach ( $sources as $source ) {
                     <?php esc_html_e( '概览', 'wpbridge' ); ?>
                 </a>
                 <a href="#projects" class="wpbridge-tab" data-tab="projects">
-                    <?php esc_html_e( '项目', 'wpbridge' ); ?>
+                    <?php esc_html_e( '更新管理', 'wpbridge' ); ?>
                 </a>
                 <a href="#vendors" class="wpbridge-tab" data-tab="vendors">
-                    <?php esc_html_e( '渠道', 'wpbridge' ); ?>
+                    <?php esc_html_e( '供应商', 'wpbridge' ); ?>
                 </a>
                 <a href="#settings" class="wpbridge-tab" data-tab="settings">
                     <?php esc_html_e( '设置', 'wpbridge' ); ?>
@@ -116,9 +116,18 @@ foreach ( $sources as $source ) {
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/vendors.php'; ?>
             </div>
 
-            <!-- Tab: 设置（含诊断 + 日志） -->
+            <!-- Tab: 设置（含调试日志） -->
             <div id="settings" class="wpbridge-tab-pane">
                 <?php include WPBRIDGE_PATH . 'templates/admin/tabs/settings.php'; ?>
+                <?php if ( ! empty( $settings['debug_mode'] ) ) : ?>
+                <div class="wpbridge-settings-panel wpbridge-mt-8">
+                    <h2 class="wpbridge-section-title wpbridge-mb-4">
+                        <span class="dashicons dashicons-editor-code"></span>
+                        <?php esc_html_e( '调试日志', 'wpbridge' ); ?>
+                    </h2>
+                    <?php include WPBRIDGE_PATH . 'templates/admin/tabs/logs.php'; ?>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- Tab: Bridge API -->
