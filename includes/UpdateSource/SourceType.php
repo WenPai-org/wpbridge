@@ -77,6 +77,11 @@ class SourceType {
      */
     const BRIDGE_SERVER = 'bridge_server';
 
+    /**
+     * 供应商（通过 VendorManager 桥接）
+     */
+    const VENDOR = 'vendor';
+
     // === 类型分组 ===
 
     /**
@@ -115,6 +120,7 @@ class SourceType {
         self::FAIR,
         self::PUC,
         self::BRIDGE_SERVER,
+        self::VENDOR,
     ];
 
     /**
@@ -135,6 +141,7 @@ class SourceType {
             self::FAIR          => __( 'FAIR', 'wpbridge' ),
             self::PUC           => __( 'PUC Server', 'wpbridge' ),
             self::BRIDGE_SERVER => __( 'Bridge Server', 'wpbridge' ),
+            self::VENDOR        => __( '供应商', 'wpbridge' ),
         ];
     }
 
@@ -198,6 +205,7 @@ class SourceType {
             self::FAIR          => 'WPBridge\\UpdateSource\\Handlers\\FairHandler',
             self::PUC           => 'WPBridge\\UpdateSource\\Handlers\\PUCHandler',
             self::BRIDGE_SERVER => 'WPBridge\\UpdateSource\\Handlers\\BridgeServerHandler',
+            self::VENDOR        => 'WPBridge\\UpdateSource\\Handlers\\VendorHandler',
         ];
 
         return $handlers[ $type ] ?? null;

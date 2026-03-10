@@ -7,13 +7,13 @@
  * @since 0.5.0
  */
 
-@import url("variables.css");
-@import url("base.css");
-@import url("components.css");
-@import url("sources.css");
-@import url("projects.css");
-@import url("overview.css");
-@import url("diagnostics.css");
-@import url("modals.css");
-@import url("vendors.css");
-@import url("responsive.css");
+@import url("variables.css?v=1.2.0");
+@import url("base.css?v=1.2.0");
+@import url("components.css?v=1.2.0");
+@import url("sources.css?v=1.2.0");
+@import url("projects.css?v=1.2.0");
+@import url("overview.css?v=1.2.0");
+@import url("diagnostics.css?v=1.2.0");
+@import url("modals.css?v=1.2.0");
+@import url("vendors.css?v=1.2.0");
+@import url("responsive.css?v=1.2.0");

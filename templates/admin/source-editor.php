@@ -20,28 +20,34 @@ $title   = $is_edit ? __( '编辑更新源', 'wpbridge' ) : __( '添加更新源
 $current_type   = $source->type ?? '';
 $git_types      = [ 'github', 'gitlab', 'gitee' ];
 $is_git_type    = in_array( $current_type, $git_types, true );
+$is_vendor      = $current_type === 'vendor';
+$is_bridge      = $current_type === 'bridge_server' || ( ! $is_git_type && $current_type === 'bridge_server' );
 
 // 类型描述和占位符配置
 $type_hints = [
-	'git'        => [
+	'git'            => [
 		'desc'        => __( '从 GitHub、GitLab 或 Gitee 仓库的 Release 获取更新，粘贴仓库地址即可自动识别平台。', 'wpbridge' ),
 		'placeholder' => 'https://github.com/user/repo',
 	],
-	'json'       => [
+	'json'           => [
 		'desc'        => __( '标准 JSON API 接口，兼容 WordPress 插件更新检查格式。可用 {slug} 占位符匹配不同插件。', 'wpbridge' ),
 		'placeholder' => 'https://example.com/updates/{slug}.json',
 	],
-	'zip'        => [
+	'zip'            => [
 		'desc'        => __( '直接指向 ZIP 安装包的下载地址，适合手动托管的插件或主题。', 'wpbridge' ),
 		'placeholder' => 'https://example.com/my-plugin-v1.2.3.zip',
 	],
-	'wenpai_git' => [
+	'wenpai_git'     => [
 		'desc'        => __( '菲码源库 (feiCode) 的 Release 更新，填写仓库地址。', 'wpbridge' ),
 		'placeholder' => 'https://feicode.com/user/repo',
 	],
-	'puc'        => [
+	'puc'            => [
 		'desc'        => __( '兼容 Plugin Update Checker 的自建更新服务器。', 'wpbridge' ),
 		'placeholder' => 'https://example.com/puc/v5/check',
+	],
+	'bridge_server'  => [
+		'desc'        => __( '连接到另一个启用了 Bridge API 的 WordPress 站点，接收其分发的插件和主题更新。', 'wpbridge' ),
+		'placeholder' => 'https://hub-site.com/wp-json/bridge/v1/',
 	],
 ];
 ?>
@@ -64,6 +70,13 @@ $type_hints = [
             <div class="wpbridge-tab-pane wpbridge-tab-pane-active" style="padding: 24px;">
                 <?php settings_errors( 'wpbridge' ); ?>
 
+                <?php if ( $is_vendor ) : ?>
+                    <div class="wpbridge-info-box wpbridge-mb-4">
+                        <p><strong><?php esc_html_e( '此更新源由供应商管理', 'wpbridge' ); ?></strong></p>
+                        <p><?php esc_html_e( '供应商更新源的配置由商城连接自动维护，无法手动编辑。如需调整，请前往「商城」Tab 管理供应商连接。', 'wpbridge' ); ?></p>
+                    </div>
+                <?php endif; ?>
+
                 <form method="post" class="wpbridge-editor-form">
                     <?php wp_nonce_field( 'wpbridge_action', 'wpbridge_nonce' ); ?>
                     <input type="hidden" name="wpbridge_action" value="save_source">
@@ -79,8 +92,8 @@ $type_hints = [
                                 <span class="required">*</span>
                             </label>
                             <div>
-                                <select name="type" id="wpbridge-source-type" class="wpbridge-form-select">
-                                    <option value="git" <?php selected( $is_git_type || empty( $current_type ) ); ?>>
+                                <select name="type" id="wpbridge-source-type" class="wpbridge-form-select" <?php echo $is_vendor ? 'disabled' : ''; ?>>
+                                    <option value="git" <?php selected( $is_git_type || ( empty( $current_type ) && ! $is_vendor ) ); ?>>
                                         <?php esc_html_e( 'Git 仓库', 'wpbridge' ); ?>
                                     </option>
                                     <option value="json" <?php selected( $current_type, 'json' ); ?>>
@@ -95,6 +108,14 @@ $type_hints = [
                                     <option value="puc" <?php selected( $current_type, 'puc' ); ?>>
                                         <?php esc_html_e( 'PUC Server', 'wpbridge' ); ?>
                                     </option>
+                                    <option value="bridge_server" <?php selected( $current_type, 'bridge_server' ); ?>>
+                                        <?php esc_html_e( 'Bridge API (Hub 站点)', 'wpbridge' ); ?>
+                                    </option>
+                                    <?php if ( $is_vendor ) : ?>
+                                    <option value="vendor" selected>
+                                        <?php esc_html_e( '供应商', 'wpbridge' ); ?>
+                                    </option>
+                                    <?php endif; ?>
                                 </select>
                                 <p class="wpbridge-form-help" id="wpbridge-type-desc"></p>
                             </div>

@@ -121,7 +121,7 @@ class SourceResolver {
         }
 
         $api_url = $source['api_url'] ?? '';
-        if ( empty( $api_url ) ) {
+        if ( empty( $api_url ) && $type !== SourceType::VENDOR ) {
             Logger::warning( '源缺少 API URL', [ 'source' => $source['source_key'] ?? '' ] );
             return null;
         }
@@ -144,6 +144,7 @@ class SourceResolver {
         $model->metadata  = [
             'auth_scheme'        => $source['auth_type'] ?? '',
             'signature_required' => ! empty( $source['signature_required'] ),
+            'vendor_id'          => $source['metadata']['vendor_id'] ?? '',
         ];
 
         $secret_ref = $source['auth_secret_ref'] ?? '';
@@ -187,6 +188,9 @@ class SourceResolver {
 
             case SourceRegistry::TYPE_CUSTOM:
                 return $this->guess_custom_type( $source['api_url'] ?? '' );
+
+            case SourceRegistry::TYPE_VENDOR:
+                return SourceType::VENDOR;
 
             default:
                 return null;

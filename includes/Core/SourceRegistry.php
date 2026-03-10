@@ -37,6 +37,7 @@ class SourceRegistry {
     const TYPE_MIRROR   = 'mirror';
     const TYPE_JSON     = 'json';
     const TYPE_ARKPRESS = 'arkpress';
+    const TYPE_VENDOR   = 'vendor';
 
     /**
      * 签名方案
@@ -350,6 +351,7 @@ class SourceRegistry {
             self::TYPE_MIRROR   => '镜像',
             self::TYPE_JSON     => 'JSON API',
             self::TYPE_ARKPRESS => 'ArkPress',
+            self::TYPE_VENDOR   => '供应商',
         ];
     }
 

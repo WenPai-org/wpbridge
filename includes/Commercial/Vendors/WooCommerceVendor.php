@@ -149,7 +149,7 @@ class WooCommerceVendor extends AbstractVendor {
 			$valid = $response !== null;
 		}
 
-		$this->set_cache( $cache_key, $valid, 300 );
+		$this->set_cache( $cache_key, $valid, 43200 );
 
 		return $valid;
 	}
@@ -264,7 +264,7 @@ class WooCommerceVendor extends AbstractVendor {
 				$info_response = $this->wc_am_information( $product_id, $slug );
 				if ( ! empty( $info_response['success'] ) && ! empty( $info_response['data']['info'] ) ) {
 					$info = $info_response['data']['info'];
-					$this->set_cache( $info_cache_key, $info, 7200 );
+					$this->set_cache( $info_cache_key, $info, 86400 );
 				}
 			}
 
@@ -636,6 +636,20 @@ class WooCommerceVendor extends AbstractVendor {
 		if ( $this->config['auth_mode'] === 'wc_am' ) {
 			$plugin_name = $slug . '/' . $slug . '.php';
 			$response    = $this->wc_am_update(
+				$product_id,
+				$slug,
+				$plugin_name,
+				$version ?: '0.0.0'
+			);
+
+			if ( ! empty( $response['success'] ) && ! empty( $response['data']['package']['package'] ) ) {
+				return $response['data']['package']['package'];
+			}
+
+			// package 为空通常是因为产品未激活，尝试自动激活后重试
+			$this->wc_am_activate( $product_id, $version ?: '0.0.0' );
+
+			$response = $this->wc_am_update(
 				$product_id,
 				$slug,
 				$plugin_name,

@@ -70,6 +70,18 @@ $version_lock = VersionLock::get_instance();
             $mode = $config['mode'] ?? ItemSourceManager::MODE_DEFAULT;
             $effective_sources = $item_manager->get_effective_sources( $item_key, $defaults_manager );
 
+            // 反查自定义源的 URL 和 token 状态
+            $saved_url       = '';
+            $has_saved_token = false;
+            if ( $mode === ItemSourceManager::MODE_CUSTOM && ! empty( $config['source_ids'] ) ) {
+                $first_source_key = array_key_first( $config['source_ids'] );
+                $saved_source     = $source_registry->get( $first_source_key );
+                if ( $saved_source ) {
+                    $saved_url       = $saved_source['api_url'] ?? '';
+                    $has_saved_token = ! empty( $saved_source['auth_secret_ref'] );
+                }
+            }
+
             // 获取插件 slug
             $plugin_slug = dirname( $plugin_file );
             if ( $plugin_slug === '.' ) {
@@ -124,11 +136,29 @@ $version_lock = VersionLock::get_instance();
                             <span class="dashicons dashicons-dismiss"></span>
                             <?php esc_html_e( '已禁用', 'wpbridge' ); ?>
                         </span>
-                    <?php elseif ( $mode === ItemSourceManager::MODE_CUSTOM ) : ?>
+                    <?php elseif ( $mode === ItemSourceManager::MODE_CUSTOM ) :
+                        // 检查是否绑定到供应商源
+                        $vendor_source_name = '';
+                        if ( ! empty( $config['source_ids'] ) ) {
+                            foreach ( $config['source_ids'] as $sk => $pri ) {
+                                if ( strpos( $sk, 'vendor_' ) === 0 ) {
+                                    $vs = $source_registry->get( $sk );
+                                    $vendor_source_name = $vs['name'] ?? '';
+                                    break;
+                                }
+                            }
+                        }
+                        if ( $vendor_source_name ) : ?>
+                        <span class="wpbridge-status-badge wpbridge-status-vendor">
+                            <span class="dashicons dashicons-store"></span>
+                            <?php echo esc_html( $vendor_source_name ); ?>
+                        </span>
+                        <?php else : ?>
                         <span class="wpbridge-status-badge wpbridge-status-custom">
                             <span class="dashicons dashicons-admin-links"></span>
                             <?php esc_html_e( '自定义', 'wpbridge' ); ?>
                         </span>
+                        <?php endif; ?>
                     <?php else : ?>
                         <span class="wpbridge-status-badge wpbridge-status-default">
                             <span class="dashicons dashicons-yes-alt"></span>
@@ -139,22 +169,35 @@ $version_lock = VersionLock::get_instance();
 
                 <!-- 内联配置面板（默认折叠） -->
                 <div class="wpbridge-project-config-panel" data-item-key="<?php echo esc_attr( $item_key ); ?>" style="display: none;">
+                    <?php if ( ! empty( $vendor_source_name ) ) : ?>
+                    <div class="wpbridge-config-row">
+                        <label class="wpbridge-config-label"><?php esc_html_e( '更新地址', 'wpbridge' ); ?></label>
+                        <div class="wpbridge-config-field">
+                            <input type="text" class="wpbridge-form-input" readonly
+                                   value="<?php echo esc_attr( $vendor_source_name ); ?>"
+                                   style="background: var(--wpbridge-gray-50);">
+                            <p class="wpbridge-form-help"><?php esc_html_e( '由供应商提供更新，如需修改请先在供应商 Tab 取消接管', 'wpbridge' ); ?></p>
+                        </div>
+                    </div>
+                    <?php else : ?>
                     <div class="wpbridge-config-row">
                         <label class="wpbridge-config-label"><?php esc_html_e( '更新地址', 'wpbridge' ); ?></label>
                         <div class="wpbridge-config-field">
                             <input type="url" class="wpbridge-form-input wpbridge-inline-url"
                                    data-item-key="<?php echo esc_attr( $item_key ); ?>"
+                                   value="<?php echo esc_attr( $saved_url ); ?>"
                                    placeholder="https://github.com/user/repo 或 https://example.com/update.json"
                                    autocomplete="off">
                             <p class="wpbridge-form-help"><?php esc_html_e( '粘贴更新源地址，系统会自动识别类型', 'wpbridge' ); ?></p>
                         </div>
                     </div>
+                    <?php endif; ?>
                     <div class="wpbridge-config-row">
                         <label class="wpbridge-config-label"><?php esc_html_e( '访问密码', 'wpbridge' ); ?></label>
                         <div class="wpbridge-config-field">
                             <input type="password" class="wpbridge-form-input wpbridge-inline-token"
                                    data-item-key="<?php echo esc_attr( $item_key ); ?>"
-                                   placeholder="<?php esc_attr_e( '可选，用于私有仓库', 'wpbridge' ); ?>"
+                                   placeholder="<?php echo $has_saved_token ? esc_attr__( '已保存（留空保持不变）', 'wpbridge' ) : esc_attr__( '可选，用于私有仓库', 'wpbridge' ); ?>"
                                    autocomplete="new-password">
                         </div>
                     </div>

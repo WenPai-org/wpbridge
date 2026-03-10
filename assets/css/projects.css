@@ -544,3 +544,180 @@
 .wpbridge-custom-source-row:last-of-type {
     margin-bottom: 0;
 }
+
+/* ========================================
+   更新源列表 (sources-list subtab)
+   ======================================== */
+
+.wpbridge-sources-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.wpbridge-toolbar-info {
+    font-size: var(--wpbridge-text-sm);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-source-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--wpbridge-space-4) var(--wpbridge-space-5);
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+    transition: background 0.1s;
+}
+
+.wpbridge-source-list-item:last-child {
+    border-bottom: none;
+}
+
+.wpbridge-source-list-item:hover {
+    background: var(--wpbridge-gray-50);
+}
+
+.wpbridge-source-list-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.wpbridge-source-list-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--wpbridge-text-md);
+    font-weight: 500;
+    color: var(--wpbridge-gray-800);
+}
+
+.wpbridge-source-list-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-400);
+}
+
+.wpbridge-source-list-meta > span + span::before {
+    content: "·";
+    margin-right: 4px;
+    color: var(--wpbridge-gray-300);
+}
+
+.wpbridge-source-list-type {
+    font-weight: 500;
+}
+
+.wpbridge-source-list-url {
+    font-family: var(--wpbridge-font-mono);
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wpbridge-source-list-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-2);
+    flex-shrink: 0;
+}
+
+.wpbridge-source-list-hint {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-400);
+}
+
+.wpbridge-badge-vendor {
+    background: var(--wpbridge-primary-light, #eef2ff);
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-badge-custom {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-600);
+}
+
+/* 添加更新源内联表单 */
+.wpbridge-add-source-form {
+    padding: var(--wpbridge-space-4) var(--wpbridge-space-5);
+    border-bottom: 1px solid var(--wpbridge-gray-200);
+}
+
+.wpbridge-add-source-card {
+    border: 1px solid var(--wpbridge-gray-200);
+    border-radius: var(--wpbridge-radius-lg, 12px);
+    background: var(--wpbridge-white);
+    overflow: hidden;
+}
+
+.wpbridge-add-source-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-5);
+    background: var(--wpbridge-gray-50);
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+    font-size: var(--wpbridge-text-sm);
+    font-weight: 600;
+    color: var(--wpbridge-gray-700);
+}
+
+.wpbridge-add-source-header .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: var(--wpbridge-primary);
+}
+
+.wpbridge-add-source-body {
+    padding: var(--wpbridge-space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--wpbridge-space-4);
+}
+
+.wpbridge-add-source-row {
+    display: flex;
+    gap: var(--wpbridge-space-4);
+    align-items: flex-start;
+}
+
+.wpbridge-add-source-label {
+    flex-shrink: 0;
+    width: 80px;
+    padding-top: 8px;
+    font-size: var(--wpbridge-text-sm);
+    font-weight: 500;
+    color: var(--wpbridge-gray-700);
+}
+
+.wpbridge-add-source-label .required {
+    color: var(--wpbridge-danger);
+}
+
+.wpbridge-add-source-field {
+    flex: 1;
+    min-width: 0;
+}
+
+.wpbridge-add-source-field .wpbridge-form-input {
+    width: 100%;
+}
+
+.wpbridge-add-source-field .wpbridge-form-help {
+    margin-top: var(--wpbridge-space-1);
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-400);
+}
+
+.wpbridge-add-source-footer {
+    display: flex;
+    gap: var(--wpbridge-space-2);
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-5);
+    background: var(--wpbridge-gray-50);
+    border-top: 1px solid var(--wpbridge-gray-100);
+}
