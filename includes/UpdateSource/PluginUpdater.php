@@ -190,10 +190,10 @@ class PluginUpdater {
                     ];
                 }
 
-                // 缓存无更新结果
+                // 缓存无更新结果（短缓存，避免临时网络失败长期阻塞真正的更新）
                 set_transient( $cache_key, [
                     'update' => null,
-                ], $this->settings->get_cache_ttl() );
+                ], min( 300, $this->settings->get_cache_ttl() ) );
             }
         }
 

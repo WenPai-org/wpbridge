@@ -69,7 +69,8 @@ class BridgeApiVendor extends AbstractVendor {
 		$response = $this->api_request( 'wp-json/bridge/v1/sources' );
 
 		$valid = $response !== null;
-		$this->set_cache( $cache_key, $valid, 300 );
+		// 失败短缓存，避免临时网络问题长期阻塞
+		$this->set_cache( $cache_key, $valid, $valid ? 3600 : 300 );
 		return $valid;
 	}
 
@@ -109,7 +110,8 @@ class BridgeApiVendor extends AbstractVendor {
 			'pages'   => 1,
 		];
 
-		$this->set_cache( $cache_key, $result );
+		// 空结果短缓存 5 分钟
+		$this->set_cache( $cache_key, $result, empty( $plugins ) ? 300 : 0 );
 		return $result;
 	}
 
