@@ -331,7 +331,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
     <div class="wpbridge-panel">
         <div class="wpbridge-panel-header">
             <h3>
-                <span class="dashicons dashicons-book" style="margin-right: 4px; vertical-align: text-bottom;"></span>
+                <span class="dashicons dashicons-book wpbridge-panel-header-icon"></span>
                 <?php esc_html_e( '帮助文档', 'wpbridge' ); ?>
             </h3>
         </div>
@@ -365,7 +365,7 @@ $health_status_class = $failed_count > 0 ? 'error' : ( $degraded_count > 0 ? 'wa
     <div class="wpbridge-panel">
         <div class="wpbridge-panel-header">
             <h3>
-                <span class="dashicons dashicons-admin-links" style="margin-right: 4px; vertical-align: text-bottom;"></span>
+                <span class="dashicons dashicons-admin-links wpbridge-panel-header-icon"></span>
                 <?php esc_html_e( '浏览更多', 'wpbridge' ); ?>
             </h3>
         </div>
