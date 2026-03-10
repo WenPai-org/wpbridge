@@ -208,7 +208,8 @@ class WooCommerceVendor extends AbstractVendor {
 			'pages'   => 1, // WC API 返回 X-WP-TotalPages header
 		];
 
-		$this->set_cache( $cache_key, $result );
+		// 空结果短缓存 5 分钟
+		$this->set_cache( $cache_key, $result, empty( $plugins ) ? 300 : 0 );
 
 		return $result;
 	}

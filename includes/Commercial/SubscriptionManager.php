@@ -122,7 +122,9 @@ class SubscriptionManager {
 
 		$subscription = $this->resolve_subscription();
 
-		set_transient( self::CACHE_KEY, $subscription, self::CACHE_TTL );
+		// 免费版（可能是网络失败导致）短缓存 5 分钟，付费版缓存 1 小时
+		$ttl = $subscription['plan'] === 'free' ? 300 : self::CACHE_TTL;
+		set_transient( self::CACHE_KEY, $subscription, $ttl );
 
 		return $subscription;
 	}
