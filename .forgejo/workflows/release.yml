@@ -98,8 +98,17 @@ jobs:
             exit 0
           fi
 
+          # 限制 changelog 条目数，避免首次发版或大版本时列出全部历史
+          MAX_ENTRIES=20
+          TOTAL=$(echo "$COMMITS" | wc -l)
+
           FEAT="" FIX="" OTHER=""
+          COUNT=0
           while IFS= read -r line; do
+            COUNT=$((COUNT + 1))
+            if [ "$COUNT" -gt "$MAX_ENTRIES" ]; then
+              break
+            fi
             case "$line" in
               feat:*|feat\(*) FEAT="${FEAT}\n- ${line}" ;;
               fix:*|fix\(*)   FIX="${FIX}\n- ${line}" ;;
@@ -125,8 +134,14 @@ jobs:
             fi
           fi
 
+          if [ "$TOTAL" -gt "$MAX_ENTRIES" ]; then
+            OMITTED=$((TOTAL - MAX_ENTRIES))
+            REPO_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+            CHANGELOG="${CHANGELOG}*...省略 ${OMITTED} 条更早的更新，[查看完整历史](${REPO_URL}/compare/${PREV_TAG:-}...${TAG})*\n\n"
+          fi
+
           printf '%b' "$CHANGELOG" > /tmp/changelog.md
-          echo "Changelog generated ($(echo "$COMMITS" | wc -l) commits)"
+          echo "Changelog generated (showing ${COUNT}/${TOTAL} commits)"
 
       - name: PHP Lint
         shell: bash
