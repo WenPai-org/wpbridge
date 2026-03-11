@@ -2369,13 +2369,18 @@
             // 接管更新 Toggle
             $(document).on('change', '.wpbridge-bind-vendor-update', function() {
                 var $cb = $(this);
-                var slug = $cb.data('slug');
+                var slug = ($cb.data('slug') || '').toString().toLowerCase();
                 var vendorId = $cb.data('vendor-id');
                 var itemType = $cb.data('item-type') || 'plugin';
                 var enabled = $cb.is(':checked') ? 1 : 0;
                 var $main = $cb.closest('.wpbridge-plugin-list-main');
+                var $toggle = $cb.closest('.wpbridge-vendor-update-toggle');
+                var $label = $toggle.find('.wpbridge-vendor-toggle-label');
+                var origLabel = $label.text();
 
                 $cb.prop('disabled', true);
+                $toggle.addClass('is-loading');
+                $label.text(enabled ? '接管中…' : '取消中…');
 
                 $.ajax({
                     url: wpbridge.ajax_url,
@@ -2415,6 +2420,8 @@
                     },
                     complete: function() {
                         $cb.prop('disabled', false);
+                        $toggle.removeClass('is-loading');
+                        $label.text(origLabel);
                     }
                 });
             });
@@ -2442,7 +2449,7 @@
                 var $items = $('.wpbridge-bulk-check:checked');
                 if (!$items.length) return;
                 var $btn = $(this);
-                $btn.prop('disabled', true);
+                $btn.prop('disabled', true).text('批量接管中…');
                 var promises = [];
                 $items.each(function() {
                     var $cb = $(this);
@@ -2452,7 +2459,7 @@
                         data: {
                             action: 'wpbridge_bind_vendor_update',
                             nonce: wpbridge.nonce,
-                            plugin_slug: $cb.data('slug'),
+                            plugin_slug: ($cb.data('slug') || '').toString().toLowerCase(),
                             vendor_id: $cb.data('vendor-id'),
                             item_type: $cb.data('item-type') || 'plugin',
                             enabled: 1
@@ -2460,7 +2467,7 @@
                     }));
                 });
                 $.when.apply($, promises).always(function() {
-                    $btn.prop('disabled', false);
+                    $btn.prop('disabled', false).text('批量接管更新');
                     Toast.success('批量接管完成');
                     location.reload();
                 });
@@ -2471,7 +2478,7 @@
                 var $items = $('.wpbridge-bulk-check:checked');
                 if (!$items.length) return;
                 var $btn = $(this);
-                $btn.prop('disabled', true);
+                $btn.prop('disabled', true).text('批量取消中…');
                 var promises = [];
                 $items.each(function() {
                     var $cb = $(this);
@@ -2481,7 +2488,7 @@
                         data: {
                             action: 'wpbridge_bind_vendor_update',
                             nonce: wpbridge.nonce,
-                            plugin_slug: $cb.data('slug'),
+                            plugin_slug: ($cb.data('slug') || '').toString().toLowerCase(),
                             vendor_id: $cb.data('vendor-id'),
                             item_type: $cb.data('item-type') || 'plugin',
                             enabled: 0
@@ -2489,7 +2496,7 @@
                     }));
                 });
                 $.when.apply($, promises).always(function() {
-                    $btn.prop('disabled', false);
+                    $btn.prop('disabled', false).text('批量取消接管');
                     Toast.success('批量取消完成');
                     location.reload();
                 });

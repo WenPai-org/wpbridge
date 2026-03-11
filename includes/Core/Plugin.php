@@ -121,6 +121,14 @@ class Plugin {
      */
     private function maybe_migrate_legacy(): void {
         $migrated = get_option( 'wpbridge_migration_version', '' );
+
+        // v1.2.0: weixiaoduo-store → weixiaoduo-mall
+        if ( version_compare( $migrated, '1.2.0', '<' ) ) {
+            $this->migrate_vendor_id( 'weixiaoduo-store', 'weixiaoduo-mall' );
+            update_option( 'wpbridge_migration_version', WPBRIDGE_VERSION );
+            return;
+        }
+
         if ( version_compare( $migrated, '0.6.0', '>=' ) ) {
             return;
         }
@@ -135,6 +143,39 @@ class Plugin {
         // 标记迁移完成（旧数据保留，不影响新架构）
         Logger::info( '旧版本数据检测完成，标记迁移版本', [ 'version' => WPBRIDGE_VERSION ] );
         update_option( 'wpbridge_migration_version', WPBRIDGE_VERSION );
+    }
+
+    /**
+     * 迁移供应商 ID：替换 source_registry 和 defaults 中的 vendor_ 前缀 key
+     */
+    private function migrate_vendor_id( string $old_id, string $new_id ): void {
+        $old_key = 'vendor_' . $old_id;
+        $new_key = 'vendor_' . $new_id;
+
+        // 迁移 source_registry
+        $sources = get_option( SourceRegistry::OPTION_NAME, [] );
+        if ( isset( $sources[ $old_key ] ) ) {
+            $sources[ $new_key ] = $sources[ $old_key ];
+            unset( $sources[ $old_key ] );
+            update_option( SourceRegistry::OPTION_NAME, $sources, false );
+        }
+
+        // 迁移 defaults（项目绑定的 source_ids）
+        $defaults = get_option( DefaultsManager::OPTION_NAME, [] );
+        $changed  = false;
+        foreach ( $defaults as &$item ) {
+            if ( isset( $item['source_ids'][ $old_key ] ) ) {
+                $item['source_ids'][ $new_key ] = $item['source_ids'][ $old_key ];
+                unset( $item['source_ids'][ $old_key ] );
+                $changed = true;
+            }
+        }
+        unset( $item );
+        if ( $changed ) {
+            update_option( DefaultsManager::OPTION_NAME, $defaults, false );
+        }
+
+        Logger::info( '供应商 ID 迁移完成', [ 'from' => $old_id, 'to' => $new_id ] );
     }
 
     /**

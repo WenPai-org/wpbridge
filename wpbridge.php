@@ -12,6 +12,7 @@
  * Domain Path: /languages
  * Requires at least: 5.9
  * Requires PHP: 7.4
+ * Update URI: https://updates.wenpai.net
  *
  * @package WPBridge
  */
@@ -52,6 +53,10 @@ register_activation_hook( __FILE__, function() {
 register_deactivation_hook( __FILE__, function() {
     Core\Plugin::deactivate();
 } );
+
+// WenPai 自更新检查器
+require_once WPBRIDGE_PATH . 'includes/class-wenpai-updater.php';
+new \WenPai_Updater( WPBRIDGE_BASENAME, WPBRIDGE_VERSION );
 
 // 启动插件
 add_action( 'plugins_loaded', __NAMESPACE__ . '\\wpbridge_init' );

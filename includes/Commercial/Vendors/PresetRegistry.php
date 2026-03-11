@@ -38,7 +38,7 @@ class PresetRegistry {
 				'is_preset'   => true,
 				'removable'   => false,
 			],
-			'weixiaoduo-store'   => [
+			'weixiaoduo-mall'   => [
 				'name'        => '薇晓朵商城',
 				'description' => '薇晓朵数字商城，购买后输入邮箱和授权密钥即可自动接收更新。',
 				'type'        => 'wc_am',

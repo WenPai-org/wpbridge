@@ -173,6 +173,9 @@ jobs:
             --exclude="vendor" \
             --exclude="tests" \
             --exclude="docs" \
+            --exclude="examples" \
+            --exclude="backups" \
+            --exclude="deploy.sh" \
             --exclude="lib" \
             --exclude="phpunit.xml*" \
             --exclude="phpcs.xml*" \

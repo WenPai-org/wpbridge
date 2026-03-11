@@ -981,11 +981,20 @@ class VendorAdmin {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
 
-		$installed = get_plugins();
+		$installed  = get_plugins();
+		$slug_lower = strtolower( $slug );
 
 		foreach ( $installed as $file => $data ) {
 			$dir_slug = dirname( $file );
-			if ( $dir_slug === $slug || basename( $file, '.php' ) === $slug ) {
+			if ( strtolower( $dir_slug ) === $slug_lower || strtolower( basename( $file, '.php' ) ) === $slug_lower ) {
+				return $file;
+			}
+		}
+
+		// 回退：用 sanitize_title( Name ) 做模糊匹配
+		foreach ( $installed as $file => $data ) {
+			$name_slug = sanitize_title( $data['Name'] ?? '' );
+			if ( $name_slug === $slug_lower ) {
 				return $file;
 			}
 		}
