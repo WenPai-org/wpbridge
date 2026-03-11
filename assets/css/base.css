@@ -119,6 +119,7 @@
 
 .wpbridge-tab-list {
     display: flex;
+    justify-content: center;
     border-bottom: 1px solid var(--wpbridge-gray-200);
     padding: 0 var(--wpbridge-space-4);
 }

@@ -2263,6 +2263,14 @@
                         $(this).toggleClass('is-hidden', $(this).data('group') !== filter);
                     });
                 }
+                // 排序：已接管 > 已安装 > 其他
+                var $items = $list.children('.wpbridge-plugin-list-item').detach();
+                $items.sort(function(a, b) {
+                    var scoreA = $(a).find('.wpbridge-plugin-list-bound').length ? 2 : ($(a).find('.wpbridge-plugin-list-installed').length ? 1 : 0);
+                    var scoreB = $(b).find('.wpbridge-plugin-list-bound').length ? 2 : ($(b).find('.wpbridge-plugin-list-installed').length ? 1 : 0);
+                    return scoreB - scoreA;
+                });
+                $list.prepend($items);
             });
 
             // 可用插件 - 显示更多
@@ -2272,7 +2280,8 @@
             });
 
             // 可用插件 - 安装
-            $(document).on('click', '.wpbridge-install-plugin', function() {
+            $(document).on('click', '.wpbridge-install-plugin', function(e) {
+                e.preventDefault();
                 var $btn = $(this);
                 if ($btn.hasClass('is-installing')) return;
 
@@ -2280,7 +2289,7 @@
                 var vendorId = $btn.data('vendor-id') || '';
 
                 $btn.addClass('is-installing');
-                $btn.find('.dashicons').removeClass('dashicons-download').addClass('dashicons-update');
+                $btn.html('<span class="dashicons dashicons-update"></span> 安装中…');
 
                 $.ajax({
                     url: wpbridge.ajax_url,
@@ -2295,26 +2304,47 @@
                     success: function(response) {
                         if (response.success) {
                             Toast.success(response.data.message);
-                            $btn.removeClass('wpbridge-install-plugin is-installing');
-                            $btn.find('.dashicons').removeClass('dashicons-update').addClass('dashicons-yes-alt');
-                            $btn.prop('disabled', true).attr('title', wpbridge.i18n.installed || '已安装');
-                            // 在名称后插入已安装标签
+                            var $item = $btn.closest('.wpbridge-plugin-list-item');
                             var $main = $btn.closest('.wpbridge-plugin-list-main');
-                            if (!$main.find('.wpbridge-plugin-list-installed').length) {
-                                $main.find('.wpbridge-plugin-list-version').after(
-                                    '<span class="wpbridge-plugin-list-installed">' + (wpbridge.i18n.installed || '已安装') + '</span>'
-                                );
+
+                            // 移除安装按钮，替换为"已安装"标签
+                            $btn.remove();
+                            if (!$main.find('.wpbridge-plugin-list-installed').length && !$main.find('.wpbridge-plugin-list-bound').length) {
+                                $main.find('.wpbridge-plugin-list-version').length
+                                    ? $main.find('.wpbridge-plugin-list-version').after('<span class="wpbridge-plugin-list-installed">已安装</span>')
+                                    : $main.find('.wpbridge-plugin-list-name').after('<span class="wpbridge-plugin-list-installed">已安装</span>');
+                            }
+
+                            // 插入接管更新 toggle（如果有 vendor_id）
+                            if (vendorId) {
+                                var toggleHtml = '<label class="wpbridge-vendor-update-toggle" title="接管更新">'
+                                    + '<input type="checkbox" class="wpbridge-bind-vendor-update"'
+                                    + ' data-slug="' + slug + '"'
+                                    + ' data-vendor-id="' + vendorId + '"'
+                                    + ' data-item-type="plugin">'
+                                    + '<span class="wpbridge-toggle-track"></span>'
+                                    + '<span class="wpbridge-vendor-toggle-label">接管更新</span>'
+                                    + '</label>';
+                                $main.find('.wpbridge-plugin-list-actions').prepend(toggleHtml);
+
+                                // 插入批量 checkbox
+                                if (!$main.find('.wpbridge-bulk-check').length) {
+                                    $main.prepend('<input type="checkbox" class="wpbridge-bulk-check"'
+                                        + ' data-slug="' + slug + '"'
+                                        + ' data-vendor-id="' + vendorId + '"'
+                                        + ' data-item-type="plugin" data-bound="0">');
+                                }
                             }
                         } else {
-                            Toast.error(response.data.message || wpbridge.i18n.install_failed || '安装失败');
+                            Toast.error(response.data.message || '安装失败');
                             $btn.removeClass('is-installing');
-                            $btn.find('.dashicons').removeClass('dashicons-update').addClass('dashicons-download');
+                            $btn.html('<span class="dashicons dashicons-download"></span> 安装');
                         }
                     },
                     error: function(jqXHR, textStatus) {
                         Toast.error(ajaxErrorMessage(jqXHR, textStatus));
                         $btn.removeClass('is-installing');
-                        $btn.find('.dashicons').removeClass('dashicons-update').addClass('dashicons-download');
+                        $btn.html('<span class="dashicons dashicons-download"></span> 安装');
                     }
                 });
             });
@@ -2343,6 +2373,7 @@
                 var vendorId = $cb.data('vendor-id');
                 var itemType = $cb.data('item-type') || 'plugin';
                 var enabled = $cb.is(':checked') ? 1 : 0;
+                var $main = $cb.closest('.wpbridge-plugin-list-main');
 
                 $cb.prop('disabled', true);
 
@@ -2360,9 +2391,21 @@
                     success: function(response) {
                         if (response.success) {
                             Toast.success(response.data.message);
+                            // 切换标签：已安装 ↔ 已接管
+                            $main.find('.wpbridge-plugin-list-installed, .wpbridge-plugin-list-bound').remove();
+                            if (enabled) {
+                                var $after = $main.find('.wpbridge-plugin-list-version');
+                                var badge = '<span class="wpbridge-plugin-list-bound">已接管</span>';
+                                $after.length ? $after.after(badge) : $main.find('.wpbridge-plugin-list-name').after(badge);
+                            } else {
+                                var $after = $main.find('.wpbridge-plugin-list-version');
+                                var badge = '<span class="wpbridge-plugin-list-installed">已安装</span>';
+                                $after.length ? $after.after(badge) : $main.find('.wpbridge-plugin-list-name').after(badge);
+                            }
+                            // 同步批量 checkbox 的 data-bound
+                            $main.find('.wpbridge-bulk-check').data('bound', enabled ? '1' : '0');
                         } else {
                             Toast.error(response.data.message || wpbridge.i18n.failed);
-                            // 回滚 checkbox 状态
                             $cb.prop('checked', !$cb.is(':checked'));
                         }
                     },
@@ -2373,6 +2416,82 @@
                     complete: function() {
                         $cb.prop('disabled', false);
                     }
+                });
+            });
+
+            // 批量勾选框 — 显示/隐藏批量操作栏
+            $(document).on('change', '.wpbridge-bulk-check', function() {
+                var $bar = $('.wpbridge-plugin-bulk-bar');
+                var checked = $('.wpbridge-bulk-check:checked').length;
+                if (checked > 0) {
+                    $bar.show();
+                    $bar.find('.wpbridge-bulk-count').text(checked + ' 个已选');
+                } else {
+                    $bar.hide();
+                }
+            });
+
+            // 全选已安装
+            $(document).on('change', '.wpbridge-bulk-check-all', function() {
+                var checked = $(this).is(':checked');
+                $('.wpbridge-bulk-check').prop('checked', checked).trigger('change');
+            });
+
+            // 批量接管更新
+            $(document).on('click', '.wpbridge-bulk-bind', function() {
+                var $items = $('.wpbridge-bulk-check:checked');
+                if (!$items.length) return;
+                var $btn = $(this);
+                $btn.prop('disabled', true);
+                var promises = [];
+                $items.each(function() {
+                    var $cb = $(this);
+                    promises.push($.ajax({
+                        url: wpbridge.ajax_url,
+                        type: 'POST',
+                        data: {
+                            action: 'wpbridge_bind_vendor_update',
+                            nonce: wpbridge.nonce,
+                            plugin_slug: $cb.data('slug'),
+                            vendor_id: $cb.data('vendor-id'),
+                            item_type: $cb.data('item-type') || 'plugin',
+                            enabled: 1
+                        }
+                    }));
+                });
+                $.when.apply($, promises).always(function() {
+                    $btn.prop('disabled', false);
+                    Toast.success('批量接管完成');
+                    location.reload();
+                });
+            });
+
+            // 批量取消接管
+            $(document).on('click', '.wpbridge-bulk-unbind', function() {
+                var $items = $('.wpbridge-bulk-check:checked');
+                if (!$items.length) return;
+                var $btn = $(this);
+                $btn.prop('disabled', true);
+                var promises = [];
+                $items.each(function() {
+                    var $cb = $(this);
+                    promises.push($.ajax({
+                        url: wpbridge.ajax_url,
+                        type: 'POST',
+                        data: {
+                            action: 'wpbridge_bind_vendor_update',
+                            nonce: wpbridge.nonce,
+                            plugin_slug: $cb.data('slug'),
+                            vendor_id: $cb.data('vendor-id'),
+                            item_type: $cb.data('item-type') || 'plugin',
+                            enabled: 0
+                        }
+                    }));
+                });
+                $.when.apply($, promises).always(function() {
+                    $btn.prop('disabled', false);
+                    Toast.success('批量取消完成');
+                    location.reload();
                 });
             });
 

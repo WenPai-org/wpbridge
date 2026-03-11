@@ -90,8 +90,8 @@
 .wpbridge-vendor-presets-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: var(--wpbridge-space-5);
-    padding: var(--wpbridge-space-5);
+    gap: var(--wpbridge-space-6);
+    padding: var(--wpbridge-space-6);
 }
 
 .wpbridge-vendor-grid-2 {
@@ -100,7 +100,7 @@
 
 /* Bridge API 单独一排 */
 .wpbridge-vendor-bridge-row {
-    padding: 0 var(--wpbridge-space-5) var(--wpbridge-space-5);
+    padding: 0 var(--wpbridge-space-6) var(--wpbridge-space-6);
 }
 
 .wpbridge-vendor-bridge-card {
@@ -113,12 +113,18 @@
     background: var(--wpbridge-white);
     border: 1px solid var(--wpbridge-gray-200);
     border-radius: var(--wpbridge-radius-lg);
-    padding: var(--wpbridge-space-5);
     display: flex;
-    gap: var(--wpbridge-space-5);
+    flex-direction: column;
     transition: all 0.2s ease;
     position: relative;
     box-sizing: border-box;
+    overflow: hidden;
+}
+
+.wpbridge-vendor-card-main {
+    display: flex;
+    gap: var(--wpbridge-space-6);
+    padding: var(--wpbridge-space-7, 28px);
 }
 
 .wpbridge-vendor-preset-card:hover {
@@ -129,7 +135,7 @@
 
 .wpbridge-vendor-preset-card.is-activated {
     border-color: var(--wpbridge-success);
-    background: linear-gradient(135deg, rgba(5, 150, 105, 0.015) 0%, var(--wpbridge-white) 100%);
+    background: var(--wpbridge-white);
 }
 
 .wpbridge-vendor-preset-card.is-activated:hover {
@@ -159,19 +165,19 @@
 .wpbridge-vendor-logo-img {
     display: block;
     width: auto;
-    height: 60px;
+    height: 72px;
 }
 
 .wpbridge-vendor-logo-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 64px;
-    font-size: 28px;
+    width: 72px;
+    height: 72px;
+    font-size: 32px;
     color: var(--wpbridge-primary);
     background: var(--wpbridge-primary-light, #eef2ff);
-    border-radius: var(--wpbridge-radius-md);
+    border-radius: var(--wpbridge-radius-lg);
 }
 
 .wpbridge-vendor-preset-card.is-activated .wpbridge-vendor-logo-icon {
@@ -185,7 +191,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--wpbridge-space-2);
+    gap: var(--wpbridge-space-4);
 }
 
 .wpbridge-vendor-preset-header {
@@ -196,7 +202,7 @@
 }
 
 .wpbridge-vendor-preset-name {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--wpbridge-gray-900);
 }
@@ -204,7 +210,7 @@
 .wpbridge-vendor-preset-desc {
     font-size: var(--wpbridge-text-sm);
     color: var(--wpbridge-gray-500);
-    line-height: 1.5;
+    line-height: 1.6;
 }
 
 .wpbridge-vendor-preset-meta {
@@ -270,15 +276,30 @@
     color: var(--wpbridge-warning);
 }
 
-/* ── 订阅状态 ── */
-.wpbridge-subscription-status {
+/* ── 激活卡片底栏 ── */
+.wpbridge-vendor-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--wpbridge-space-4) var(--wpbridge-space-7, 28px);
+    background: var(--wpbridge-gray-50);
+    border-top: 1px solid var(--wpbridge-gray-100);
+    gap: var(--wpbridge-space-3);
+}
+
+.wpbridge-vendor-footer-left {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 0;
-    font-size: 13px;
-    color: var(--wpbridge-gray-600);
     flex-wrap: wrap;
+    min-width: 0;
+}
+
+.wpbridge-vendor-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
 }
 
 .wpbridge-subscription-badge {
@@ -292,20 +313,63 @@
     color: var(--wpbridge-primary-600, #4f46e5);
 }
 
+.wpbridge-subscription-badge.is-free {
+    background: var(--wpbridge-gray-100);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-subscription-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--wpbridge-success);
+    flex-shrink: 0;
+}
+
 .wpbridge-subscription-active {
     font-size: 12px;
     font-weight: 500;
     color: var(--wpbridge-success);
 }
 
+.wpbridge-footer-sep {
+    width: 1px;
+    height: 14px;
+    background: var(--wpbridge-gray-200);
+    flex-shrink: 0;
+}
+
+.wpbridge-vendor-perk {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--wpbridge-gray-500);
+    letter-spacing: 0.2px;
+}
+
+.wpbridge-vendor-upgrade-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--wpbridge-primary);
+    text-decoration: none;
+    transition: opacity 0.15s;
+}
+
+.wpbridge-vendor-upgrade-link:hover {
+    opacity: 0.8;
+}
+
+.wpbridge-vendor-upgrade-link .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
 .wpbridge-subscription-checked {
     font-size: 11px;
     color: var(--wpbridge-gray-400);
-}
-
-.wpbridge-subscription-badge.is-free {
-    background: var(--wpbridge-gray-100);
-    color: var(--wpbridge-gray-500);
 }
 
 .wpbridge-refresh-subscription {
@@ -320,6 +384,12 @@
 
 .wpbridge-refresh-subscription:hover {
     color: var(--wpbridge-primary-600, #4f46e5);
+}
+
+.wpbridge-refresh-subscription .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
 }
 
 .wpbridge-refresh-subscription.is-loading .dashicons {
@@ -515,13 +585,17 @@
 .wpbridge-plugin-list-actions {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     margin-left: auto;
+}
+
+/* 外部链接图标 hover 才显示 */
+.wpbridge-plugin-list-actions > .wpbridge-plugin-action-link {
     opacity: 0;
     transition: opacity 0.15s;
 }
 
-.wpbridge-plugin-list-item:hover .wpbridge-plugin-list-actions {
+.wpbridge-plugin-list-item:hover .wpbridge-plugin-list-actions > .wpbridge-plugin-action-link {
     opacity: 1;
 }
 
@@ -568,20 +642,105 @@
     display: none;
 }
 
-/* 安装按钮 */
-.wpbridge-install-plugin {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-}
-
+/* 安装按钮（旧样式兼容） */
 .wpbridge-install-plugin.is-installing {
     pointer-events: none;
 }
 
-.wpbridge-install-plugin.is-installing .dashicons {
+/* 安装按钮（明确样式） */
+a.wpbridge-btn-xs,
+button.wpbridge-btn-xs {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    height: 28px;
+    border-radius: var(--wpbridge-radius);
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s;
+    box-sizing: border-box;
+}
+
+a.wpbridge-btn-xs .dashicons,
+button.wpbridge-btn-xs .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+a.wpbridge-btn-xs:hover,
+button.wpbridge-btn-xs:hover {
+    opacity: 0.85;
+}
+
+/* 安装按钮始终可见 */
+.wpbridge-plugin-list-item .wpbridge-install-plugin.wpbridge-btn-xs {
+    opacity: 1;
+    background: var(--wpbridge-primary);
+    color: #fff;
+}
+
+.wpbridge-install-plugin.wpbridge-btn-xs .dashicons {
+    color: inherit;
+}
+
+.wpbridge-install-plugin.wpbridge-btn-xs.is-installing {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.wpbridge-install-plugin.wpbridge-btn-xs.is-installing .dashicons {
     animation: wpbridge-spin 1s linear infinite;
+}
+
+/* 已接管标签 */
+.wpbridge-plugin-list-bound {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: var(--wpbridge-radius-sm);
+    background: var(--wpbridge-primary-light);
+    color: var(--wpbridge-primary);
+}
+
+/* 批量操作栏 */
+.wpbridge-plugin-bulk-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--wpbridge-space-4);
+    padding: var(--wpbridge-space-3) var(--wpbridge-space-5);
+    background: var(--wpbridge-gray-50);
+    border-bottom: 1px solid var(--wpbridge-gray-100);
+    font-size: var(--wpbridge-text-sm);
+}
+
+.wpbridge-bulk-select-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    color: var(--wpbridge-gray-700);
+    cursor: pointer;
+}
+
+.wpbridge-bulk-count {
+    font-size: var(--wpbridge-text-xs);
+    color: var(--wpbridge-gray-500);
+}
+
+.wpbridge-bulk-check {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+    accent-color: var(--wpbridge-primary);
 }
 
 /* ========================================

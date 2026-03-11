@@ -459,7 +459,7 @@ class BridgeManager {
 			'bridged_count'   => count( $bridged ),
 			'available_count' => count( $available ),
 			'plan'            => $subscription['plan'] ?? 'free',
-			'plan_label'      => $subscription['label'] ?? '免费版',
+			'plan_label'      => $subscription['label'] ?? 'Free',
 			'plugins_limit'   => $plugins_limit,
 			'plugins_used'    => count( $bridged ),
 			'can_add_more'    => $plugins_limit === PHP_INT_MAX || count( $bridged ) < $plugins_limit,

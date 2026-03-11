@@ -46,7 +46,7 @@ class SubscriptionManager {
 	private const PRODUCT_PLANS = [
 		41705 => [
 			'plan'            => 'all_access',
-			'label'           => '全站通',
+			'label'           => 'All Access',
 			'priority'        => 100,
 			'plugins_limit'   => PHP_INT_MAX,
 			'daily_downloads' => PHP_INT_MAX,
@@ -83,7 +83,7 @@ class SubscriptionManager {
 	 */
 	private const FREE_PLAN = [
 		'plan'            => 'free',
-		'label'           => '免费版',
+		'label'           => 'Free',
 		'priority'        => 0,
 		'plugins_limit'   => 0,
 		'daily_downloads' => 0,
