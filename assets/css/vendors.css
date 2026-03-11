@@ -799,6 +799,20 @@ button.wpbridge-btn-xs:hover {
     color: var(--wpbridge-success);
 }
 
+.wpbridge-vendor-update-toggle.is-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.wpbridge-vendor-update-toggle.is-loading .wpbridge-toggle-track::after {
+    animation: wpbridge-toggle-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes wpbridge-toggle-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
 /* 供应商状态标签（项目列表） */
 .wpbridge-status-vendor {
     background: var(--wpbridge-primary-light, #eef2ff);

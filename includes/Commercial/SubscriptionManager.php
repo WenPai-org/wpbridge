@@ -25,7 +25,7 @@ class SubscriptionManager {
 	/**
 	 * 订阅供应商 ID（薇晓朵商城）
 	 */
-	private const SUBSCRIPTION_VENDOR_ID = 'weixiaoduo-store';
+	private const SUBSCRIPTION_VENDOR_ID = 'weixiaoduo-mall';
 
 	/**
 	 * 订阅缓存 transient key
