@@ -83,97 +83,134 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 				$has_logo      = ! empty( $preset['logo'] );
 			?>
 				<div class="<?php echo esc_attr( $card_class ); ?>" data-preset-id="<?php echo esc_attr( $preset_id ); ?>">
-					<div class="wpbridge-vendor-preset-logo">
-						<?php if ( $has_logo ) : ?>
-							<img src="<?php echo esc_url( $preset['logo'] ); ?>"
-								 alt="<?php echo esc_attr( $preset['name'] ); ?>"
-								 class="wpbridge-vendor-logo-img">
-						<?php else : ?>
-							<span class="dashicons <?php echo esc_attr( $preset['icon'] ?? 'dashicons-store' ); ?> wpbridge-vendor-logo-icon"></span>
-						<?php endif; ?>
-					</div>
-
-					<div class="wpbridge-vendor-preset-body">
-						<div class="wpbridge-vendor-preset-header">
-							<span class="wpbridge-vendor-preset-name"><?php echo esc_html( $preset['name'] ); ?></span>
-							<?php if ( $is_coming ) : ?>
-								<span class="wpbridge-badge-coming-soon"><?php echo esc_html( $status_labels['coming_soon'] ); ?></span>
-							<?php elseif ( $is_activated ) : ?>
-								<span class="wpbridge-badge-active"><?php echo esc_html( $status_labels['activated'] ); ?></span>
+					<!-- 卡片主体：Logo + 信息 + 操作 -->
+					<div class="wpbridge-vendor-card-main">
+						<div class="wpbridge-vendor-preset-logo">
+							<?php if ( $has_logo ) :
+								$logo_url = ( strpos( $preset['logo'], 'http' ) === 0 )
+									? $preset['logo']
+									: WPBRIDGE_URL . 'assets/images/' . $preset['logo'];
+							?>
+								<img src="<?php echo esc_url( $logo_url ); ?>"
+									 alt="<?php echo esc_attr( $preset['name'] ); ?>"
+									 class="wpbridge-vendor-logo-img">
 							<?php else : ?>
-								<span class="wpbridge-badge-inactive"><?php echo esc_html( $status_labels['inactive'] ); ?></span>
+								<span class="dashicons <?php echo esc_attr( $preset['icon'] ?? 'dashicons-store' ); ?> wpbridge-vendor-logo-icon"></span>
 							<?php endif; ?>
 						</div>
 
-						<div class="wpbridge-vendor-preset-desc">
-							<?php echo esc_html( $preset['description'] ?? '' ); ?>
+						<div class="wpbridge-vendor-preset-body">
+							<div class="wpbridge-vendor-preset-header">
+								<span class="wpbridge-vendor-preset-name"><?php echo esc_html( $preset['name'] ); ?></span>
+								<?php if ( $is_coming ) : ?>
+									<span class="wpbridge-badge-coming-soon"><?php echo esc_html( $status_labels['coming_soon'] ); ?></span>
+								<?php elseif ( $is_activated ) : ?>
+									<span class="wpbridge-badge-active"><?php echo esc_html( $status_labels['activated'] ); ?></span>
+								<?php else : ?>
+									<span class="wpbridge-badge-inactive"><?php echo esc_html( $status_labels['inactive'] ); ?></span>
+								<?php endif; ?>
+							</div>
+
+							<div class="wpbridge-vendor-preset-desc">
+								<?php echo esc_html( $preset['description'] ?? '' ); ?>
+							</div>
+
+							<?php if ( $is_activated && null !== $plugin_count ) : ?>
+								<div class="wpbridge-vendor-preset-meta">
+									<span class="wpbridge-vendor-meta-item">
+										<span class="dashicons dashicons-admin-plugins"></span>
+										<?php printf( esc_html__( '%d 个插件', 'wpbridge' ), $plugin_count ); ?>
+									</span>
+									<?php if ( $last_sync ) : ?>
+										<span class="wpbridge-vendor-meta-item">
+											<span class="dashicons dashicons-clock"></span>
+											<?php echo esc_html( human_time_diff( $last_sync ) ); ?><?php esc_html_e( '前同步', 'wpbridge' ); ?>
+										</span>
+									<?php endif; ?>
+								</div>
+							<?php endif; ?>
 						</div>
 
-						<?php if ( $is_activated && ! empty( $preset['subscription_vendor'] ) ) :
-							$plan_label  = $subscription['label'] ?? $subscription['plan'] ?? 'free';
-							$is_free     = ( $subscription['plan'] ?? 'free' ) === 'free';
-							$sub_status  = $subscription['status'] ?? '';
-							$checked_at  = $subscription['checked_at'] ?? 0;
-						?>
-							<div class="wpbridge-subscription-status">
-								<span><?php esc_html_e( '订阅', 'wpbridge' ); ?>:</span>
-								<span class="wpbridge-subscription-badge <?php echo $is_free ? 'is-free' : ''; ?>">
-									<?php echo esc_html( $plan_label ); ?>
-								</span>
-								<?php if ( $sub_status === 'active' ) : ?>
-									<span class="wpbridge-subscription-active"><?php esc_html_e( '有效', 'wpbridge' ); ?></span>
-								<?php endif; ?>
-								<?php if ( $checked_at > 0 ) : ?>
-									<span class="wpbridge-subscription-checked">
-										<?php printf( esc_html__( '%s前验证', 'wpbridge' ), esc_html( human_time_diff( $checked_at ) ) ); ?>
-									</span>
-								<?php endif; ?>
-								<button type="button" class="wpbridge-refresh-subscription" title="<?php esc_attr_e( '刷新订阅状态', 'wpbridge' ); ?>">
-									<span class="dashicons dashicons-update"></span>
+						<div class="wpbridge-vendor-preset-actions">
+							<?php if ( $is_coming ) : ?>
+								<span class="wpbridge-text-muted"><?php esc_html_e( '敬请期待', 'wpbridge' ); ?></span>
+							<?php elseif ( $is_activated ) : ?>
+								<button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-test-vendor" data-vendor-id="<?php echo esc_attr( $preset_id ); ?>">
+									<?php esc_html_e( '测试', 'wpbridge' ); ?>
 								</button>
-							</div>
-						<?php endif; ?>
-
-						<?php if ( $is_activated && null !== $plugin_count ) : ?>
-							<div class="wpbridge-vendor-preset-meta">
-								<span class="wpbridge-vendor-meta-item">
-									<span class="dashicons dashicons-admin-plugins"></span>
-									<?php printf( esc_html__( '%d 个插件', 'wpbridge' ), $plugin_count ); ?>
-								</span>
-								<?php if ( $last_sync ) : ?>
-									<span class="wpbridge-vendor-meta-item">
-										<span class="dashicons dashicons-clock"></span>
-										<?php echo esc_html( human_time_diff( $last_sync ) ); ?><?php esc_html_e( '前同步', 'wpbridge' ); ?>
-									</span>
+								<button type="button" class="wpbridge-btn wpbridge-btn-danger wpbridge-btn-sm wpbridge-deactivate-preset" data-preset-id="<?php echo esc_attr( $preset_id ); ?>">
+									<?php esc_html_e( '停用', 'wpbridge' ); ?>
+								</button>
+							<?php else : ?>
+								<button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm wpbridge-activate-preset-btn" data-preset-id="<?php echo esc_attr( $preset_id ); ?>">
+									<?php esc_html_e( '添加密钥', 'wpbridge' ); ?>
+								</button>
+								<?php if ( ! empty( $preset['api_url'] ) ) : ?>
+									<a href="<?php echo esc_url( rtrim( $preset['api_url'], '/' ) . '/my-account/api-keys' ); ?>"
+									   target="_blank"
+									   class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm">
+										<?php esc_html_e( '获取 ↗', 'wpbridge' ); ?>
+									</a>
 								<?php endif; ?>
-							</div>
-						<?php endif; ?>
+							<?php endif; ?>
+						</div>
 					</div>
 
-					<div class="wpbridge-vendor-preset-actions">
-						<?php if ( $is_coming ) : ?>
-							<span class="wpbridge-text-muted"><?php esc_html_e( '敬请期待', 'wpbridge' ); ?></span>
-						<?php elseif ( $is_activated ) : ?>
-							<button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-test-vendor" data-vendor-id="<?php echo esc_attr( $preset_id ); ?>">
-								<?php esc_html_e( '测试', 'wpbridge' ); ?>
-							</button>
-							<button type="button" class="wpbridge-btn wpbridge-btn-danger wpbridge-btn-sm wpbridge-deactivate-preset" data-preset-id="<?php echo esc_attr( $preset_id ); ?>">
-								<?php esc_html_e( '停用', 'wpbridge' ); ?>
-							</button>
-						<?php else : ?>
-							<button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm wpbridge-activate-preset-btn" data-preset-id="<?php echo esc_attr( $preset_id ); ?>">
-								<?php esc_html_e( '添加密钥', 'wpbridge' ); ?>
-							</button>
-							<?php if ( ! empty( $preset['api_url'] ) ) : ?>
-								<a href="<?php echo esc_url( rtrim( $preset['api_url'], '/' ) . '/my-account/api-keys' ); ?>"
-								   target="_blank"
-								   class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm">
-									<?php esc_html_e( '获取密钥', 'wpbridge' ); ?>
-									<span class="dashicons dashicons-external" style="font-size:14px;width:14px;height:14px;vertical-align:text-bottom;margin-left:2px;"></span>
+					<!-- 激活后的订阅底栏 -->
+					<?php if ( $is_activated && ! empty( $preset['subscription_vendor'] ) ) :
+						$plan_label  = $subscription['label'] ?? $subscription['plan'] ?? 'free';
+						$plan_name   = $subscription['plan'] ?? 'free';
+						$is_free     = $plan_name === 'free';
+						$sub_status  = $subscription['status'] ?? '';
+						$checked_at  = $subscription['checked_at'] ?? 0;
+						$features    = $subscription['features'] ?? [];
+						$daily_dl    = $subscription['daily_downloads'] ?? 0;
+					?>
+					<div class="wpbridge-vendor-card-footer">
+						<div class="wpbridge-vendor-footer-left">
+							<span class="wpbridge-subscription-badge <?php echo $is_free ? 'is-free' : ''; ?>">
+								<?php echo esc_html( $plan_label ); ?>
+							</span>
+							<?php if ( $sub_status === 'active' && ! $is_free ) : ?>
+								<span class="wpbridge-subscription-dot"></span>
+								<span class="wpbridge-subscription-active"><?php esc_html_e( '有效', 'wpbridge' ); ?></span>
+							<?php endif; ?>
+							<?php if ( ! $is_free ) : ?>
+								<span class="wpbridge-footer-sep"></span>
+								<?php if ( $daily_dl >= PHP_INT_MAX ) : ?>
+									<span class="wpbridge-vendor-perk"><?php esc_html_e( '无限下载', 'wpbridge' ); ?></span>
+								<?php else : ?>
+									<span class="wpbridge-vendor-perk"><?php printf( esc_html__( '%d 次/天', 'wpbridge' ), $daily_dl ); ?></span>
+								<?php endif; ?>
+								<?php if ( in_array( 'bridge_api', $features, true ) ) : ?>
+									<span class="wpbridge-vendor-perk">API</span>
+								<?php endif; ?>
+								<?php if ( in_array( 'bridge_server', $features, true ) ) : ?>
+									<span class="wpbridge-vendor-perk">Server</span>
+								<?php endif; ?>
+								<?php if ( in_array( 'priority_support', $features, true ) ) : ?>
+									<span class="wpbridge-vendor-perk"><?php esc_html_e( '优先支持', 'wpbridge' ); ?></span>
+								<?php endif; ?>
+							<?php else : ?>
+								<span class="wpbridge-footer-sep"></span>
+								<a href="https://mall.weixiaoduo.com/item/wpbridge-pro" target="_blank" class="wpbridge-vendor-upgrade-link">
+									<?php esc_html_e( '升级 Pro', 'wpbridge' ); ?>
+									<span class="dashicons dashicons-arrow-right-alt2"></span>
 								</a>
 							<?php endif; ?>
-						<?php endif; ?>
+						</div>
+						<div class="wpbridge-vendor-footer-right">
+							<?php if ( $checked_at > 0 ) : ?>
+								<span class="wpbridge-subscription-checked">
+									<?php printf( esc_html__( '%s前验证', 'wpbridge' ), esc_html( human_time_diff( $checked_at ) ) ); ?>
+								</span>
+							<?php endif; ?>
+							<button type="button" class="wpbridge-refresh-subscription" title="<?php esc_attr_e( '刷新', 'wpbridge' ); ?>">
+								<span class="dashicons dashicons-update"></span>
+							</button>
+						</div>
 					</div>
+					<?php endif; ?>
 				</div>
 			<?php endforeach; ?>
 		</div>
@@ -190,55 +227,52 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 		?>
 			<div class="wpbridge-vendor-bridge-row">
 				<div class="<?php echo esc_attr( $card_class ); ?>" data-preset-id="<?php echo esc_attr( $preset_id ); ?>">
-					<div class="wpbridge-vendor-preset-logo">
-						<span class="dashicons <?php echo esc_attr( $preset['icon'] ?? 'dashicons-admin-links' ); ?> wpbridge-vendor-logo-icon"></span>
-					</div>
-
-					<div class="wpbridge-vendor-preset-body">
-						<div class="wpbridge-vendor-preset-header">
-							<span class="wpbridge-vendor-preset-name"><?php echo esc_html( $preset['name'] ); ?></span>
-							<span class="wpbridge-badge-inactive"><?php echo esc_html( $bridge_count ); ?> <?php esc_html_e( '个连接', 'wpbridge' ); ?></span>
+					<div class="wpbridge-vendor-card-main">
+						<div class="wpbridge-vendor-preset-logo">
+							<span class="dashicons <?php echo esc_attr( $preset['icon'] ?? 'dashicons-admin-links' ); ?> wpbridge-vendor-logo-icon"></span>
 						</div>
 
-						<div class="wpbridge-vendor-preset-desc">
-							<?php echo esc_html( $preset['description'] ?? '' ); ?>
-						</div>
-
-						<?php if ( $plugin_count !== null ) : ?>
-							<div class="wpbridge-vendor-preset-meta">
-								<span class="wpbridge-vendor-meta-item">
-									<span class="dashicons dashicons-admin-plugins"></span>
-									<?php printf( esc_html__( '%d 个插件', 'wpbridge' ), $plugin_count ); ?>
-								</span>
-								<?php if ( $last_sync ) : ?>
-									<span class="wpbridge-vendor-meta-item">
-										<span class="dashicons dashicons-clock"></span>
-										<?php echo esc_html( human_time_diff( $last_sync ) ); ?><?php esc_html_e( '前同步', 'wpbridge' ); ?>
-									</span>
-								<?php endif; ?>
+						<div class="wpbridge-vendor-preset-body">
+							<div class="wpbridge-vendor-preset-header">
+								<span class="wpbridge-vendor-preset-name"><?php echo esc_html( $preset['name'] ); ?></span>
+								<span class="wpbridge-badge-inactive"><?php echo esc_html( $bridge_count ); ?> <?php esc_html_e( '个连接', 'wpbridge' ); ?></span>
 							</div>
-						<?php endif; ?>
-					</div>
 
-					<div class="wpbridge-vendor-preset-actions">
-						<?php if ( $is_feature_locked( 'bridge_api' ) ) : ?>
-							<button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm" disabled>
-								<span class="dashicons dashicons-lock"></span>
-								<?php esc_html_e( '升级专业版', 'wpbridge' ); ?>
-							</button>
-							<a href="https://mall.weixiaoduo.com/product-category/wpbridge/"
-							   target="_blank"
-							   class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm">
-								<?php esc_html_e( '订阅产品', 'wpbridge' ); ?>
-								<span class="dashicons dashicons-external" style="font-size:14px;width:14px;height:14px;vertical-align:text-bottom;margin-left:2px;"></span>
-							</a>
+							<div class="wpbridge-vendor-preset-desc">
+								<?php echo esc_html( $preset['description'] ?? '' ); ?>
+							</div>
+
+							<?php if ( $plugin_count !== null ) : ?>
+								<div class="wpbridge-vendor-preset-meta">
+									<span class="wpbridge-vendor-meta-item">
+										<span class="dashicons dashicons-admin-plugins"></span>
+										<?php printf( esc_html__( '%d 个插件', 'wpbridge' ), $plugin_count ); ?>
+									</span>
+									<?php if ( $last_sync ) : ?>
+										<span class="wpbridge-vendor-meta-item">
+											<span class="dashicons dashicons-clock"></span>
+											<?php echo esc_html( human_time_diff( $last_sync ) ); ?><?php esc_html_e( '前同步', 'wpbridge' ); ?>
+										</span>
+									<?php endif; ?>
+								</div>
+							<?php endif; ?>
+						</div>
+
+						<div class="wpbridge-vendor-preset-actions">
+							<?php if ( $is_feature_locked( 'bridge_api' ) ) : ?>
+								<a href="https://mall.weixiaoduo.com/item/wpbridge-pro"
+								   target="_blank"
+								   class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm">
+									<?php esc_html_e( '升级专业版  ↗', 'wpbridge' ); ?>
+								</a>
 						<?php else : ?>
 							<button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm wpbridge-add-bridge-vendor-btn">
 								<span class="dashicons dashicons-plus-alt2"></span>
 								<?php esc_html_e( '添加连接', 'wpbridge' ); ?>
 							</button>
 						<?php endif; ?>
-					</div>
+						</div>
+					</div><!-- .wpbridge-vendor-card-main -->
 				</div>
 			</div>
 		<?php endforeach; ?>
@@ -338,6 +372,21 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 				<?php endforeach; ?>
 			</nav>
 
+			<!-- 批量操作栏 -->
+			<div class="wpbridge-plugin-bulk-bar" style="display:none;">
+				<label class="wpbridge-bulk-select-all">
+					<input type="checkbox" class="wpbridge-bulk-check-all">
+					<?php esc_html_e( '全选已安装', 'wpbridge' ); ?>
+				</label>
+				<span class="wpbridge-bulk-count"></span>
+				<button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm wpbridge-bulk-bind">
+					<?php esc_html_e( '批量接管更新', 'wpbridge' ); ?>
+				</button>
+				<button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-bulk-unbind">
+					<?php esc_html_e( '批量取消接管', 'wpbridge' ); ?>
+				</button>
+			</div>
+
 			<!-- 插件列表 -->
 			<div class="wpbridge-plugin-list" data-limit="20">
 				<?php $index = 0; foreach ( $all_plugins as $slug => $info ) :
@@ -348,24 +397,34 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 					$tested       = $info['tested'] ?? '';
 					$requires_php = $info['requires_php'] ?? '';
 					$homepage     = $info['homepage'] ?? '';
-					$vendor_label = $info['vendor'] ?? ( ( $info['source'] ?? '' ) === 'custom' ? __( '自定义', 'wpbridge' ) : '' );
+					$vendor_label = $info['vendor'] ?? '';
 					$hidden       = $index >= 20 ? ' is-overflow' : '';
 					$vendor_id    = $info['vendor_id'] ?? '';
 					$is_bound     = $is_installed && isset( $vendor_bound[ strtolower( $slug ) ] );
-					// 判断是插件还是主题
 					$item_type    = 'plugin';
 					if ( $is_installed && isset( $installed_map[ strtolower( $slug ) ] ) && strpos( $installed_map[ strtolower( $slug ) ], 'theme:' ) === 0 ) {
 						$item_type = 'theme';
 					}
+					// vendor 和 author 去重
+					$show_author = $author && $author !== $vendor_label;
 					$index++;
 				?>
 					<div class="wpbridge-plugin-list-item<?php echo esc_attr( $hidden ); ?>" data-group="<?php echo esc_attr( $group_id ); ?>">
 						<div class="wpbridge-plugin-list-main">
+							<?php if ( $is_installed && ! empty( $vendor_id ) ) : ?>
+								<input type="checkbox" class="wpbridge-bulk-check"
+									data-slug="<?php echo esc_attr( $slug ); ?>"
+									data-vendor-id="<?php echo esc_attr( $vendor_id ); ?>"
+									data-item-type="<?php echo esc_attr( $item_type ); ?>"
+									data-bound="<?php echo $is_bound ? '1' : '0'; ?>">
+							<?php endif; ?>
 							<span class="wpbridge-plugin-list-name"><?php echo esc_html( $info['name'] ?? $slug ); ?></span>
 							<?php if ( $version ) : ?>
 								<span class="wpbridge-plugin-list-version">v<?php echo esc_html( $version ); ?></span>
 							<?php endif; ?>
-							<?php if ( $is_installed ) : ?>
+							<?php if ( $is_bound ) : ?>
+								<span class="wpbridge-plugin-list-bound"><?php esc_html_e( '已接管', 'wpbridge' ); ?></span>
+							<?php elseif ( $is_installed ) : ?>
 								<span class="wpbridge-plugin-list-installed"><?php esc_html_e( '已安装', 'wpbridge' ); ?></span>
 							<?php endif; ?>
 							<span class="wpbridge-plugin-list-actions">
@@ -382,12 +441,11 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 									</label>
 								<?php endif; ?>
 								<?php if ( ! $is_installed ) : ?>
-									<button type="button"
-										class="wpbridge-plugin-action-link wpbridge-install-plugin"
+									<button type="button" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-xs wpbridge-install-plugin"
 										data-slug="<?php echo esc_attr( $slug ); ?>"
-										data-vendor-id="<?php echo esc_attr( $info['vendor_id'] ?? '' ); ?>"
-										title="<?php esc_attr_e( '安装插件', 'wpbridge' ); ?>">
+										data-vendor-id="<?php echo esc_attr( $info['vendor_id'] ?? '' ); ?>">
 										<span class="dashicons dashicons-download"></span>
+										<?php esc_html_e( '安装', 'wpbridge' ); ?>
 									</button>
 								<?php endif; ?>
 								<?php if ( $homepage ) : ?>
@@ -401,7 +459,7 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 							<?php if ( $vendor_label ) : ?>
 								<span class="wpbridge-plugin-list-vendor"><?php echo esc_html( $vendor_label ); ?></span>
 							<?php endif; ?>
-							<?php if ( $author ) : ?>
+							<?php if ( $show_author ) : ?>
 								<span class="wpbridge-plugin-list-author"><?php echo esc_html( $author ); ?></span>
 							<?php endif; ?>
 							<?php if ( $tested ) : ?>

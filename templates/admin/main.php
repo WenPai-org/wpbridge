@@ -53,15 +53,15 @@ foreach ( $sources as $source ) {
 <!-- 标题栏 -->
 <header class="wpbridge-header">
     <div class="wpbridge-header-left">
-        <span class="dashicons dashicons-networking wpbridge-logo"></span>
+        <img src="<?php echo esc_url( WPBRIDGE_URL . 'assets/images/wpbridge-logo.webp' ); ?>" alt="WPBridge" class="wpbridge-logo">
         <h1 class="wpbridge-title">
-            <?php esc_html_e( '云桥', 'wpbridge' ); ?>
+            <?php esc_html_e( '文派云桥', 'wpbridge' ); ?>
             <span class="wpbridge-version">v<?php echo esc_html( WPBRIDGE_VERSION ); ?></span>
         </h1>
     </div>
 
     <div class="wpbridge-header-right">
-        <a href="https://wenpai.org/plugins/wpbridge" target="_blank" class="wpbridge-header-link">
+        <a href="https://wpcy.com/bridge" target="_blank" class="wpbridge-header-link">
             <span class="dashicons dashicons-book"></span>
             <?php esc_html_e( '文档', 'wpbridge' ); ?>
         </a>
@@ -69,7 +69,7 @@ foreach ( $sources as $source ) {
             <span class="dashicons dashicons-editor-code"></span>
             <?php esc_html_e( 'GitHub', 'wpbridge' ); ?>
         </a>
-        <a href="https://wenpai.org/support" target="_blank" class="wpbridge-header-link">
+        <a href="https://wpcy.com/support" target="_blank" class="wpbridge-header-link">
             <span class="dashicons dashicons-sos"></span>
             <?php esc_html_e( '支持', 'wpbridge' ); ?>
         </a>
