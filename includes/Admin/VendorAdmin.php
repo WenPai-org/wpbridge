@@ -133,10 +133,9 @@ class VendorAdmin {
 			wp_send_json_error( [ 'message' => __( 'API 地址不能为空', 'wpbridge' ) ] );
 		}
 
-		// 验证 URL 协议
-		$scheme = wp_parse_url( $api_url, PHP_URL_SCHEME );
-		if ( ! in_array( $scheme, [ 'http', 'https' ], true ) ) {
-			wp_send_json_error( [ 'message' => __( 'API 地址必须使用 http 或 https 协议', 'wpbridge' ) ] );
+		// SSRF 防护：校验 URL 格式 + 禁止内网地址
+		if ( ! \WPBridge\Security\Validator::is_valid_url( $api_url ) ) {
+			wp_send_json_error( [ 'message' => __( '无效的 API 地址或不允许访问内网地址', 'wpbridge' ) ] );
 		}
 
 		// 验证供应商类型
