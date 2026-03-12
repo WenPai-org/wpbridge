@@ -134,11 +134,14 @@ class Logger {
      * @return array
      */
     private static function sanitize_context( array $context ): array {
-        $sensitive_keys = [ 'auth_token', 'api_key', 'password', 'secret' ];
+        $sensitive_keys = [ 'auth_token', 'api_key', 'api_secret', 'password', 'secret', 'license_key', 'consumer_key', 'consumer_secret', 'access_token', 'refresh_token' ];
 
         foreach ( $context as $key => $value ) {
             if ( in_array( strtolower( $key ), $sensitive_keys, true ) ) {
                 $context[ $key ] = '***REDACTED***';
+            } elseif ( is_string( $value ) && strlen( $value ) > 32 && preg_match( '/^[a-fA-F0-9]{32,}$|^[A-Za-z0-9+\/=]{32,}$/', $value ) ) {
+                // 通用脱敏：长 hex 或 base64 字符串
+                $context[ $key ] = substr( $value, 0, 6 ) . '***REDACTED***';
             } elseif ( is_array( $value ) ) {
                 $context[ $key ] = self::sanitize_context( $value );
             }

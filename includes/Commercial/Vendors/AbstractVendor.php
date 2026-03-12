@@ -94,16 +94,40 @@ abstract class AbstractVendor implements VendorInterface {
 	 * @param string $method   方法 (GET/POST)
 	 * @return array|null
 	 */
+	/**
+	 * 不应出现在 URL query 中的敏感参数名
+	 */
+	private const SENSITIVE_PARAMS = [ 'api_key', 'api_secret', 'consumer_key', 'consumer_secret', 'license_key', 'token', 'access_token' ];
+
 	protected function api_request( string $endpoint, array $params = [], string $method = 'GET' ): ?array {
-		$url = trailingslashit( $this->config['api_url'] ) . ltrim( $endpoint, '/' );
+		$api_url = $this->config['api_url'] ?? '';
+
+		// H3/H4: 强制 HTTPS
+		if ( ! empty( $api_url ) && strpos( $api_url, 'http://' ) === 0 ) {
+			$api_url = 'https://' . substr( $api_url, 7 );
+		}
+
+		$url = trailingslashit( $api_url ) . ltrim( $endpoint, '/' );
 
 		$args = [
-			'timeout' => $this->config['timeout'],
-			'headers' => $this->get_request_headers(),
+			'timeout'   => $this->config['timeout'],
+			'headers'   => $this->get_request_headers(),
+			'sslverify' => true,
 		];
 
 		if ( $method === 'GET' && ! empty( $params ) ) {
-			$url = add_query_arg( $params, $url );
+			// H2: 敏感参数不通过 URL 传输，移到 headers
+			$url_params    = [];
+			foreach ( $params as $key => $value ) {
+				if ( in_array( $key, self::SENSITIVE_PARAMS, true ) ) {
+					$args['headers'][ 'X-' . str_replace( '_', '-', ucwords( $key, '_' ) ) ] = $value;
+				} else {
+					$url_params[ $key ] = $value;
+				}
+			}
+			if ( ! empty( $url_params ) ) {
+				$url = add_query_arg( $url_params, $url );
+			}
 		} elseif ( $method === 'POST' ) {
 			$args['body'] = $params;
 		}

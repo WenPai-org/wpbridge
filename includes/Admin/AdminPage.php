@@ -478,8 +478,9 @@ class AdminPage {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
         }
 
-        $api_url   = esc_url_raw( wp_unslash( $_POST['api_url'] ?? '' ) );
-        $raw_token = sanitize_text_field( wp_unslash( $_POST['auth_token'] ?? '' ) );
+        try {
+            $api_url   = esc_url_raw( wp_unslash( $_POST['api_url'] ?? '' ) );
+            $raw_token = sanitize_text_field( wp_unslash( $_POST['auth_token'] ?? '' ) );
 
         if ( empty( $api_url ) ) {
             wp_send_json_error( [ 'message' => __( '请输入更新源地址', 'wpbridge' ) ] );
@@ -558,7 +559,7 @@ class AdminPage {
         }
 
         // 保存
-        $result = $this->source_manager->save( $source );
+        $result = $this->source_manager->add( $source );
         if ( ! $result ) {
             wp_send_json_error( [ 'message' => __( '保存失败', 'wpbridge' ) ] );
         }
@@ -575,6 +576,13 @@ class AdminPage {
                 'type' => $source->type,
             ],
         ] );
+        } catch ( \Exception $e ) {
+            Logger::error( 'ajax_add_source 异常', [ 'error' => $e->getMessage() ] );
+            wp_send_json_error( [
+                'message' => __( '操作失败，请稍后重试', 'wpbridge' ),
+                'code'    => 'internal_error',
+            ] );
+        }
     }
 
     /**
