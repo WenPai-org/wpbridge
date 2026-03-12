@@ -969,15 +969,9 @@ class AdminPage {
             wp_send_json_error( [ 'message' => __( '缺少必要参数', 'wpbridge' ) ] );
         }
 
-        // 验证 URL 格式
-        if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
-            wp_send_json_error( [ 'message' => __( '无效的 URL 格式', 'wpbridge' ) ] );
-        }
-
-        // 验证 URL 协议（防止 javascript: 或 data: URL）
-        $scheme = wp_parse_url( $url, PHP_URL_SCHEME );
-        if ( ! in_array( $scheme, [ 'http', 'https' ], true ) ) {
-            wp_send_json_error( [ 'message' => __( 'URL 必须使用 http 或 https 协议', 'wpbridge' ) ] );
+        // SSRF 防护：校验 URL 格式 + 禁止内网地址
+        if ( ! \WPBridge\Security\Validator::is_valid_url( $url ) ) {
+            wp_send_json_error( [ 'message' => __( '无效的 URL 或不允许访问内网地址', 'wpbridge' ) ] );
         }
 
         // "Git 仓库" 选项：根据 URL 自动识别具体平台
@@ -1111,15 +1105,9 @@ class AdminPage {
                     wp_send_json_error( [ 'message' => __( '请输入更新地址', 'wpbridge' ) ] );
                 }
 
-                // 验证 URL 格式
-                if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
-                    wp_send_json_error( [ 'message' => __( '无效的 URL 格式', 'wpbridge' ) ] );
-                }
-
-                // 验证 URL 协议
-                $scheme = wp_parse_url( $url, PHP_URL_SCHEME );
-                if ( ! in_array( $scheme, [ 'http', 'https' ], true ) ) {
-                    wp_send_json_error( [ 'message' => __( 'URL 必须使用 http 或 https 协议', 'wpbridge' ) ] );
+                // SSRF 防护：校验 URL 格式 + 禁止内网地址
+                if ( ! \WPBridge\Security\Validator::is_valid_url( $url ) ) {
+                    wp_send_json_error( [ 'message' => __( '无效的 URL 或不允许访问内网地址', 'wpbridge' ) ] );
                 }
 
                 // 验证源类型白名单

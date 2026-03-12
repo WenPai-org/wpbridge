@@ -863,8 +863,9 @@ class WooCommerceVendor extends AbstractVendor {
 		);
 
 		$response = wp_remote_get( $url, [
-			'timeout' => $this->config['timeout'],
-			'headers' => [ 'Accept' => 'application/json' ],
+			'timeout'   => $this->config['timeout'],
+			'sslverify' => true,
+			'headers'   => [ 'Accept' => 'application/json' ],
 		] );
 
 		if ( is_wp_error( $response ) ) {
