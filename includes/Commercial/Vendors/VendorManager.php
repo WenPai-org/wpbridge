@@ -86,8 +86,8 @@ class VendorManager {
 				continue;
 			}
 
-			// 解密敏感字段
-			$config = self::decrypt_config( $config );
+			// 解密敏感字段（兼容 secure option 存储）
+			$config = self::decrypt_config( $config, $vendor_id );
 
 			$vendor = $this->create_vendor( $vendor_id, $config );
 			if ( $vendor !== null ) {
@@ -428,12 +428,28 @@ class VendorManager {
 	/**
 	 * 解密配置中的敏感字段
 	 *
-	 * @param array $config 加密配置
+	 * 支持两种存储方式：
+	 * 1. 直接加密存储在 config 中（旧版）
+	 * 2. ***encrypted*** 占位符 + secure option（新版）
+	 *
+	 * @param array  $config    加密配置
+	 * @param string $vendor_id 供应商 ID（用于读取 secure option）
 	 * @return array 明文配置
 	 */
-	private static function decrypt_config( array $config ): array {
+	private static function decrypt_config( array $config, string $vendor_id = '' ): array {
 		foreach ( self::SENSITIVE_FIELDS as $field ) {
-			if ( ! empty( $config[ $field ] ) && Encryption::is_encrypted( $config[ $field ] ) ) {
+			if ( empty( $config[ $field ] ) ) {
+				continue;
+			}
+
+			// 新版：占位符 + secure option
+			if ( $config[ $field ] === '***encrypted***' && $vendor_id !== '' ) {
+				$config[ $field ] = Encryption::get_secure( "vendor_{$vendor_id}_{$field}", '' );
+				continue;
+			}
+
+			// 旧版：直接加密存储
+			if ( Encryption::is_encrypted( $config[ $field ] ) ) {
 				$config[ $field ] = Encryption::decrypt( $config[ $field ] );
 			}
 		}
