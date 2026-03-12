@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace WPBridge\Commercial;
 
 use WPBridge\Core\Logger;
+use WPBridge\Security\Validator;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -53,7 +54,22 @@ class BridgeClient {
 	 * @param int    $timeout    请求超时（秒）
 	 */
 	public function __construct( string $server_url, string $api_key, int $timeout = 30 ) {
-		$this->server_url = rtrim( $server_url, '/' );
+		$server_url = rtrim( $server_url, '/' );
+
+		// H3/H4: 强制 HTTPS
+		if ( strpos( $server_url, 'http://' ) === 0 ) {
+			$server_url = 'https://' . substr( $server_url, 7 );
+		}
+
+		// M8: SSRF 防护 — 禁止内网地址
+		if ( ! Validator::is_valid_url( $server_url ) ) {
+			Logger::error( 'BridgeClient: 无效的 server_url（可能为内网地址）', [
+				'url' => $server_url,
+			] );
+			$server_url = '';
+		}
+
+		$this->server_url = $server_url;
 		$this->api_key    = $api_key;
 		$this->timeout    = $timeout;
 	}
@@ -301,9 +317,10 @@ class BridgeClient {
 		$url = $this->server_url . $endpoint;
 
 		$args = [
-			'method'  => $method,
-			'timeout' => $this->timeout,
-			'headers' => [
+			'method'    => $method,
+			'timeout'   => $this->timeout,
+			'sslverify' => true,
+			'headers'   => [
 				'Content-Type' => 'application/json',
 				'Accept'       => 'application/json',
 			],

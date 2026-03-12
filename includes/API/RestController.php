@@ -175,8 +175,9 @@ class RestController {
             );
         }
 
-        // 检查是否需要认证
-        if ( ! empty( $api_settings['require_auth'] ) ) {
+        // M3: 默认要求认证，除非显式关闭
+        $require_auth = $api_settings['require_auth'] ?? true;
+        if ( $require_auth ) {
             $api_key = $this->get_api_key_from_request( $request );
 
             if ( empty( $api_key ) ) {
@@ -699,7 +700,7 @@ class RestController {
                 'id'           => $release['id'] ?? 0,
                 'tag_name'     => $release['tag_name'] ?? '',
                 'name'         => $release['name'] ?? '',
-                'body'         => $release['body'] ?? '',
+                'body'         => wp_kses_post( $release['body'] ?? '' ),
                 'draft'        => $release['draft'] ?? false,
                 'prerelease'   => $release['prerelease'] ?? false,
                 'created_at'   => $release['created_at'] ?? '',

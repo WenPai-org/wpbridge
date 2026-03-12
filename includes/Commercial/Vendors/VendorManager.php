@@ -14,6 +14,7 @@ namespace WPBridge\Commercial\Vendors;
 
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
+use WPBridge\Security\Encryption;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -70,6 +71,11 @@ class VendorManager {
 	}
 
 	/**
+	 * 需要加密的敏感配置字段
+	 */
+	private const SENSITIVE_FIELDS = [ 'api_key', 'api_secret', 'license_key', 'consumer_key', 'consumer_secret' ];
+
+	/**
 	 * 加载已配置的供应商
 	 */
 	private function load_vendors(): void {
@@ -79,6 +85,9 @@ class VendorManager {
 			if ( empty( $config['enabled'] ) ) {
 				continue;
 			}
+
+			// 解密敏感字段
+			$config = self::decrypt_config( $config );
 
 			$vendor = $this->create_vendor( $vendor_id, $config );
 			if ( $vendor !== null ) {
@@ -280,12 +289,13 @@ class VendorManager {
 	 */
 	public function add_vendor_config( string $vendor_id, array $config ): bool {
 		$vendors              = $this->settings->get( 'vendors', [] );
-		$vendors[ $vendor_id ] = $config;
+		// 加密敏感字段后存储
+		$vendors[ $vendor_id ] = self::encrypt_config( $config );
 
 		$result = $this->settings->set( 'vendors', $vendors );
 
 		if ( $result ) {
-			// 重新加载
+			// 用明文 config 创建运行时实例
 			$vendor = $this->create_vendor( $vendor_id, $config );
 			if ( $vendor !== null ) {
 				$this->vendors[ $vendor_id ] = $vendor;
@@ -398,5 +408,35 @@ class VendorManager {
 			'active_vendors' => $active_vendors,
 			'total_plugins'  => $total_plugins,
 		];
+	}
+
+	/**
+	 * 加密配置中的敏感字段
+	 *
+	 * @param array $config 明文配置
+	 * @return array 加密后的配置
+	 */
+	private static function encrypt_config( array $config ): array {
+		foreach ( self::SENSITIVE_FIELDS as $field ) {
+			if ( ! empty( $config[ $field ] ) && ! Encryption::is_encrypted( $config[ $field ] ) ) {
+				$config[ $field ] = Encryption::encrypt( $config[ $field ] );
+			}
+		}
+		return $config;
+	}
+
+	/**
+	 * 解密配置中的敏感字段
+	 *
+	 * @param array $config 加密配置
+	 * @return array 明文配置
+	 */
+	private static function decrypt_config( array $config ): array {
+		foreach ( self::SENSITIVE_FIELDS as $field ) {
+			if ( ! empty( $config[ $field ] ) && Encryption::is_encrypted( $config[ $field ] ) ) {
+				$config[ $field ] = Encryption::decrypt( $config[ $field ] );
+			}
+		}
+		return $config;
 	}
 }

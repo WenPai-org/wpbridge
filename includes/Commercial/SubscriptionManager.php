@@ -33,9 +33,9 @@ class SubscriptionManager {
 	private const CACHE_KEY = 'wpbridge_subscription';
 
 	/**
-	 * 缓存时长（秒）
+	 * 缓存时长（秒）— 缩短至 15 分钟以减少 TOCTOU 窗口
 	 */
-	private const CACHE_TTL = 3600;
+	private const CACHE_TTL = 900;
 
 	/**
 	 * 产品 → 订阅等级映射
