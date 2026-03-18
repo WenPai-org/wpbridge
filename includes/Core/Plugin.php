@@ -12,6 +12,7 @@ use WPBridge\UpdateSource\ThemeUpdater;
 use WPBridge\Admin\AdminPage;
 use WPBridge\Admin\VendorAdmin;
 use WPBridge\Commercial\CommercialManager;
+use WPBridge\Commercial\AutoMatcher;
 use WPBridge\API\RestController;
 
 // 防止直接访问
@@ -86,6 +87,13 @@ class Plugin {
      * @var RestController|null
      */
     private ?RestController $rest_controller = null;
+
+    /**
+     * 自动匹配器
+     *
+     * @var AutoMatcher|null
+     */
+    private ?AutoMatcher $auto_matcher = null;
 
     /**
      * 获取单例实例
@@ -234,6 +242,10 @@ class Plugin {
 
         // 初始化 Site Health 集成
         new SiteHealth( $this->settings );
+
+        // 初始化供应商产品自动匹配
+        $this->auto_matcher = new AutoMatcher();
+        $this->auto_matcher->init();
     }
 
     /**
@@ -445,6 +457,7 @@ class Plugin {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+            return;
         }
 
         $include_secrets = isset( $_POST['include_secrets'] ) && 'true' === $_POST['include_secrets'];
@@ -466,16 +479,19 @@ class Plugin {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+            return;
         }
 
         if ( empty( $_POST['config'] ) ) {
             wp_send_json_error( array( 'message' => __( '配置数据为空', 'wpbridge' ) ) );
+            return;
         }
 
         $config = json_decode( wp_unslash( $_POST['config'] ), true );
 
         if ( json_last_error() !== JSON_ERROR_NONE ) {
             wp_send_json_error( array( 'message' => __( 'JSON 格式无效', 'wpbridge' ) ) );
+            return;
         }
 
         $merge = isset( $_POST['merge'] ) && 'true' === $_POST['merge'];
@@ -511,6 +527,7 @@ class Plugin {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+            return;
         }
 
         $item_key  = isset( $_POST['item_key'] ) ? sanitize_text_field( wp_unslash( $_POST['item_key'] ) ) : '';
@@ -519,6 +536,7 @@ class Plugin {
 
         if ( empty( $item_key ) || empty( $lock_type ) ) {
             wp_send_json_error( array( 'message' => __( '参数不完整', 'wpbridge' ) ) );
+            return;
         }
 
         $version_lock = VersionLock::get_instance();
@@ -534,6 +552,7 @@ class Plugin {
             ) );
         } else {
             wp_send_json_error( array( 'message' => __( '锁定失败', 'wpbridge' ) ) );
+            return;
         }
     }
 
@@ -545,12 +564,14 @@ class Plugin {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+            return;
         }
 
         $item_key = isset( $_POST['item_key'] ) ? sanitize_text_field( wp_unslash( $_POST['item_key'] ) ) : '';
 
         if ( empty( $item_key ) ) {
             wp_send_json_error( array( 'message' => __( '参数不完整', 'wpbridge' ) ) );
+            return;
         }
 
         $version_lock = VersionLock::get_instance();
@@ -565,6 +586,7 @@ class Plugin {
             ) );
         } else {
             wp_send_json_error( array( 'message' => __( '解锁失败', 'wpbridge' ) ) );
+            return;
         }
     }
 
@@ -576,6 +598,7 @@ class Plugin {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+            return;
         }
 
         $item_key  = isset( $_POST['item_key'] ) ? sanitize_text_field( wp_unslash( $_POST['item_key'] ) ) : '';
@@ -583,6 +606,7 @@ class Plugin {
 
         if ( empty( $item_key ) || empty( $backup_id ) ) {
             wp_send_json_error( array( 'message' => __( '参数不完整', 'wpbridge' ) ) );
+            return;
         }
 
         $backup_manager = BackupManager::get_instance();
@@ -590,6 +614,7 @@ class Plugin {
 
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+            return;
         }
 
         wp_send_json_success( array(
@@ -605,12 +630,14 @@ class Plugin {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => __( '权限不足', 'wpbridge' ) ) );
+            return;
         }
 
         $item_key = isset( $_POST['item_key'] ) ? sanitize_text_field( wp_unslash( $_POST['item_key'] ) ) : '';
 
         if ( empty( $item_key ) ) {
             wp_send_json_error( array( 'message' => __( '参数不完整', 'wpbridge' ) ) );
+            return;
         }
 
         $backup_manager = BackupManager::get_instance();
