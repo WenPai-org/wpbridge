@@ -78,13 +78,8 @@ class GiteeHandler extends AbstractHandler {
             return null;
         }
 
-        // 构建 URL（带 access_token 参数）
+        // 构建 URL（token 通过 Authorization header 发送，避免 URL 泄露）
         $url = self::API_BASE . '/repos/' . $repo . '/releases/latest';
-
-        $token = $this->get_auth_token();
-        if ( ! empty( $token ) ) {
-            $url = add_query_arg( 'access_token', $token, $url );
-        }
 
         $data = $this->request( $url );
 
@@ -150,19 +145,12 @@ class GiteeHandler extends AbstractHandler {
             return null;
         }
 
-        // 获取仓库信息
+        // 获取仓库信息（token 通过 Authorization header 发送）
         $repo_url = self::API_BASE . '/repos/' . $repo;
-        $token = $this->get_auth_token();
-        if ( ! empty( $token ) ) {
-            $repo_url = add_query_arg( 'access_token', $token, $repo_url );
-        }
         $repo_data = $this->request( $repo_url );
 
         // 获取最新 Release
         $release_url = self::API_BASE . '/repos/' . $repo . '/releases/latest';
-        if ( ! empty( $token ) ) {
-            $release_url = add_query_arg( 'access_token', $token, $release_url );
-        }
         $release_data = $this->request( $release_url );
 
         if ( null === $repo_data ) {

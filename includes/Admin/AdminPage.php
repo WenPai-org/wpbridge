@@ -414,6 +414,7 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         $source_id = sanitize_text_field( $_POST['source_id'] ?? '' );
@@ -423,6 +424,7 @@ class AdminPage {
             wp_send_json_success( [ 'message' => __( '状态已更新', 'wpbridge' ) ] );
         } else {
             wp_send_json_error( [ 'message' => __( '更新失败', 'wpbridge' ) ] );
+            return;
         }
     }
 
@@ -434,6 +436,7 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         $source_id = sanitize_text_field( $_POST['source_id'] ?? '' );
@@ -441,6 +444,7 @@ class AdminPage {
 
         if ( null === $source ) {
             wp_send_json_error( [ 'message' => __( '源不存在', 'wpbridge' ) ] );
+            return;
         }
 
         $checker = new HealthChecker();
@@ -461,6 +465,7 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         \WPBridge\Core\Plugin::clear_all_cache();
@@ -476,6 +481,7 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         try {
@@ -484,6 +490,7 @@ class AdminPage {
 
         if ( empty( $api_url ) ) {
             wp_send_json_error( [ 'message' => __( '请输入更新源地址', 'wpbridge' ) ] );
+            return;
         }
 
         // 重复源检测
@@ -556,12 +563,14 @@ class AdminPage {
         $errors = $source->validate();
         if ( ! empty( $errors ) ) {
             wp_send_json_error( [ 'message' => implode( ', ', $errors ) ] );
+            return;
         }
 
         // 保存
         $result = $this->source_manager->add( $source );
         if ( ! $result ) {
             wp_send_json_error( [ 'message' => __( '保存失败', 'wpbridge' ) ] );
+            return;
         }
 
         wp_send_json_success( [
@@ -593,6 +602,7 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         Logger::clear();
@@ -608,6 +618,7 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         $key_name = sanitize_text_field( $_POST['key_name'] ?? '' );
@@ -620,6 +631,7 @@ class AdminPage {
             $api_key = 'wpb_' . bin2hex( random_bytes( 24 ) );
         } catch ( \Exception $e ) {
             wp_send_json_error( [ 'message' => __( '生成随机数失败', 'wpbridge' ) ] );
+            return;
         }
 
         // 生成唯一 ID
@@ -651,6 +663,7 @@ class AdminPage {
             ] );
         } else {
             wp_send_json_error( [ 'message' => __( '生成失败', 'wpbridge' ) ] );
+            return;
         }
     }
 
@@ -662,12 +675,14 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         $key_id = sanitize_text_field( $_POST['key_id'] ?? '' );
 
         if ( empty( $key_id ) ) {
             wp_send_json_error( [ 'message' => __( 'Key ID 不能为空', 'wpbridge' ) ] );
+            return;
         }
 
         // 获取当前 API 设置
@@ -687,6 +702,7 @@ class AdminPage {
 
         if ( ! $found ) {
             wp_send_json_error( [ 'message' => __( 'Key 不存在', 'wpbridge' ) ] );
+            return;
         }
 
         $api_settings['keys'] = $keys;
@@ -696,6 +712,7 @@ class AdminPage {
             wp_send_json_success( [ 'message' => __( 'API Key 已撤销', 'wpbridge' ) ] );
         } else {
             wp_send_json_error( [ 'message' => __( '撤销失败', 'wpbridge' ) ] );
+            return;
         }
     }
 
@@ -804,6 +821,7 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         $item_key   = sanitize_text_field( $_POST['item_key'] ?? '' );
@@ -811,6 +829,7 @@ class AdminPage {
 
         if ( empty( $item_key ) ) {
             wp_send_json_error( [ 'message' => __( '项目键不能为空', 'wpbridge' ) ] );
+            return;
         }
 
         $source_registry = new \WPBridge\Core\SourceRegistry();
@@ -837,6 +856,7 @@ class AdminPage {
             wp_send_json_success( [ 'message' => __( '配置已保存', 'wpbridge' ) ] );
         } else {
             wp_send_json_error( [ 'message' => __( '保存失败', 'wpbridge' ) ] );
+            return;
         }
     }
 
@@ -848,6 +868,7 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         $item_keys  = isset( $_POST['item_keys'] ) ? array_map( 'sanitize_text_field', (array) $_POST['item_keys'] ) : [];
@@ -856,12 +877,14 @@ class AdminPage {
 
         if ( empty( $item_keys ) ) {
             wp_send_json_error( [ 'message' => __( '请选择项目', 'wpbridge' ) ] );
+            return;
         }
 
         // 白名单验证操作类型
         $allowed_actions = [ 'set_source', 'reset_default', 'disable' ];
         if ( ! in_array( $action, $allowed_actions, true ) ) {
             wp_send_json_error( [ 'message' => __( '无效操作', 'wpbridge' ) ] );
+            return;
         }
 
         $source_registry = new \WPBridge\Core\SourceRegistry();
@@ -914,6 +937,7 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         $defaults_manager = new \WPBridge\Core\DefaultsManager();
@@ -957,6 +981,7 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         $item_key = sanitize_text_field( $_POST['item_key'] ?? '' );
@@ -967,11 +992,13 @@ class AdminPage {
 
         if ( empty( $item_key ) || empty( $url ) ) {
             wp_send_json_error( [ 'message' => __( '缺少必要参数', 'wpbridge' ) ] );
+            return;
         }
 
         // SSRF 防护：校验 URL 格式 + 禁止内网地址
         if ( ! \WPBridge\Security\Validator::is_valid_url( $url ) ) {
             wp_send_json_error( [ 'message' => __( '无效的 URL 或不允许访问内网地址', 'wpbridge' ) ] );
+            return;
         }
 
         // "Git 仓库" 选项：根据 URL 自动识别具体平台
@@ -1032,6 +1059,7 @@ class AdminPage {
 
         if ( ! $result ) {
             wp_send_json_error( [ 'message' => __( '创建更新源失败', 'wpbridge' ) ] );
+            return;
         }
 
         $this->sync_source_to_registry( $source );
@@ -1060,6 +1088,7 @@ class AdminPage {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+            return;
         }
 
         $item_key = sanitize_text_field( $_POST['item_key'] ?? '' );
@@ -1067,12 +1096,14 @@ class AdminPage {
 
         if ( empty( $item_key ) ) {
             wp_send_json_error( [ 'message' => __( '缺少必要参数', 'wpbridge' ) ] );
+            return;
         }
 
         // 验证模式白名单
         $allowed_modes = [ 'default', 'custom', 'disabled' ];
         if ( ! in_array( $mode, $allowed_modes, true ) ) {
             wp_send_json_error( [ 'message' => __( '无效的模式', 'wpbridge' ) ] );
+            return;
         }
 
         $source_registry = new \WPBridge\Core\SourceRegistry();
@@ -1103,11 +1134,13 @@ class AdminPage {
 
                 if ( empty( $url ) ) {
                     wp_send_json_error( [ 'message' => __( '请输入更新地址', 'wpbridge' ) ] );
+                    return;
                 }
 
                 // SSRF 防护：校验 URL 格式 + 禁止内网地址
                 if ( ! \WPBridge\Security\Validator::is_valid_url( $url ) ) {
                     wp_send_json_error( [ 'message' => __( '无效的 URL 或不允许访问内网地址', 'wpbridge' ) ] );
+                    return;
                 }
 
                 // 验证源类型白名单
@@ -1153,6 +1186,7 @@ class AdminPage {
 
                 if ( ! $save_result ) {
                     wp_send_json_error( [ 'message' => __( '创建更新源失败', 'wpbridge' ) ] );
+                    return;
                 }
 
                 $this->sync_source_to_registry( $source );
@@ -1169,6 +1203,7 @@ class AdminPage {
             wp_send_json_success( [ 'message' => __( '配置已保存', 'wpbridge' ) ] );
         } else {
             wp_send_json_error( [ 'message' => __( '保存失败', 'wpbridge' ) ] );
+            return;
         }
     }
 }

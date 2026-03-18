@@ -101,6 +101,9 @@ class BridgeClient {
 	 * @return string|null
 	 */
 	public function get_download_url( string $slug ): ?string {
+		if ( empty( $this->server_url ) ) {
+			return null;
+		}
 		// 下载端点会返回重定向或直接代理
 		return $this->server_url . "/api/v1/download/{$slug}";
 	}

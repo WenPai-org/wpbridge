@@ -147,7 +147,7 @@ class SubscriptionManager {
 
 		$response = $vendor->wc_am_product_list();
 
-		if ( empty( $response['success'] ) ) {
+		if ( ! is_array( $response ) || empty( $response['success'] ) ) {
 			Logger::warning( 'Subscription check failed', [
 				'vendor'   => self::SUBSCRIPTION_VENDOR_ID,
 				'response' => $response,
