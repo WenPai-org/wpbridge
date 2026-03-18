@@ -2,7 +2,7 @@ includes:
     - %rootDir%/../../szepeviktor/phpstan-wordpress/extension.neon
 
 parameters:
-    level: 3
+    level: 6
     paths:
         - includes
         - wpbridge.php
@@ -14,7 +14,10 @@ parameters:
             - node_modules (?)
             - backups (?)
             - examples (?)
-    # 忽略的错误模式（level 3 暂无需忽略，升级 level 时按需添加）
-    ignoreErrors: []
+    ignoreErrors:
+        - '#Call to function is_(array|string|int|bool|null) with .* will always evaluate to (true|false)#'
+        - '#Undefined variable: \$wpdb#'
+        - '#Undefined variable: \$wp_query#'
+        - '#Undefined variable: \$post#'
     checkUninitializedProperties: true
     checkMissingCallableSignature: true
