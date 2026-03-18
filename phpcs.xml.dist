@@ -1,5 +1,8 @@
 <?xml version="1.0"?>
-<ruleset name="WPBridge Coding Standards">
+<ruleset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         name="WPBridge Coding Standards"
+         xsi:noNamespaceSchemaLocation="https://schema.phpcodesniffer.com/phpcs.xsd">
+
     <description>WPBridge 插件代码规范</description>
 
     <file>.</file>
@@ -11,17 +14,25 @@
     <exclude-pattern>*/assets/*</exclude-pattern>
     <exclude-pattern>*/backups/*</exclude-pattern>
     <exclude-pattern>*/examples/*</exclude-pattern>
+    <exclude-pattern>*.min.js</exclude-pattern>
 
-    <rule ref="WordPress-Core">
+    <!-- WordPress-Extra 已包含 WordPress-Core，无需重复引用 -->
+    <rule ref="WordPress-Extra">
+        <exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
         <exclude name="Universal.Arrays.DisallowShortArraySyntax"/>
         <exclude name="Universal.Operators.DisallowShortTernary"/>
     </rule>
+
     <rule ref="WordPress-Docs"/>
-    <rule ref="WordPress-Extra">
-        <exclude name="WordPress.Files.FileName"/>
+
+    <!-- PHP 兼容性检查 -->
+    <config name="testVersion" value="8.1-"/>
+    <rule ref="PHPCompatibilityWP">
+        <include-pattern>*.php$</include-pattern>
     </rule>
 
-    <config name="testVersion" value="8.1-"/>
+    <!-- 最低 WordPress 版本（用于废弃函数检测） -->
+    <config name="minimum_wp_version" value="6.4"/>
 
     <rule ref="WordPress.WP.I18n">
         <properties>
