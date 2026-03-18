@@ -151,7 +151,12 @@ class SourceResolver {
         if ( ! empty( $secret_ref ) ) {
             $secret = get_option( 'wpbridge_secret_' . $secret_ref, '' );
             if ( ! empty( $secret ) ) {
-                $model->auth_token = Encryption::encrypt( $secret );
+                // 避免双重加密：如果已经是加密数据则直接使用
+                if ( Encryption::is_encrypted( $secret ) ) {
+                    $model->auth_token = $secret;
+                } else {
+                    $model->auth_token = Encryption::encrypt( $secret );
+                }
             }
         }
 

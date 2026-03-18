@@ -72,7 +72,7 @@ class BridgeManager {
 	public function __construct( Settings $settings, RemoteConfig $remote_config ) {
 		$this->settings       = $settings;
 		$this->remote_config  = $remote_config;
-		$this->vendor_manager = new VendorManager( $settings );
+		$this->vendor_manager = VendorManager::get_instance( $settings );
 
 		// 初始化 Bridge Server 客户端
 		$this->init_bridge_client();
@@ -310,17 +310,7 @@ class BridgeManager {
 
 		$plugin_info = $all_available[ $plugin_slug ];
 
-		// 3. 获取下载地址
-
-		if ( $gpl_result['is_gpl'] === null && $gpl_result['confidence'] < 50 ) {
-			// 无法确定，但置信度低，警告用户
-			Logger::info( 'GPL validation uncertain', [
-				'plugin' => $plugin_slug,
-				'result' => $gpl_result,
-			] );
-		}
-
-		// 3. 检查订阅限制
+		// 2. 检查订阅限制
 		$limit_check = $this->check_subscription_limit();
 		if ( ! $limit_check['allowed'] ) {
 			return [
@@ -337,18 +327,16 @@ class BridgeManager {
 			$this->settings->set( 'bridged_plugins', $bridged );
 
 			Logger::info( 'Plugin bridge enabled', [
-				'plugin'     => $plugin_slug,
-				'gpl_result' => $gpl_result,
+				'plugin' => $plugin_slug,
 			] );
 		}
 
 		return [
-			'success'     => true,
-			'message'     => __( '桥接已启用', 'wpbridge' ),
-			'code'        => 'enabled',
-			'gpl_result'  => $gpl_result,
-			'source'      => $plugin_info['source'] ?? 'official',
-			'vendor'      => $plugin_info['vendor'] ?? null,
+			'success' => true,
+			'message' => __( '桥接已启用', 'wpbridge' ),
+			'code'    => 'enabled',
+			'source'  => $plugin_info['source'] ?? 'official',
+			'vendor'  => $plugin_info['vendor'] ?? null,
 		];
 	}
 
