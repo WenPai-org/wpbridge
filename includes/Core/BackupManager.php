@@ -433,6 +433,40 @@ class BackupManager {
             return new \WP_Error( 'zip_open_failed', __( '无法打开备份文件', 'wpbridge' ) );
         }
 
+        // Zip Slip 防护：检查所有条目是否在目标目录内
+        $real_target = realpath( $target_dir );
+        if ( false === $real_target ) {
+            $zip->close();
+            return new \WP_Error( 'invalid_target', __( '目标目录不存在', 'wpbridge' ) );
+        }
+        $real_target = rtrim( $real_target, '/' ) . '/';
+
+        for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+            $entry = $zip->getNameIndex( $i );
+            // 规范化路径并检查是否包含路径遍历
+            $full_path = realpath( $target_dir ) . '/' . $entry;
+            $resolved  = realpath( dirname( $target_dir . '/' . $entry ) );
+
+            // 如果目录尚不存在，用字符串检查
+            if ( false === $resolved ) {
+                // 检查原始条目名是否包含 .. 遍历
+                $normalized = str_replace( '\\', '/', $entry );
+                if ( strpos( $normalized, '../' ) !== false || strpos( $normalized, '..' . DIRECTORY_SEPARATOR ) !== false ) {
+                    $zip->close();
+                    return new \WP_Error(
+                        'invalid_backup_archive',
+                        sprintf( __( '备份文件包含非法路径: %s', 'wpbridge' ), $entry )
+                    );
+                }
+            } elseif ( strpos( $resolved . '/', $real_target ) !== 0 ) {
+                $zip->close();
+                return new \WP_Error(
+                    'invalid_backup_archive',
+                    sprintf( __( '备份文件包含非法路径: %s', 'wpbridge' ), $entry )
+                );
+            }
+        }
+
         $zip->extractTo( $target_dir );
         $zip->close();
 
