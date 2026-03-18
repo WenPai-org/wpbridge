@@ -70,6 +70,9 @@ $version_lock = VersionLock::get_instance();
             $mode = $config['mode'] ?? ItemSourceManager::MODE_DEFAULT;
             $effective_sources = $item_manager->get_effective_sources( $item_key, $defaults_manager );
 
+            // 每次迭代重置，防止上一个插件的供应商名称泄漏到当前插件
+            $vendor_source_name = '';
+
             // 反查自定义源的 URL 和 token 状态
             $saved_url       = '';
             $has_saved_token = false;
