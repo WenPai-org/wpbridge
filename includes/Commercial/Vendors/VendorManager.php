@@ -119,10 +119,13 @@ class VendorManager {
 				return new BridgeApiVendor( $vendor_id, $name, $config );
 
 			default:
-				Logger::warning( 'Unknown vendor type', [
-					'vendor_id' => $vendor_id,
-					'type'      => $type,
-				] );
+				Logger::warning(
+					'Unknown vendor type',
+					[
+						'vendor_id' => $vendor_id,
+						'type'      => $type,
+					]
+				);
 				return null;
 		}
 	}
@@ -206,10 +209,13 @@ class VendorManager {
 					$results[]             = $plugin;
 				}
 			} catch ( \Exception $e ) {
-				Logger::error( 'Vendor search failed', [
-					'vendor' => $vendor->get_id(),
-					'error'  => $e->getMessage(),
-				] );
+				Logger::error(
+					'Vendor search failed',
+					[
+						'vendor' => $vendor->get_id(),
+						'error'  => $e->getMessage(),
+					]
+				);
 			}
 		}
 
@@ -288,7 +294,7 @@ class VendorManager {
 	 * @return bool
 	 */
 	public function add_vendor_config( string $vendor_id, array $config ): bool {
-		$vendors              = $this->settings->get( 'vendors', [] );
+		$vendors = $this->settings->get( 'vendors', [] );
 		// 加密敏感字段后存储
 		$vendors[ $vendor_id ] = self::encrypt_config( $config );
 
@@ -378,9 +384,9 @@ class VendorManager {
 					continue;
 				}
 
-				$plugin['source']    = 'vendor';
-				$plugin['vendor']    = $vendor_info['name'] ?? $vendor->get_id();
-				$plugin['vendor_id'] = $vendor->get_id();
+				$plugin['source']     = 'vendor';
+				$plugin['vendor']     = $vendor_info['name'] ?? $vendor->get_id();
+				$plugin['vendor_id']  = $vendor->get_id();
 				$all_plugins[ $slug ] = $plugin;
 			}
 		}
@@ -394,12 +400,12 @@ class VendorManager {
 	 * @return array
 	 */
 	public function get_stats(): array {
-		$total_vendors   = count( $this->vendors );
-		$active_vendors  = count( $this->get_vendors( true ) );
-		$total_plugins   = 0;
+		$total_vendors  = count( $this->vendors );
+		$active_vendors = count( $this->get_vendors( true ) );
+		$total_plugins  = 0;
 
 		foreach ( $this->get_vendors( true ) as $vendor ) {
-			$plugins       = $vendor->get_plugins( 1, 1 );
+			$plugins        = $vendor->get_plugins( 1, 1 );
 			$total_plugins += $plugins['total'] ?? 0;
 		}
 

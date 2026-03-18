@@ -16,8 +16,8 @@ use WPBridge\Core\SourceRegistry;
 use WPBridge\Core\ItemSourceManager;
 
 // $bridge_manager 和 $subscription 由 main.php 提供
-$vendors        = $bridge_manager->get_vendors();
-$presets        = PresetRegistry::get_presets();
+$vendors = $bridge_manager->get_vendors();
+$presets = PresetRegistry::get_presets();
 
 // 标记已激活的预设
 foreach ( $presets as $preset_id => &$_preset ) {
@@ -29,7 +29,7 @@ unset( $_preset );
 $bridge_count = 0;
 foreach ( $vendors as $_vc ) {
 	if ( ( $_vc['type'] ?? '' ) === 'bridge_api' ) {
-		$bridge_count++;
+		++$bridge_count;
 	}
 }
 
@@ -70,30 +70,36 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 
 		<!-- 商城供应商（一排） -->
 		<div class="wpbridge-vendor-presets-grid wpbridge-vendor-grid-2">
-			<?php foreach ( $marketplace_presets as $preset_id => $preset ) :
-				$is_activated  = ! empty( $preset['activated'] );
-				$is_coming     = ( $preset['status'] ?? '' ) === 'coming_soon';
-				$card_class    = 'wpbridge-vendor-preset-card';
-				if ( $is_activated ) $card_class .= ' is-activated';
-				if ( $is_coming ) $card_class .= ' is-coming-soon';
+			<?php
+			foreach ( $marketplace_presets as $preset_id => $preset ) :
+				$is_activated = ! empty( $preset['activated'] );
+				$is_coming    = ( $preset['status'] ?? '' ) === 'coming_soon';
+				$card_class   = 'wpbridge-vendor-preset-card';
+				if ( $is_activated ) {
+					$card_class .= ' is-activated';
+				}
+				if ( $is_coming ) {
+					$card_class .= ' is-coming-soon';
+				}
 
-				$vendor_data   = $vendors[ $preset_id ] ?? [];
-				$plugin_count  = isset( $vendor_data['plugin_count'] ) ? (int) $vendor_data['plugin_count'] : null;
-				$last_sync     = $vendor_data['last_sync'] ?? null;
-				$has_logo      = ! empty( $preset['logo'] );
-			?>
+				$vendor_data  = $vendors[ $preset_id ] ?? [];
+				$plugin_count = isset( $vendor_data['plugin_count'] ) ? (int) $vendor_data['plugin_count'] : null;
+				$last_sync    = $vendor_data['last_sync'] ?? null;
+				$has_logo     = ! empty( $preset['logo'] );
+				?>
 				<div class="<?php echo esc_attr( $card_class ); ?>" data-preset-id="<?php echo esc_attr( $preset_id ); ?>">
 					<!-- 卡片主体：Logo + 信息 + 操作 -->
 					<div class="wpbridge-vendor-card-main">
 						<div class="wpbridge-vendor-preset-logo">
-							<?php if ( $has_logo ) :
+							<?php
+							if ( $has_logo ) :
 								$logo_url = ( strpos( $preset['logo'], 'http' ) === 0 )
 									? $preset['logo']
 									: WPBRIDGE_URL . 'assets/images/' . $preset['logo'];
-							?>
+								?>
 								<img src="<?php echo esc_url( $logo_url ); ?>"
-									 alt="<?php echo esc_attr( $preset['name'] ); ?>"
-									 class="wpbridge-vendor-logo-img">
+									alt="<?php echo esc_attr( $preset['name'] ); ?>"
+									class="wpbridge-vendor-logo-img">
 							<?php else : ?>
 								<span class="dashicons <?php echo esc_attr( $preset['icon'] ?? 'dashicons-store' ); ?> wpbridge-vendor-logo-icon"></span>
 							<?php endif; ?>
@@ -147,8 +153,8 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 								</button>
 								<?php if ( ! empty( $preset['api_url'] ) ) : ?>
 									<a href="<?php echo esc_url( rtrim( $preset['api_url'], '/' ) . '/my-account/api-keys' ); ?>"
-									   target="_blank"
-									   class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm">
+										target="_blank"
+										class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm">
 										<?php esc_html_e( '获取 ↗', 'wpbridge' ); ?>
 									</a>
 								<?php endif; ?>
@@ -157,15 +163,16 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 					</div>
 
 					<!-- 激活后的订阅底栏 -->
-					<?php if ( $is_activated && ! empty( $preset['subscription_vendor'] ) ) :
-						$plan_label  = $subscription['label'] ?? $subscription['plan'] ?? 'free';
-						$plan_name   = $subscription['plan'] ?? 'free';
-						$is_free     = $plan_name === 'free';
-						$sub_status  = $subscription['status'] ?? '';
-						$checked_at  = $subscription['checked_at'] ?? 0;
-						$features    = $subscription['features'] ?? [];
-						$daily_dl    = $subscription['daily_downloads'] ?? 0;
-					?>
+					<?php
+					if ( $is_activated && ! empty( $preset['subscription_vendor'] ) ) :
+						$plan_label = $subscription['label'] ?? $subscription['plan'] ?? 'free';
+						$plan_name  = $subscription['plan'] ?? 'free';
+						$is_free    = $plan_name === 'free';
+						$sub_status = $subscription['status'] ?? '';
+						$checked_at = $subscription['checked_at'] ?? 0;
+						$features   = $subscription['features'] ?? [];
+						$daily_dl   = $subscription['daily_downloads'] ?? 0;
+						?>
 					<div class="wpbridge-vendor-card-footer">
 						<div class="wpbridge-vendor-footer-left">
 							<span class="wpbridge-subscription-badge <?php echo $is_free ? 'is-free' : ''; ?>">
@@ -216,15 +223,18 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 		</div>
 
 		<!-- Bridge API（单独一排） -->
-		<?php foreach ( $bridge_presets as $preset_id => $preset ) :
-			$is_activated  = ! empty( $preset['activated'] );
-			$card_class    = 'wpbridge-vendor-preset-card wpbridge-vendor-bridge-card';
-			if ( $is_activated ) $card_class .= ' is-activated';
+		<?php
+		foreach ( $bridge_presets as $preset_id => $preset ) :
+			$is_activated = ! empty( $preset['activated'] );
+			$card_class   = 'wpbridge-vendor-preset-card wpbridge-vendor-bridge-card';
+			if ( $is_activated ) {
+				$card_class .= ' is-activated';
+			}
 
-			$vendor_data   = $vendors[ $preset_id ] ?? [];
-			$plugin_count  = isset( $vendor_data['plugin_count'] ) ? (int) $vendor_data['plugin_count'] : null;
-			$last_sync     = $vendor_data['last_sync'] ?? null;
-		?>
+			$vendor_data  = $vendors[ $preset_id ] ?? [];
+			$plugin_count = isset( $vendor_data['plugin_count'] ) ? (int) $vendor_data['plugin_count'] : null;
+			$last_sync    = $vendor_data['last_sync'] ?? null;
+			?>
 			<div class="wpbridge-vendor-bridge-row">
 				<div class="<?php echo esc_attr( $card_class ); ?>" data-preset-id="<?php echo esc_attr( $preset_id ); ?>">
 					<div class="wpbridge-vendor-card-main">
@@ -261,8 +271,8 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 						<div class="wpbridge-vendor-preset-actions">
 							<?php if ( $is_feature_locked( 'bridge_api' ) ) : ?>
 								<a href="https://mall.weixiaoduo.com/item/wpbridge-pro"
-								   target="_blank"
-								   class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm">
+									target="_blank"
+									class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm">
 									<?php esc_html_e( '升级专业版  ↗', 'wpbridge' ); ?>
 								</a>
 						<?php else : ?>
@@ -295,7 +305,8 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 				<span class="dashicons dashicons-admin-plugins"></span>
 				<p><?php esc_html_e( '暂无可用插件，请先连接供应商或添加自定义更新源', 'wpbridge' ); ?></p>
 			</div>
-		<?php else :
+			<?php
+		else :
 			// 按来源分组统计
 			$grouped = [];
 			foreach ( $all_plugins as $slug => $info ) {
@@ -311,20 +322,20 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 			$installed_slugs   = [];
 			$installed_map     = []; // slug => plugin_file
 			foreach ( $installed_plugins as $file => $data ) {
-				$dir_slug = dirname( $file );
-				$installed_slugs[] = strtolower( $dir_slug );
+				$dir_slug                                 = dirname( $file );
+				$installed_slugs[]                        = strtolower( $dir_slug );
 				$installed_map[ strtolower( $dir_slug ) ] = $file;
 				// 也记录插件名称做模糊匹配
 				$name_slug = sanitize_title( $data['Name'] ?? '' );
 				if ( $name_slug && $name_slug !== $dir_slug ) {
-					$installed_slugs[] = $name_slug;
+					$installed_slugs[]           = $name_slug;
 					$installed_map[ $name_slug ] = $file;
 				}
 			}
 
 			// 读取已绑定到供应商源的项目
-			$_sr = new SourceRegistry();
-			$_im = new ItemSourceManager( $_sr );
+			$_sr          = new SourceRegistry();
+			$_im          = new ItemSourceManager( $_sr );
 			$vendor_bound = []; // slug => vendor_id
 			foreach ( $installed_map as $_slug => $_pfile ) {
 				$_conf = $_im->get( 'plugin:' . $_pfile );
@@ -340,7 +351,7 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 			// 已安装主题 slug 列表
 			$installed_themes = wp_get_themes();
 			foreach ( $installed_themes as $theme_slug => $theme_obj ) {
-				$installed_slugs[] = strtolower( $theme_slug );
+				$installed_slugs[]                          = strtolower( $theme_slug );
 				$installed_map[ strtolower( $theme_slug ) ] = 'theme:' . $theme_slug;
 			}
 			$installed_slugs = array_unique( $installed_slugs );
@@ -357,7 +368,7 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 					}
 				}
 			}
-		?>
+			?>
 			<!-- 来源筛选 Tab -->
 			<nav class="wpbridge-plugin-filter-tabs">
 				<button type="button" class="wpbridge-plugin-filter-tab is-active" data-filter="all">
@@ -389,7 +400,8 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 
 			<!-- 插件列表 -->
 			<div class="wpbridge-plugin-list" data-limit="20">
-				<?php $index = 0; foreach ( $all_plugins as $slug => $info ) :
+				<?php
+				$index = 0; foreach ( $all_plugins as $slug => $info ) :
 					$is_installed = in_array( strtolower( $slug ), $installed_slugs, true );
 					$group_id     = sanitize_title( $info['vendor'] ?? ( ( $info['source'] ?? '' ) === 'custom' ? __( '自定义', 'wpbridge' ) : __( '其他', 'wpbridge' ) ) );
 					$version      = $info['version'] ?? '';
@@ -407,8 +419,8 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 					}
 					// vendor 和 author 去重
 					$show_author = $author && $author !== $vendor_label;
-					$index++;
-				?>
+					++$index;
+					?>
 					<div class="wpbridge-plugin-list-item<?php echo esc_attr( $hidden ); ?>" data-group="<?php echo esc_attr( $group_id ); ?>">
 						<div class="wpbridge-plugin-list-main">
 							<?php if ( $is_installed && ! empty( $vendor_id ) ) : ?>

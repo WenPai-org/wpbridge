@@ -117,7 +117,7 @@ abstract class AbstractVendor implements VendorInterface {
 
 		if ( $method === 'GET' && ! empty( $params ) ) {
 			// H2: 敏感参数不通过 URL 传输，移到 headers
-			$url_params    = [];
+			$url_params = [];
 			foreach ( $params as $key => $value ) {
 				if ( in_array( $key, self::SENSITIVE_PARAMS, true ) ) {
 					$args['headers'][ 'X-' . str_replace( '_', '-', ucwords( $key, '_' ) ) ] = $value;
@@ -137,11 +137,14 @@ abstract class AbstractVendor implements VendorInterface {
 			: wp_remote_post( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
-			Logger::error( 'Vendor API request failed', [
-				'vendor'   => $this->get_id(),
-				'endpoint' => $endpoint,
-				'error'    => $response->get_error_message(),
-			] );
+			Logger::error(
+				'Vendor API request failed',
+				[
+					'vendor'   => $this->get_id(),
+					'endpoint' => $endpoint,
+					'error'    => $response->get_error_message(),
+				]
+			);
 			return null;
 		}
 
@@ -149,21 +152,27 @@ abstract class AbstractVendor implements VendorInterface {
 		$body = wp_remote_retrieve_body( $response );
 
 		if ( $code !== 200 ) {
-			Logger::warning( 'Vendor API non-200 response', [
-				'vendor'   => $this->get_id(),
-				'endpoint' => $endpoint,
-				'code'     => $code,
-			] );
+			Logger::warning(
+				'Vendor API non-200 response',
+				[
+					'vendor'   => $this->get_id(),
+					'endpoint' => $endpoint,
+					'code'     => $code,
+				]
+			);
 			return null;
 		}
 
 		$data = json_decode( $body, true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			Logger::error( 'Vendor API invalid JSON', [
-				'vendor'   => $this->get_id(),
-				'endpoint' => $endpoint,
-			] );
+			Logger::error(
+				'Vendor API invalid JSON',
+				[
+					'vendor'   => $this->get_id(),
+					'endpoint' => $endpoint,
+				]
+			);
 			return null;
 		}
 

@@ -126,7 +126,10 @@ class AutoMatcher {
 		$vendors        = $vendor_manager->get_vendors( true );
 
 		if ( empty( $vendors ) ) {
-			return [ 'matched' => 0, 'skipped' => 0 ];
+			return [
+				'matched' => 0,
+				'skipped' => 0,
+			];
 		}
 
 		// 获取本地已安装的插件和主题
@@ -148,23 +151,26 @@ class AutoMatcher {
 				$result   = $vendor->get_plugins();
 				$products = $result['plugins'] ?? [];
 			} catch ( \Exception $e ) {
-				Logger::error( 'AutoMatcher: 获取供应商产品失败', [
-					'vendor' => $vendor_id,
-					'error'  => $e->getMessage(),
-				] );
+				Logger::error(
+					'AutoMatcher: 获取供应商产品失败',
+					[
+						'vendor' => $vendor_id,
+						'error'  => $e->getMessage(),
+					]
+				);
 				continue;
 			}
 
 			foreach ( $products as $product ) {
 				$vendor_slug = $product['slug'] ?? '';
 				if ( empty( $vendor_slug ) ) {
-					$total_skipped++;
+					++$total_skipped;
 					continue;
 				}
 
 				// 跳过没有版本信息的产品（供应商无法提供实际更新）
 				if ( empty( $product['version'] ) ) {
-					$total_skipped++;
+					++$total_skipped;
 					continue;
 				}
 
@@ -177,7 +183,7 @@ class AutoMatcher {
 				);
 
 				if ( null === $match ) {
-					$total_skipped++;
+					++$total_skipped;
 					continue;
 				}
 
@@ -186,39 +192,49 @@ class AutoMatcher {
 				$existing = $this->item_manager->get( $item_key );
 
 				// 已有用户配置的不覆盖（自定义源或已禁用更新）
-				if ( $existing && in_array( $existing['mode'], [
-					ItemSourceManager::MODE_CUSTOM,
-					ItemSourceManager::MODE_DISABLED,
-				], true ) ) {
-					$total_skipped++;
+				if ( $existing && in_array(
+					$existing['mode'],
+					[
+						ItemSourceManager::MODE_CUSTOM,
+						ItemSourceManager::MODE_DISABLED,
+					],
+					true
+				) ) {
+					++$total_skipped;
 					continue;
 				}
 
-				$this->item_manager->set( $item_key, [
-					'item_type'  => $match['type'],
-					'item_slug'  => $match['wp_slug'],
-					'label'      => $match['label'],
-					'mode'       => ItemSourceManager::MODE_CUSTOM,
-					'source_ids' => [ $source_key => 100 ],
-					'metadata'   => [
-						'preconfigured'  => true,
-						'installed'      => true,
-						'vendor_id'      => $vendor_id,
-						'vendor_slug'    => $vendor_slug,
-						'product_id'     => $product['product_id'] ?? 0,
-						'auto_matched'   => true,
-						'matched_at'     => current_time( 'mysql' ),
-					],
-				] );
+				$this->item_manager->set(
+					$item_key,
+					[
+						'item_type'  => $match['type'],
+						'item_slug'  => $match['wp_slug'],
+						'label'      => $match['label'],
+						'mode'       => ItemSourceManager::MODE_CUSTOM,
+						'source_ids' => [ $source_key => 100 ],
+						'metadata'   => [
+							'preconfigured' => true,
+							'installed'     => true,
+							'vendor_id'     => $vendor_id,
+							'vendor_slug'   => $vendor_slug,
+							'product_id'    => $product['product_id'] ?? 0,
+							'auto_matched'  => true,
+							'matched_at'    => current_time( 'mysql' ),
+						],
+					]
+				);
 
-				$total_matched++;
+				++$total_matched;
 
-				Logger::info( 'AutoMatcher: 匹配成功', [
-					'vendor_slug' => $vendor_slug,
-					'wp_slug'     => $match['wp_slug'],
-					'item_key'    => $item_key,
-					'vendor'      => $vendor_id,
-				] );
+				Logger::info(
+					'AutoMatcher: 匹配成功',
+					[
+						'vendor_slug' => $vendor_slug,
+						'wp_slug'     => $match['wp_slug'],
+						'item_key'    => $item_key,
+						'vendor'      => $vendor_id,
+					]
+				);
 			}
 		}
 
@@ -228,10 +244,13 @@ class AutoMatcher {
 			delete_site_transient( 'update_themes' );
 		}
 
-		Logger::info( 'AutoMatcher: 扫描完成', [
-			'matched' => $total_matched,
-			'skipped' => $total_skipped,
-		] );
+		Logger::info(
+			'AutoMatcher: 扫描完成',
+			[
+				'matched' => $total_matched,
+				'skipped' => $total_skipped,
+			]
+		);
 
 		return [
 			'matched' => $total_matched,
@@ -356,23 +375,28 @@ class AutoMatcher {
 			return;
 		}
 
-		$this->source_registry->add( [
-			'source_key'         => $source_key,
-			'name'               => $vendor_info['name'] ?? $vendor_id,
-			'type'               => SourceRegistry::TYPE_VENDOR,
-			'base_url'           => $vendor_info['url'] ?? '',
-			'api_url'            => $vendor_info['url'] ?? '',
-			'enabled'            => true,
-			'default_priority'   => 100,
-			'trust_level'        => 70,
-			'capabilities'       => [ 'plugins', 'themes' ],
-			'metadata'           => [ 'vendor_id' => $vendor_id ],
-		] );
+		$this->source_registry->add(
+			[
+				'source_key'       => $source_key,
+				'name'             => $vendor_info['name'] ?? $vendor_id,
+				'type'             => SourceRegistry::TYPE_VENDOR,
+				'base_url'         => $vendor_info['url'] ?? '',
+				'api_url'          => $vendor_info['url'] ?? '',
+				'enabled'          => true,
+				'default_priority' => 100,
+				'trust_level'      => 70,
+				'capabilities'     => [ 'plugins', 'themes' ],
+				'metadata'         => [ 'vendor_id' => $vendor_id ],
+			]
+		);
 
-		Logger::info( 'AutoMatcher: 注册供应商源', [
-			'source_key' => $source_key,
-			'vendor'     => $vendor_id,
-		] );
+		Logger::info(
+			'AutoMatcher: 注册供应商源',
+			[
+				'source_key' => $source_key,
+				'vendor'     => $vendor_id,
+			]
+		);
 	}
 
 	/**

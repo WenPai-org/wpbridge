@@ -21,7 +21,7 @@ namespace WPBridge;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
-    exit;
+	exit;
 }
 
 // 插件常量
@@ -36,23 +36,29 @@ require_once WPBRIDGE_PATH . 'includes/Core/Loader.php';
 
 // 初始化插件
 function wpbridge_init() {
-    return Core\Plugin::get_instance();
+	return Core\Plugin::get_instance();
 }
 
 // 激活钩子
-register_activation_hook( __FILE__, function() {
-    Core\Plugin::activate();
+register_activation_hook(
+	__FILE__,
+	function () {
+		Core\Plugin::activate();
 
-    // 调度后台更新任务
-    $settings = new Core\Settings();
-    $updater  = new Performance\BackgroundUpdater( $settings );
-    $updater->schedule_update();
-} );
+		// 调度后台更新任务
+		$settings = new Core\Settings();
+		$updater  = new Performance\BackgroundUpdater( $settings );
+		$updater->schedule_update();
+	}
+);
 
 // 停用钩子
-register_deactivation_hook( __FILE__, function() {
-    Core\Plugin::deactivate();
-} );
+register_deactivation_hook(
+	__FILE__,
+	function () {
+		Core\Plugin::deactivate();
+	}
+);
 
 // WenPai 自更新检查器
 require_once WPBRIDGE_PATH . 'includes/class-wenpai-updater.php';
@@ -63,5 +69,5 @@ add_action( 'plugins_loaded', __NAMESPACE__ . '\\wpbridge_init' );
 
 // 注册 WP-CLI 命令
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
-    \WP_CLI::add_command( 'bridge', CLI\BridgeCommand::class );
+	\WP_CLI::add_command( 'bridge', CLI\BridgeCommand::class );
 }

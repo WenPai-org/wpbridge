@@ -9,7 +9,7 @@ namespace WPBridge\UpdateSource\Handlers;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
-    exit;
+	exit;
 }
 
 require_once __DIR__ . '/HandlerInterface.php';

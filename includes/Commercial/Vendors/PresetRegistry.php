@@ -38,17 +38,17 @@ class PresetRegistry {
 				'is_preset'   => true,
 				'removable'   => false,
 			],
-			'weixiaoduo-mall'   => [
-				'name'        => '薇晓朵商城',
-				'description' => '薇晓朵数字商城，购买后输入邮箱和授权密钥即可自动接收更新。',
-				'type'        => 'wc_am',
-				'auth_mode'   => 'wc_am',
-				'api_url'     => 'https://mall.weixiaoduo.com',
-				'status'      => 'available',
-				'icon'        => 'dashicons-cart',
-				'logo'        => 'weixiaoduo-logo.png',
-				'auth_fields' => [ 'email', 'license_key' ],
-				'is_preset'   => true,
+			'weixiaoduo-mall'    => [
+				'name'                => '薇晓朵商城',
+				'description'         => '薇晓朵数字商城，购买后输入邮箱和授权密钥即可自动接收更新。',
+				'type'                => 'wc_am',
+				'auth_mode'           => 'wc_am',
+				'api_url'             => 'https://mall.weixiaoduo.com',
+				'status'              => 'available',
+				'icon'                => 'dashicons-cart',
+				'logo'                => 'weixiaoduo-logo.png',
+				'auth_fields'         => [ 'email', 'license_key' ],
+				'is_preset'           => true,
 				'removable'           => false,
 				'subscription_vendor' => true,
 			],
@@ -112,10 +112,10 @@ class PresetRegistry {
 	 */
 	public static function get_status_labels(): array {
 		return [
-			'available'    => __( '可用', 'wpbridge' ),
-			'coming_soon'  => __( '即将上线', 'wpbridge' ),
-			'activated'    => __( '已激活', 'wpbridge' ),
-			'inactive'     => __( '未激活', 'wpbridge' ),
+			'available'   => __( '可用', 'wpbridge' ),
+			'coming_soon' => __( '即将上线', 'wpbridge' ),
+			'activated'   => __( '已激活', 'wpbridge' ),
+			'inactive'    => __( '未激活', 'wpbridge' ),
 		];
 	}
 }

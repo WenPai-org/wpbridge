@@ -63,17 +63,20 @@ class WooCommerceVendor extends AbstractVendor {
 	 * @return array
 	 */
 	protected function get_default_config(): array {
-		return array_merge( parent::get_default_config(), [
-			'auth_mode'      => 'consumer_key', // consumer_key | wc_am
-			'api_version'    => 'v2',
-			'product_id'     => '',
-			'instance'       => '',
-			'email'          => '',
-			'license_key'    => '',
-			'use_rest_api'   => true,
-			'products_endpoint' => '/wp-json/wc/v3/products',
-			'download_endpoint' => '/wp-json/wc-am/v2/download',
-		] );
+		return array_merge(
+			parent::get_default_config(),
+			[
+				'auth_mode'         => 'consumer_key', // consumer_key | wc_am
+				'api_version'       => 'v2',
+				'product_id'        => '',
+				'instance'          => '',
+				'email'             => '',
+				'license_key'       => '',
+				'use_rest_api'      => true,
+				'products_endpoint' => '/wp-json/wc/v3/products',
+				'download_endpoint' => '/wp-json/wc-am/v2/download',
+			]
+		);
 	}
 
 	/**
@@ -142,11 +145,14 @@ class WooCommerceVendor extends AbstractVendor {
 			$response = $this->wc_am_verify_key();
 			$valid    = ! empty( $response['success'] );
 		} else {
-			$response = $this->api_request( $this->config['products_endpoint'], [
-				'per_page' => 1,
-				'status'   => 'publish',
-			] );
-			$valid = $response !== null;
+			$response = $this->api_request(
+				$this->config['products_endpoint'],
+				[
+					'per_page' => 1,
+					'status'   => 'publish',
+				]
+			);
+			$valid    = $response !== null;
 		}
 
 		// 成功缓存 12 小时，失败只缓存 5 分钟（避免临时网络问题长期阻塞）
@@ -178,13 +184,16 @@ class WooCommerceVendor extends AbstractVendor {
 			return $result;
 		}
 
-		$response = $this->api_request( $this->config['products_endpoint'], [
-			'page'     => $page,
-			'per_page' => $limit,
-			'status'   => 'publish',
-			'type'     => 'simple', // 或 'variable' 取决于商店配置
-			'category' => $this->config['category'] ?? '', // 可选：按分类过滤
-		] );
+		$response = $this->api_request(
+			$this->config['products_endpoint'],
+			[
+				'page'     => $page,
+				'per_page' => $limit,
+				'status'   => 'publish',
+				'type'     => 'simple', // 或 'variable' 取决于商店配置
+				'category' => $this->config['category'] ?? '', // 可选：按分类过滤
+			]
+		);
 
 		if ( $response === null ) {
 			return [
@@ -241,7 +250,7 @@ class WooCommerceVendor extends AbstractVendor {
 		} else {
 			$products = [];
 		}
-		$plugins  = [];
+		$plugins = [];
 
 		foreach ( $products as $product ) {
 			$product_id    = (int) ( $product['product_id'] ?? 0 );
@@ -653,11 +662,14 @@ class WooCommerceVendor extends AbstractVendor {
 			}
 
 			// 首次失败 — 记录响应，尝试自动激活后重试
-			Logger::error( 'WC AM download: first attempt failed', [
-				'slug'        => $slug,
-				'product_id'  => $product_id,
-				'response'    => $response,
-			] );
+			Logger::error(
+				'WC AM download: first attempt failed',
+				[
+					'slug'       => $slug,
+					'product_id' => $product_id,
+					'response'   => $response,
+				]
+			);
 
 			$this->wc_am_activate( $product_id, $version ?: '0.0.0' );
 
@@ -674,11 +686,14 @@ class WooCommerceVendor extends AbstractVendor {
 				return $package;
 			}
 
-			Logger::error( 'WC AM download: retry after activate also failed', [
-				'slug'        => $slug,
-				'product_id'  => $product_id,
-				'response'    => $response,
-			] );
+			Logger::error(
+				'WC AM download: retry after activate also failed',
+				[
+					'slug'       => $slug,
+					'product_id' => $product_id,
+					'response'   => $response,
+				]
+			);
 
 			return null;
 		}
@@ -862,26 +877,35 @@ class WooCommerceVendor extends AbstractVendor {
 			trailingslashit( $this->config['api_url'] )
 		);
 
-		$response = wp_remote_get( $url, [
-			'timeout'   => $this->config['timeout'],
-			'sslverify' => true,
-			'headers'   => [ 'Accept' => 'application/json' ],
-		] );
+		$response = wp_remote_get(
+			$url,
+			[
+				'timeout'   => $this->config['timeout'],
+				'sslverify' => true,
+				'headers'   => [ 'Accept' => 'application/json' ],
+			]
+		);
 
 		if ( is_wp_error( $response ) ) {
-			Logger::error( "WC AM {$action} failed", [
-				'vendor' => $this->get_id(),
-				'error'  => $response->get_error_message(),
-			] );
+			Logger::error(
+				"WC AM {$action} failed",
+				[
+					'vendor' => $this->get_id(),
+					'error'  => $response->get_error_message(),
+				]
+			);
 			return null;
 		}
 
 		$code = wp_remote_retrieve_response_code( $response );
 		if ( $code !== 200 ) {
-			Logger::warning( "WC AM {$action} non-200", [
-				'vendor' => $this->get_id(),
-				'code'   => $code,
-			] );
+			Logger::warning(
+				"WC AM {$action} non-200",
+				[
+					'vendor' => $this->get_id(),
+					'code'   => $code,
+				]
+			);
 			return null;
 		}
 
@@ -889,9 +913,12 @@ class WooCommerceVendor extends AbstractVendor {
 		$data = json_decode( $body, true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			Logger::error( "WC AM {$action} invalid JSON", [
-				'vendor' => $this->get_id(),
-			] );
+			Logger::error(
+				"WC AM {$action} invalid JSON",
+				[
+					'vendor' => $this->get_id(),
+				]
+			);
 			return null;
 		}
 
@@ -909,11 +936,14 @@ class WooCommerceVendor extends AbstractVendor {
 			return null;
 		}
 
-		return $this->wc_am_request( 'deactivate', [
-			'product_id' => $product_id,
-			'instance'   => $this->get_or_create_instance(),
-			'object'     => $this->get_object(),
-		] );
+		return $this->wc_am_request(
+			'deactivate',
+			[
+				'product_id' => $product_id,
+				'instance'   => $this->get_or_create_instance(),
+				'object'     => $this->get_object(),
+			]
+		);
 	}
 
 	/**
@@ -926,10 +956,13 @@ class WooCommerceVendor extends AbstractVendor {
 			return null;
 		}
 
-		return $this->wc_am_request( 'verify_api_key_is_active', [
-			'instance' => $this->get_or_create_instance(),
-			'object'   => $this->get_object(),
-		] );
+		return $this->wc_am_request(
+			'verify_api_key_is_active',
+			[
+				'instance' => $this->get_or_create_instance(),
+				'object'   => $this->get_object(),
+			]
+		);
 	}
 
 	/**
@@ -942,10 +975,13 @@ class WooCommerceVendor extends AbstractVendor {
 			return null;
 		}
 
-		return $this->wc_am_request( 'product_list', [
-			'instance' => $this->get_or_create_instance(),
-			'object'   => $this->get_object(),
-		] );
+		return $this->wc_am_request(
+			'product_list',
+			[
+				'instance' => $this->get_or_create_instance(),
+				'object'   => $this->get_object(),
+			]
+		);
 	}
 
 	/**
@@ -962,14 +998,17 @@ class WooCommerceVendor extends AbstractVendor {
 			return null;
 		}
 
-		return $this->wc_am_request( 'update', [
-			'product_id'  => $product_id,
-			'slug'        => $slug,
-			'plugin_name' => $plugin_name,
-			'version'     => $version,
-			'instance'    => $this->get_or_create_instance(),
-			'object'      => $this->get_object(),
-		] );
+		return $this->wc_am_request(
+			'update',
+			[
+				'product_id'  => $product_id,
+				'slug'        => $slug,
+				'plugin_name' => $plugin_name,
+				'version'     => $version,
+				'instance'    => $this->get_or_create_instance(),
+				'object'      => $this->get_object(),
+			]
+		);
 	}
 
 	/**
@@ -984,12 +1023,15 @@ class WooCommerceVendor extends AbstractVendor {
 			return null;
 		}
 
-		return $this->wc_am_request( 'information', [
-			'product_id'  => $product_id,
-			'slug'        => $slug,
-			'plugin_name' => $slug . '/' . $slug . '.php',
-			'instance'    => $this->get_or_create_instance(),
-			'object'      => $this->get_object(),
-		] );
+		return $this->wc_am_request(
+			'information',
+			[
+				'product_id'  => $product_id,
+				'slug'        => $slug,
+				'plugin_name' => $slug . '/' . $slug . '.php',
+				'instance'    => $this->get_or_create_instance(),
+				'object'      => $this->get_object(),
+			]
+		);
 	}
 }

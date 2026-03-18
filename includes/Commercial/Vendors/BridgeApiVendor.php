@@ -30,9 +30,12 @@ class BridgeApiVendor extends AbstractVendor {
 	}
 
 	protected function get_default_config(): array {
-		return array_merge( parent::get_default_config(), [
-			'api_key' => '',
-		] );
+		return array_merge(
+			parent::get_default_config(),
+			[
+				'api_key' => '',
+			]
+		);
 	}
 
 	public function get_id(): string {
@@ -84,7 +87,11 @@ class BridgeApiVendor extends AbstractVendor {
 		// 获取所有源，筛选 plugin 类型
 		$sources = $this->api_request( 'wp-json/bridge/v1/sources' );
 		if ( $sources === null ) {
-			return [ 'plugins' => [], 'total' => 0, 'pages' => 0 ];
+			return [
+				'plugins' => [],
+				'total'   => 0,
+				'pages'   => 0,
+			];
 		}
 
 		$plugins = [];

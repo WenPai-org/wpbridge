@@ -105,20 +105,22 @@ class BridgeServerHandler extends AbstractHandler {
 			return null;
 		}
 
-		return UpdateInfo::from_array( [
-			'slug'         => $slug,
-			'version'      => $info['version'],
-			'download_url' => $download_url,
-			'details_url'  => $info['homepage'] ?? '',
-			'requires'     => $info['requires'] ?? '',
-			'tested'       => $info['tested'] ?? '',
-			'requires_php' => $info['requires_php'] ?? '',
-			'last_updated' => $info['updated_at'] ?? '',
-			'icons'        => $info['icons'] ?? [],
-			'banners'      => $info['banners'] ?? [],
-			'changelog'    => $info['changelog'] ?? '',
-			'description'  => $info['description'] ?? '',
-		] );
+		return UpdateInfo::from_array(
+			[
+				'slug'         => $slug,
+				'version'      => $info['version'],
+				'download_url' => $download_url,
+				'details_url'  => $info['homepage'] ?? '',
+				'requires'     => $info['requires'] ?? '',
+				'tested'       => $info['tested'] ?? '',
+				'requires_php' => $info['requires_php'] ?? '',
+				'last_updated' => $info['updated_at'] ?? '',
+				'icons'        => $info['icons'] ?? [],
+				'banners'      => $info['banners'] ?? [],
+				'changelog'    => $info['changelog'] ?? '',
+				'description'  => $info['description'] ?? '',
+			]
+		);
 	}
 
 	/**

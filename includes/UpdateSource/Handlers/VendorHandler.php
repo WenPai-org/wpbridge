@@ -83,7 +83,7 @@ class VendorHandler extends AbstractHandler {
 			return null;
 		}
 
-		$vm = VendorManager::get_instance();
+		$vm     = VendorManager::get_instance();
 		$vendor = $vm->get_vendor( $vendor_id );
 		if ( ! $vendor ) {
 			Logger::warning( '供应商不存在', [ 'vendor_id' => $vendor_id ] );
@@ -96,22 +96,27 @@ class VendorHandler extends AbstractHandler {
 		}
 
 		// 转换为 UpdateInfo（WP 标准格式）
-		$info = UpdateInfo::from_array( [
-			'slug'         => $slug,
-			'version'      => $result['version'] ?? '',
-			'download_url' => $result['download_url'] ?? '',
-			'tested'       => $result['tested'] ?? '',
-			'requires'     => $result['requires'] ?? '',
-			'requires_php' => $result['requires_php'] ?? '',
-			'changelog'    => $result['changelog'] ?? '',
-		] );
+		$info = UpdateInfo::from_array(
+			[
+				'slug'         => $slug,
+				'version'      => $result['version'] ?? '',
+				'download_url' => $result['download_url'] ?? '',
+				'tested'       => $result['tested'] ?? '',
+				'requires'     => $result['requires'] ?? '',
+				'requires_php' => $result['requires_php'] ?? '',
+				'changelog'    => $result['changelog'] ?? '',
+			]
+		);
 
-		Logger::info( '供应商发现更新', [
-			'slug'      => $slug,
-			'vendor_id' => $vendor_id,
-			'current'   => $version,
-			'new'       => $result['version'] ?? '',
-		] );
+		Logger::info(
+			'供应商发现更新',
+			[
+				'slug'      => $slug,
+				'vendor_id' => $vendor_id,
+				'current'   => $version,
+				'new'       => $result['version'] ?? '',
+			]
+		);
 
 		return $info;
 	}
@@ -128,7 +133,7 @@ class VendorHandler extends AbstractHandler {
 			return null;
 		}
 
-		$vm = VendorManager::get_instance();
+		$vm     = VendorManager::get_instance();
 		$vendor = $vm->get_vendor( $vendor_id );
 		if ( ! $vendor ) {
 			return null;
@@ -148,8 +153,8 @@ class VendorHandler extends AbstractHandler {
 			return HealthStatus::failed( '未配置供应商 ID' );
 		}
 
-		$start = microtime( true );
-		$vm = VendorManager::get_instance();
+		$start  = microtime( true );
+		$vm     = VendorManager::get_instance();
 		$vendor = $vm->get_vendor( $vendor_id );
 
 		if ( ! $vendor ) {

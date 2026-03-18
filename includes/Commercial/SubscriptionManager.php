@@ -148,10 +148,13 @@ class SubscriptionManager {
 		$response = $vendor->wc_am_product_list();
 
 		if ( ! is_array( $response ) || empty( $response['success'] ) ) {
-			Logger::warning( 'Subscription check failed', [
-				'vendor'   => self::SUBSCRIPTION_VENDOR_ID,
-				'response' => $response,
-			] );
+			Logger::warning(
+				'Subscription check failed',
+				[
+					'vendor'   => self::SUBSCRIPTION_VENDOR_ID,
+					'response' => $response,
+				]
+			);
 			return self::FREE_PLAN;
 		}
 
@@ -226,7 +229,7 @@ class SubscriptionManager {
 				continue;
 			}
 
-			$plan = $plans[ $product_id ];
+			$plan               = $plans[ $product_id ];
 			$plan['product_id'] = $product_id;
 
 			if ( $plan['priority'] > $best_plan['priority'] ) {

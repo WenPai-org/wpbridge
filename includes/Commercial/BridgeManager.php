@@ -207,7 +207,10 @@ class BridgeManager {
 		$result     = [];
 		foreach ( $commercial as $key => $value ) {
 			if ( is_string( $value ) ) {
-				$result[ $value ] = [ 'slug' => $value, 'name' => $value ];
+				$result[ $value ] = [
+					'slug' => $value,
+					'name' => $value,
+				];
 			} elseif ( is_array( $value ) && isset( $value['slug'] ) ) {
 				$result[ $value['slug'] ] = $value;
 			}
@@ -253,10 +256,13 @@ class BridgeManager {
 		$custom = $this->settings->get( 'custom_plugins', [] );
 		foreach ( $custom as $slug => $info ) {
 			if ( ! isset( $plugins[ $slug ] ) ) {
-				$plugins[ $slug ] = array_merge( $info, [
-					'source' => 'custom',
-					'vendor' => null,
-				] );
+				$plugins[ $slug ] = array_merge(
+					$info,
+					[
+						'source' => 'custom',
+						'vendor' => null,
+					]
+				);
 			}
 		}
 
@@ -326,9 +332,12 @@ class BridgeManager {
 			$bridged[] = $plugin_slug;
 			$this->settings->set( 'bridged_plugins', $bridged );
 
-			Logger::info( 'Plugin bridge enabled', [
-				'plugin' => $plugin_slug,
-			] );
+			Logger::info(
+				'Plugin bridge enabled',
+				[
+					'plugin' => $plugin_slug,
+				]
+			);
 		}
 
 		return [
@@ -550,7 +559,13 @@ class BridgeManager {
 				break;
 		}
 
-		Logger::info( 'Vendor added (v2)', [ 'vendor_id' => $vendor_id, 'type' => $type ] );
+		Logger::info(
+			'Vendor added (v2)',
+			[
+				'vendor_id' => $vendor_id,
+				'type'      => $type,
+			]
+		);
 
 		return [
 			'success' => true,
@@ -598,13 +613,16 @@ class BridgeManager {
 		string $consumer_key,
 		string $consumer_secret
 	): array {
-		return $this->add_vendor_v2( $vendor_id, [
-			'name'            => $name,
-			'type'            => $type,
-			'api_url'         => $api_url,
-			'consumer_key'    => $consumer_key,
-			'consumer_secret' => $consumer_secret,
-		] );
+		return $this->add_vendor_v2(
+			$vendor_id,
+			[
+				'name'            => $name,
+				'type'            => $type,
+				'api_url'         => $api_url,
+				'consumer_key'    => $consumer_key,
+				'consumer_secret' => $consumer_secret,
+			]
+		);
 	}
 
 	/**
@@ -688,9 +706,12 @@ class BridgeManager {
 	public function add_custom_plugin( string $plugin_slug, array $info ): array {
 		$custom = $this->settings->get( 'custom_plugins', [] );
 
-		$custom[ $plugin_slug ] = array_merge( $info, [
-			'added_at' => time(),
-		] );
+		$custom[ $plugin_slug ] = array_merge(
+			$info,
+			[
+				'added_at' => time(),
+			]
+		);
 
 		$this->settings->set( 'custom_plugins', $custom );
 

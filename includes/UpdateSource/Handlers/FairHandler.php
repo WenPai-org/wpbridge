@@ -14,7 +14,7 @@ use WPBridge\Core\Logger;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
-    exit;
+	exit;
 }
 
 /**
@@ -22,40 +22,40 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class FairHandler extends AbstractHandler {
 
-    /**
-     * 获取能力列表
-     *
-     * @return array
-     */
-    public function get_capabilities(): array {
-        return [
-            'auth'      => 'token',
-            'version'   => 'fair',
-            'download'  => 'direct',
-            'signature' => 'ed25519',
-        ];
-    }
+	/**
+	 * 获取能力列表
+	 *
+	 * @return array
+	 */
+	public function get_capabilities(): array {
+		return [
+			'auth'      => 'token',
+			'version'   => 'fair',
+			'download'  => 'direct',
+			'signature' => 'ed25519',
+		];
+	}
 
-    /**
-     * 检查更新
-     *
-     * @param string $slug    插件/主题 slug
-     * @param string $version 当前版本
-     * @return UpdateInfo|null
-     */
-    public function check_update( string $slug, string $version ): ?UpdateInfo {
-        Logger::debug( 'FAIR handler not yet implemented', [ 'slug' => $slug ] );
-        return null;
-    }
+	/**
+	 * 检查更新
+	 *
+	 * @param string $slug    插件/主题 slug
+	 * @param string $version 当前版本
+	 * @return UpdateInfo|null
+	 */
+	public function check_update( string $slug, string $version ): ?UpdateInfo {
+		Logger::debug( 'FAIR handler not yet implemented', [ 'slug' => $slug ] );
+		return null;
+	}
 
-    /**
-     * 获取项目信息
-     *
-     * @param string $slug 插件/主题 slug
-     * @return array|null
-     */
-    public function get_info( string $slug ): ?array {
-        Logger::debug( 'FAIR handler not yet implemented', [ 'slug' => $slug ] );
-        return null;
-    }
+	/**
+	 * 获取项目信息
+	 *
+	 * @param string $slug 插件/主题 slug
+	 * @return array|null
+	 */
+	public function get_info( string $slug ): ?array {
+		Logger::debug( 'FAIR handler not yet implemented', [ 'slug' => $slug ] );
+		return null;
+	}
 }

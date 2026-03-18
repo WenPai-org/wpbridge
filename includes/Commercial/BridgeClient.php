@@ -63,9 +63,12 @@ class BridgeClient {
 
 		// M8: SSRF 防护 — 禁止内网地址
 		if ( ! Validator::is_valid_url( $server_url ) ) {
-			Logger::error( 'BridgeClient: 无效的 server_url（可能为内网地址）', [
-				'url' => $server_url,
-			] );
+			Logger::error(
+				'BridgeClient: 无效的 server_url（可能为内网地址）',
+				[
+					'url' => $server_url,
+				]
+			);
 			$server_url = '';
 		}
 
@@ -84,10 +87,13 @@ class BridgeClient {
 		$response = $this->request( 'GET', "/api/v1/plugin/{$slug}" );
 
 		if ( is_wp_error( $response ) ) {
-			Logger::error( 'Failed to get plugin info', [
-				'slug'  => $slug,
-				'error' => $response->get_error_message(),
-			] );
+			Logger::error(
+				'Failed to get plugin info',
+				[
+					'slug'  => $slug,
+					'error' => $response->get_error_message(),
+				]
+			);
 			return null;
 		}
 
@@ -117,9 +123,12 @@ class BridgeClient {
 		$response = $this->request( 'GET', '/api/v1/admin/vendors', [], true );
 
 		if ( is_wp_error( $response ) ) {
-			Logger::error( 'Failed to list vendors', [
-				'error' => $response->get_error_message(),
-			] );
+			Logger::error(
+				'Failed to list vendors',
+				[
+					'error' => $response->get_error_message(),
+				]
+			);
 			return [];
 		}
 
@@ -201,9 +210,12 @@ class BridgeClient {
 		$response = $this->request( 'GET', '/api/v1/admin/plugins', [], true );
 
 		if ( is_wp_error( $response ) ) {
-			Logger::error( 'Failed to list plugins', [
-				'error' => $response->get_error_message(),
-			] );
+			Logger::error(
+				'Failed to list plugins',
+				[
+					'error' => $response->get_error_message(),
+				]
+			);
 			return [];
 		}
 

@@ -95,7 +95,7 @@ class VendorAdmin {
 	 */
 	private function get_bridge_manager(): BridgeManager {
 		if ( null === $this->bridge_manager ) {
-			$remote_config = \WPBridge\Core\RemoteConfig::get_instance();
+			$remote_config        = \WPBridge\Core\RemoteConfig::get_instance();
 			$this->bridge_manager = new BridgeManager( $this->settings, $remote_config );
 		}
 		return $this->bridge_manager;
@@ -258,16 +258,21 @@ class VendorAdmin {
 		$vendors[ $vendor_id ]['enabled'] = $enabled;
 		$this->settings->set( 'vendors', $vendors );
 
-		Logger::info( 'Vendor toggled', [
-			'vendor_id' => $vendor_id,
-			'enabled'   => $enabled,
-		] );
+		Logger::info(
+			'Vendor toggled',
+			[
+				'vendor_id' => $vendor_id,
+				'enabled'   => $enabled,
+			]
+		);
 
-		wp_send_json_success( [
-			'message' => $enabled
-				? __( '供应商已启用', 'wpbridge' )
-				: __( '供应商已禁用', 'wpbridge' ),
-		] );
+		wp_send_json_success(
+			[
+				'message' => $enabled
+					? __( '供应商已启用', 'wpbridge' )
+					: __( '供应商已禁用', 'wpbridge' ),
+			]
+		);
 	}
 
 	/**
@@ -299,28 +304,32 @@ class VendorAdmin {
 			$vendor->clear_all_cache();
 			$result = $vendor->get_plugins();
 			$count  = $result['total'] ?? count( $result['plugins'] ?? [] );
-			wp_send_json_success( [
-				'message' => sprintf(
-					/* translators: %d: plugin count */
-					__( '已同步 %d 个插件', 'wpbridge' ),
-					$count
-				),
-				'count'   => $count,
-			] );
+			wp_send_json_success(
+				[
+					'message' => sprintf(
+						/* translators: %d: plugin count */
+						__( '已同步 %d 个插件', 'wpbridge' ),
+						$count
+					),
+					'count'   => $count,
+				]
+			);
 		} else {
 			// 同步所有供应商：先清缓存
 			foreach ( $vendor_manager->get_vendors() as $v ) {
 				$v->clear_all_cache();
 			}
 			$all_plugins = $vendor_manager->get_all_plugins();
-			wp_send_json_success( [
-				'message' => sprintf(
-					/* translators: %d: plugin count */
-					__( '已同步 %d 个插件', 'wpbridge' ),
-					count( $all_plugins )
-				),
-				'count'   => count( $all_plugins ),
-			] );
+			wp_send_json_success(
+				[
+					'message' => sprintf(
+						/* translators: %d: plugin count */
+						__( '已同步 %d 个插件', 'wpbridge' ),
+						count( $all_plugins )
+					),
+					'count'   => count( $all_plugins ),
+				]
+			);
 		}
 	}
 
@@ -362,15 +371,18 @@ class VendorAdmin {
 			return;
 		}
 
-		$result = $this->get_bridge_manager()->add_vendor_v2( $preset_id, [
-			'name'        => $preset['name'],
-			'type'        => $preset['type'],
-			'auth_mode'   => $preset['auth_mode'] ?? 'wc_am',
-			'api_url'     => $preset['api_url'],
-			'email'       => $email,
-			'license_key' => $license,
-			'is_preset'   => true,
-		] );
+		$result = $this->get_bridge_manager()->add_vendor_v2(
+			$preset_id,
+			[
+				'name'        => $preset['name'],
+				'type'        => $preset['type'],
+				'auth_mode'   => $preset['auth_mode'] ?? 'wc_am',
+				'api_url'     => $preset['api_url'],
+				'email'       => $email,
+				'license_key' => $license,
+				'is_preset'   => true,
+			]
+		);
 
 		if ( ! $result['success'] ) {
 			wp_send_json_error( $result );
@@ -406,7 +418,7 @@ class VendorAdmin {
 			$sub_manager = $this->get_bridge_manager()->get_subscription_manager();
 			if ( $sub_manager ) {
 				$sub_manager->clear_cache();
-				$subscription = $sub_manager->get_subscription( true );
+				$subscription           = $sub_manager->get_subscription( true );
 				$result['subscription'] = [
 					'plan'  => $subscription['plan'] ?? 'free',
 					'label' => $subscription['label'] ?? '免费版',
@@ -522,12 +534,15 @@ class VendorAdmin {
 			$name = $host ?: $api_url;
 		}
 
-		$result = $this->get_bridge_manager()->add_vendor_v2( $vendor_id, [
-			'name'    => $name,
-			'type'    => 'bridge_api',
-			'api_url' => $api_url,
-			'api_key' => $api_key,
-		] );
+		$result = $this->get_bridge_manager()->add_vendor_v2(
+			$vendor_id,
+			[
+				'name'    => $name,
+				'type'    => 'bridge_api',
+				'api_url' => $api_url,
+				'api_key' => $api_key,
+			]
+		);
 
 		if ( $result['success'] ) {
 			$result['vendor_id'] = $vendor_id;
@@ -631,10 +646,12 @@ class VendorAdmin {
 
 		$subscription = $sub_manager->get_subscription();
 
-		wp_send_json_success( [
-			'subscription' => $subscription,
-			'is_paid'      => $sub_manager->is_paid(),
-		] );
+		wp_send_json_success(
+			[
+				'subscription' => $subscription,
+				'is_paid'      => $sub_manager->is_paid(),
+			]
+		);
 	}
 
 	/**
@@ -660,15 +677,17 @@ class VendorAdmin {
 		$sub_manager->clear_cache();
 		$subscription = $sub_manager->get_subscription( true );
 
-		wp_send_json_success( [
-			'subscription' => $subscription,
-			'is_paid'      => $sub_manager->is_paid(),
-			'message'      => sprintf(
-				/* translators: %s: plan label */
-				__( '订阅状态已刷新：%s', 'wpbridge' ),
-				$subscription['label'] ?? '免费版'
-			),
-		] );
+		wp_send_json_success(
+			[
+				'subscription' => $subscription,
+				'is_paid'      => $sub_manager->is_paid(),
+				'message'      => sprintf(
+					/* translators: %s: plan label */
+					__( '订阅状态已刷新：%s', 'wpbridge' ),
+					$subscription['label'] ?? '免费版'
+				),
+			]
+		);
 	}
 
 	/**
@@ -782,23 +801,28 @@ class VendorAdmin {
 		$installed_file = $is_theme ? $upgrader->theme_info() : $upgrader->plugin_info();
 		$type_label     = $is_theme ? __( '主题', 'wpbridge' ) : __( '插件', 'wpbridge' );
 
-		Logger::info( 'Package installed via vendor', [
-			'slug'      => $plugin_slug,
-			'vendor_id' => $vendor_id,
-			'type'      => $is_theme ? 'theme' : 'plugin',
-			'file'      => $installed_file,
-		] );
+		Logger::info(
+			'Package installed via vendor',
+			[
+				'slug'      => $plugin_slug,
+				'vendor_id' => $vendor_id,
+				'type'      => $is_theme ? 'theme' : 'plugin',
+				'file'      => $installed_file,
+			]
+		);
 
-		wp_send_json_success( [
-			'message'     => sprintf(
-				/* translators: 1: type label, 2: slug */
-				__( '%1$s %2$s 安装成功', 'wpbridge' ),
-				$type_label,
-				$plugin_slug
-			),
-			'plugin_file' => $installed_file,
-			'type'        => $is_theme ? 'theme' : 'plugin',
-		] );
+		wp_send_json_success(
+			[
+				'message'     => sprintf(
+					/* translators: 1: type label, 2: slug */
+					__( '%1$s %2$s 安装成功', 'wpbridge' ),
+					$type_label,
+					$plugin_slug
+				),
+				'plugin_file' => $installed_file,
+				'type'        => $is_theme ? 'theme' : 'plugin',
+			]
+		);
 	}
 
 	/**
@@ -838,10 +862,10 @@ class VendorAdmin {
 	 * @return void
 	 */
 	public function render_vendor_settings(): void {
-		$vendors      = $this->get_bridge_manager()->get_vendors();
-		$custom       = $this->settings->get( 'custom_plugins', [] );
-		$all_plugins  = $this->get_bridge_manager()->get_all_available_plugins();
-		$stats        = $this->get_bridge_manager()->get_stats();
+		$vendors     = $this->get_bridge_manager()->get_vendors();
+		$custom      = $this->settings->get( 'custom_plugins', [] );
+		$all_plugins = $this->get_bridge_manager()->get_all_available_plugins();
+		$stats       = $this->get_bridge_manager()->get_stats();
 
 		include WPBRIDGE_PATH . 'templates/admin/vendor-settings.php';
 	}
@@ -865,7 +889,7 @@ class VendorAdmin {
 		$bridge_count = 0;
 		foreach ( $vendors as $vid => $vc ) {
 			if ( ( $vc['type'] ?? '' ) === 'bridge_api' ) {
-				$bridge_count++;
+				++$bridge_count;
 			}
 		}
 
@@ -873,14 +897,14 @@ class VendorAdmin {
 		$subscription = $sub_manager ? $sub_manager->get_subscription() : null;
 
 		return [
-			'vendors'       => $vendors,
-			'presets'        => $presets,
-			'bridge_count'   => $bridge_count,
-			'custom'        => $this->settings->get( 'custom_plugins', [] ),
-			'all_plugins'   => $this->get_bridge_manager()->get_all_available_plugins(),
-			'stats'          => $this->get_bridge_manager()->get_stats(),
-			'subscription'   => $subscription,
-			'vendor_types'  => [
+			'vendors'            => $vendors,
+			'presets'            => $presets,
+			'bridge_count'       => $bridge_count,
+			'custom'             => $this->settings->get( 'custom_plugins', [] ),
+			'all_plugins'        => $this->get_bridge_manager()->get_all_available_plugins(),
+			'stats'              => $this->get_bridge_manager()->get_stats(),
+			'subscription'       => $subscription,
+			'vendor_types'       => [
 				'woocommerce' => __( 'WooCommerce 商店', 'wpbridge' ),
 				'wc_am'       => __( 'WC API Manager', 'wpbridge' ),
 				'bridge_api'  => __( 'Bridge API', 'wpbridge' ),
@@ -961,11 +985,13 @@ class VendorAdmin {
 		}
 
 		if ( $result ) {
-			wp_send_json_success( [
-				'message' => $enabled
-					? __( '已启用供应商更新', 'wpbridge' )
-					: __( '已恢复默认更新源', 'wpbridge' ),
-			] );
+			wp_send_json_success(
+				[
+					'message' => $enabled
+						? __( '已启用供应商更新', 'wpbridge' )
+						: __( '已恢复默认更新源', 'wpbridge' ),
+				]
+			);
 		} else {
 			wp_send_json_error( [ 'message' => __( '操作失败', 'wpbridge' ) ] );
 			return;
@@ -981,7 +1007,7 @@ class VendorAdmin {
 	 * @return void
 	 */
 	private function register_vendor_source( string $vendor_id, string $vendor_name, string $api_url ): void {
-		$source_key = 'vendor_' . $vendor_id;
+		$source_key      = 'vendor_' . $vendor_id;
 		$source_registry = new SourceRegistry();
 
 		// 如果已存在，跳过
@@ -989,21 +1015,26 @@ class VendorAdmin {
 			return;
 		}
 
-		$source_registry->add( [
-			'source_key'       => $source_key,
-			'name'             => $vendor_name . __( ' (供应商)', 'wpbridge' ),
-			'type'             => SourceRegistry::TYPE_VENDOR,
-			'api_url'          => $api_url ?: 'vendor://' . $vendor_id,
-			'enabled'          => true,
-			'is_preset'        => false,
-			'default_priority' => 50,
-			'metadata'         => [ 'vendor_id' => $vendor_id ],
-		] );
+		$source_registry->add(
+			[
+				'source_key'       => $source_key,
+				'name'             => $vendor_name . __( ' (供应商)', 'wpbridge' ),
+				'type'             => SourceRegistry::TYPE_VENDOR,
+				'api_url'          => $api_url ?: 'vendor://' . $vendor_id,
+				'enabled'          => true,
+				'is_preset'        => false,
+				'default_priority' => 50,
+				'metadata'         => [ 'vendor_id' => $vendor_id ],
+			]
+		);
 
-		Logger::info( '供应商已注册为更新源', [
-			'vendor_id'  => $vendor_id,
-			'source_key' => $source_key,
-		] );
+		Logger::info(
+			'供应商已注册为更新源',
+			[
+				'vendor_id'  => $vendor_id,
+				'source_key' => $source_key,
+			]
+		);
 	}
 
 	/**
@@ -1013,16 +1044,19 @@ class VendorAdmin {
 	 * @return void
 	 */
 	private function unregister_vendor_source( string $vendor_id ): void {
-		$source_key = 'vendor_' . $vendor_id;
+		$source_key      = 'vendor_' . $vendor_id;
 		$source_registry = new SourceRegistry();
 
 		if ( $source_registry->get( $source_key ) ) {
 			$source_registry->delete( $source_key );
 
-			Logger::info( '供应商更新源已删除', [
-				'vendor_id'  => $vendor_id,
-				'source_key' => $source_key,
-			] );
+			Logger::info(
+				'供应商更新源已删除',
+				[
+					'vendor_id'  => $vendor_id,
+					'source_key' => $source_key,
+				]
+			);
 		}
 	}
 
