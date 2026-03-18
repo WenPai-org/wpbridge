@@ -111,6 +111,7 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$vendor_id       = sanitize_key( $_POST['vendor_id'] ?? '' );
@@ -123,25 +124,30 @@ class VendorAdmin {
 		// 验证必填字段
 		if ( empty( $vendor_id ) ) {
 			wp_send_json_error( [ 'message' => __( '供应商 ID 不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		if ( empty( $name ) ) {
 			wp_send_json_error( [ 'message' => __( '供应商名称不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		if ( empty( $api_url ) ) {
 			wp_send_json_error( [ 'message' => __( 'API 地址不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		// SSRF 防护：校验 URL 格式 + 禁止内网地址
 		if ( ! \WPBridge\Security\Validator::is_valid_url( $api_url ) ) {
 			wp_send_json_error( [ 'message' => __( '无效的 API 地址或不允许访问内网地址', 'wpbridge' ) ] );
+			return;
 		}
 
 		// 验证供应商类型
 		$allowed_types = [ 'woocommerce', 'wc_am', 'bridge_api' ];
 		if ( ! in_array( $type, $allowed_types, true ) ) {
 			wp_send_json_error( [ 'message' => __( '不支持的供应商类型', 'wpbridge' ) ] );
+			return;
 		}
 
 		$result = $this->get_bridge_manager()->add_vendor(
@@ -157,6 +163,7 @@ class VendorAdmin {
 			wp_send_json_success( $result );
 		} else {
 			wp_send_json_error( $result );
+			return;
 		}
 	}
 
@@ -170,12 +177,14 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$vendor_id = sanitize_key( $_POST['vendor_id'] ?? '' );
 
 		if ( empty( $vendor_id ) ) {
 			wp_send_json_error( [ 'message' => __( '供应商 ID 不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		$result = $this->get_bridge_manager()->remove_vendor( $vendor_id );
@@ -184,6 +193,7 @@ class VendorAdmin {
 			wp_send_json_success( $result );
 		} else {
 			wp_send_json_error( $result );
+			return;
 		}
 	}
 
@@ -197,12 +207,14 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$vendor_id = sanitize_key( $_POST['vendor_id'] ?? '' );
 
 		if ( empty( $vendor_id ) ) {
 			wp_send_json_error( [ 'message' => __( '供应商 ID 不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		$result = $this->get_bridge_manager()->test_vendor_connection( $vendor_id );
@@ -211,6 +223,7 @@ class VendorAdmin {
 			wp_send_json_success( $result );
 		} else {
 			wp_send_json_error( $result );
+			return;
 		}
 	}
 
@@ -224,6 +237,7 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$vendor_id = sanitize_key( $_POST['vendor_id'] ?? '' );
@@ -231,12 +245,14 @@ class VendorAdmin {
 
 		if ( empty( $vendor_id ) ) {
 			wp_send_json_error( [ 'message' => __( '供应商 ID 不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		$vendors = $this->settings->get( 'vendors', [] );
 
 		if ( ! isset( $vendors[ $vendor_id ] ) ) {
 			wp_send_json_error( [ 'message' => __( '供应商不存在', 'wpbridge' ) ] );
+			return;
 		}
 
 		$vendors[ $vendor_id ]['enabled'] = $enabled;
@@ -264,6 +280,7 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$vendor_id = sanitize_key( $_POST['vendor_id'] ?? '' );
@@ -317,6 +334,7 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$preset_id = sanitize_key( $_POST['preset_id'] ?? '' );
@@ -325,19 +343,23 @@ class VendorAdmin {
 
 		if ( empty( $preset_id ) ) {
 			wp_send_json_error( [ 'message' => __( '预设 ID 不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		$preset = PresetRegistry::get_preset( $preset_id );
 		if ( $preset === null ) {
 			wp_send_json_error( [ 'message' => __( '无效的预设供应商', 'wpbridge' ) ] );
+			return;
 		}
 
 		if ( ( $preset['status'] ?? '' ) === 'coming_soon' ) {
 			wp_send_json_error( [ 'message' => __( '该供应商即将上线，暂不可用', 'wpbridge' ) ] );
+			return;
 		}
 
 		if ( empty( $email ) || empty( $license ) ) {
 			wp_send_json_error( [ 'message' => __( '请填写邮箱和授权密钥', 'wpbridge' ) ] );
+			return;
 		}
 
 		$result = $this->get_bridge_manager()->add_vendor_v2( $preset_id, [
@@ -417,17 +439,20 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$preset_id = sanitize_key( $_POST['preset_id'] ?? '' );
 
 		if ( empty( $preset_id ) ) {
 			wp_send_json_error( [ 'message' => __( '预设 ID 不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		$preset = PresetRegistry::get_preset( $preset_id );
 		if ( $preset === null ) {
 			wp_send_json_error( [ 'message' => __( '无效的预设供应商', 'wpbridge' ) ] );
+			return;
 		}
 
 		$result = $this->get_bridge_manager()->remove_vendor( $preset_id );
@@ -451,6 +476,7 @@ class VendorAdmin {
 			wp_send_json_success( $result );
 		} else {
 			wp_send_json_error( $result );
+			return;
 		}
 	}
 
@@ -464,6 +490,7 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$name    = sanitize_text_field( $_POST['name'] ?? '' );
@@ -472,16 +499,19 @@ class VendorAdmin {
 
 		if ( empty( $api_url ) ) {
 			wp_send_json_error( [ 'message' => __( 'API 地址不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		if ( empty( $api_key ) ) {
 			wp_send_json_error( [ 'message' => __( 'API Key 不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		// 验证 URL 协议
 		$scheme = wp_parse_url( $api_url, PHP_URL_SCHEME );
 		if ( ! in_array( $scheme, [ 'http', 'https' ], true ) ) {
 			wp_send_json_error( [ 'message' => __( 'API 地址必须使用 http 或 https 协议', 'wpbridge' ) ] );
+			return;
 		}
 
 		// 自动生成 vendor_id
@@ -508,6 +538,7 @@ class VendorAdmin {
 			wp_send_json_success( $result );
 		} else {
 			wp_send_json_error( $result );
+			return;
 		}
 	}
 
@@ -521,6 +552,7 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$plugin_slug = sanitize_key( $_POST['plugin_slug'] ?? '' );
@@ -529,6 +561,7 @@ class VendorAdmin {
 
 		if ( empty( $plugin_slug ) ) {
 			wp_send_json_error( [ 'message' => __( '插件 slug 不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		$info = [
@@ -542,6 +575,7 @@ class VendorAdmin {
 			wp_send_json_success( $result );
 		} else {
 			wp_send_json_error( $result );
+			return;
 		}
 	}
 
@@ -555,12 +589,14 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$plugin_slug = sanitize_key( $_POST['plugin_slug'] ?? '' );
 
 		if ( empty( $plugin_slug ) ) {
 			wp_send_json_error( [ 'message' => __( '插件 slug 不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		$result = $this->get_bridge_manager()->remove_custom_plugin( $plugin_slug );
@@ -569,6 +605,7 @@ class VendorAdmin {
 			wp_send_json_success( $result );
 		} else {
 			wp_send_json_error( $result );
+			return;
 		}
 	}
 
@@ -582,12 +619,14 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$sub_manager = $this->get_bridge_manager()->get_subscription_manager();
 
 		if ( ! $sub_manager ) {
 			wp_send_json_error( [ 'message' => __( '订阅管理器未初始化', 'wpbridge' ) ] );
+			return;
 		}
 
 		$subscription = $sub_manager->get_subscription();
@@ -608,12 +647,14 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$sub_manager = $this->get_bridge_manager()->get_subscription_manager();
 
 		if ( ! $sub_manager ) {
 			wp_send_json_error( [ 'message' => __( '订阅管理器未初始化', 'wpbridge' ) ] );
+			return;
 		}
 
 		$sub_manager->clear_cache();
@@ -640,18 +681,21 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$bridge_client = $this->get_bridge_manager()->get_bridge_client();
 
 		if ( ! $bridge_client ) {
 			wp_send_json_error( [ 'message' => __( 'Bridge Server 未配置', 'wpbridge' ) ] );
+			return;
 		}
 
 		if ( $bridge_client->health_check() ) {
 			wp_send_json_success( [ 'message' => __( '连接成功', 'wpbridge' ) ] );
 		} else {
 			wp_send_json_error( [ 'message' => __( '连接失败', 'wpbridge' ) ] );
+			return;
 		}
 	}
 
@@ -665,6 +709,7 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'install_plugins' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		// 商业包体较大，延长执行时间
@@ -675,6 +720,7 @@ class VendorAdmin {
 
 		if ( empty( $plugin_slug ) ) {
 			wp_send_json_error( [ 'message' => __( '插件 slug 不能为空', 'wpbridge' ) ] );
+			return;
 		}
 
 		$vendor_manager = $this->get_bridge_manager()->get_vendor_manager();
@@ -682,6 +728,7 @@ class VendorAdmin {
 
 		if ( empty( $download_url ) ) {
 			wp_send_json_error( [ 'message' => __( '无法获取下载地址，请检查授权是否有效', 'wpbridge' ) ] );
+			return;
 		}
 
 		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
@@ -694,6 +741,7 @@ class VendorAdmin {
 		$tmpfile = download_url( $download_url, 600 );
 		if ( is_wp_error( $tmpfile ) ) {
 			wp_send_json_error( [ 'message' => __( '下载失败：', 'wpbridge' ) . $tmpfile->get_error_message() ] );
+			return;
 		}
 
 		// 检查 zip 内容判断是插件还是主题
@@ -704,6 +752,7 @@ class VendorAdmin {
 			if ( ! current_user_can( 'install_themes' ) ) {
 				@unlink( $tmpfile );
 				wp_send_json_error( [ 'message' => __( '没有安装主题的权限', 'wpbridge' ) ] );
+				return;
 			}
 			$upgrader = new \Theme_Upgrader( $skin );
 		} else {
@@ -720,12 +769,14 @@ class VendorAdmin {
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( [ 'message' => $result->get_error_message() ] );
+			return;
 		}
 
 		if ( $result === false ) {
 			$errors = $skin->get_errors();
 			$msg    = is_wp_error( $errors ) ? $errors->get_error_message() : __( '安装失败', 'wpbridge' );
 			wp_send_json_error( [ 'message' => $msg ] );
+			return;
 		}
 
 		$installed_file = $is_theme ? $upgrader->theme_info() : $upgrader->plugin_info();
@@ -850,6 +901,7 @@ class VendorAdmin {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( [ 'message' => __( '权限不足', 'wpbridge' ) ] );
+			return;
 		}
 
 		$slug      = sanitize_text_field( wp_unslash( $_POST['plugin_slug'] ?? '' ) );
@@ -859,6 +911,7 @@ class VendorAdmin {
 
 		if ( empty( $slug ) || empty( $vendor_id ) ) {
 			wp_send_json_error( [ 'message' => __( '参数不完整', 'wpbridge' ) ] );
+			return;
 		}
 
 		// 根据类型构建 item_key
@@ -876,6 +929,7 @@ class VendorAdmin {
 				}
 				if ( empty( $found_slug ) ) {
 					wp_send_json_error( [ 'message' => __( '未找到已安装的主题', 'wpbridge' ) ] );
+					return;
 				}
 				$slug = $found_slug;
 			}
@@ -885,6 +939,7 @@ class VendorAdmin {
 			$plugin_file = $this->resolve_plugin_file( $slug );
 			if ( empty( $plugin_file ) ) {
 				wp_send_json_error( [ 'message' => __( '未找到已安装的插件', 'wpbridge' ) ] );
+				return;
 			}
 			$item_key = 'plugin:' . $plugin_file;
 		}
@@ -898,6 +953,7 @@ class VendorAdmin {
 			// 确保源存在
 			if ( ! $source_registry->get( $source_key ) ) {
 				wp_send_json_error( [ 'message' => __( '供应商更新源不存在，请先激活供应商', 'wpbridge' ) ] );
+				return;
 			}
 			$result = $item_manager->set_source( $item_key, $source_key, 50 );
 		} else {
@@ -912,6 +968,7 @@ class VendorAdmin {
 			] );
 		} else {
 			wp_send_json_error( [ 'message' => __( '操作失败', 'wpbridge' ) ] );
+			return;
 		}
 	}
 
