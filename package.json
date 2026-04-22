@@ -1,0 +1,29 @@
+{
+  "name": "wpbridge",
+  "version": "1.0.0",
+  "description": "\u6587\u6d3e\u4e91\u6865\u63d2\u4ef6",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "wp-env:start": "wp-env-start-patched .",
+    "wp-env:stop": "wp-env stop",
+    "wp-env:destroy": "wp-env destroy",
+    "e2e": "playwright test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@feicode.com:2222/WenPai-org/wpbridge.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@wordpress/env": "^11.2.0"
+  }
+}
