@@ -141,16 +141,23 @@ class WPBridge_Updater {
 			return $update;
 		}
 
-		$data = $response['plugins'][ $this->plugin_file ];
+		$data        = $response['plugins'][ $this->plugin_file ];
+		$new_version = sanitize_text_field( (string) ( $data['version'] ?? '' ) );
+		$package     = esc_url_raw( (string) ( $data['package'] ?? '' ) );
+
+		// 失败时保留 WordPress 已有结果；拒绝降级、同版本和非 HTTPS 安装包。
+		if ( ! version_compare( $new_version, $this->version, '>' ) || 'https' !== wp_parse_url( $package, PHP_URL_SCHEME ) ) {
+			return $update;
+		}
 
 		return (object) [
 			'id'           => $data['id'] ?? '',
 			'slug'         => $data['slug'] ?? $this->slug,
 			'plugin'       => $this->plugin_file,
-			'version'      => $data['version'] ?? '',
-			'new_version'  => $data['version'] ?? '',
+			'version'      => $new_version,
+			'new_version'  => $new_version,
 			'url'          => $data['url'] ?? '',
-			'package'      => $data['package'] ?? '',
+			'package'      => $package,
 			'icons'        => $data['icons'] ?? [],
 			'banners'      => $data['banners'] ?? [],
 			'requires'     => $data['requires'] ?? '',
@@ -233,7 +240,7 @@ class WPBridge_Updater {
 	 *
 	 * @param string     $endpoint API 端点（不含 /api/v1/ 前缀）.
 	 * @param array|null $body     POST 请求体（null 则用 GET）.
-	 * @return array|WP_Error 解码后的响应或错误。
+	 * @return array|\WP_Error 解码后的响应或错误。
 	 */
 	private function api_request( string $endpoint, ?array $body = null ) {
 		$url = self::API_URL . '/' . ltrim( $endpoint, '/' );
@@ -286,8 +293,12 @@ class WPBridge_Updater {
 	 * @return string HTML。
 	 */
 	private function markdown_to_html( string $text ): string {
-		if ( empty( $text ) || str_starts_with( trim( $text ), '<' ) ) {
-			return $text;
+		if ( empty( $text ) ) {
+			return '';
+		}
+
+		if ( 0 === strpos( trim( $text ), '<' ) ) {
+			return wp_kses_post( $text );
 		}
 
 		// 截断 feicode-ai 自动追加的 AI 摘要（以 HTML 注释标记为界）.
@@ -348,7 +359,7 @@ class WPBridge_Updater {
 			$html .= "</ul>\n";
 		}
 
-		return $html;
+		return wp_kses_post( $html );
 	}
 
 	/**
@@ -364,6 +375,6 @@ class WPBridge_Updater {
 		$text = preg_replace( '/`(.+?)`/', '<code>$1</code>', $text );
 		$text = preg_replace( '/\[([^\]]+)\]\(([^)]+)\)/', '<a href="$2">$1</a>', $text );
 
-		return $text;
+		return wp_kses_post( $text );
 	}
 }

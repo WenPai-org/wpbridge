@@ -1,0 +1,3 @@
+[allowlist]
+description = "Ignore the documented API placeholder, not a usable credential"
+regexes = ['''X-WPBridge-Key:\s*your_api_key''']

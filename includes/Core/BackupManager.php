@@ -141,9 +141,9 @@ class BackupManager {
 	/**
 	 * 更新前创建备份
 	 *
-	 * @param bool|WP_Error $response 响应
+	 * @param bool|\WP_Error $response 响应
 	 * @param array         $hook_extra 额外参数
-	 * @return bool|WP_Error
+	 * @return bool|\WP_Error
 	 */
 	public function pre_install_backup( $response, $hook_extra ) {
 		// 检查是否启用了备份
@@ -363,7 +363,7 @@ class BackupManager {
 	 *
 	 * @param string $item_key  项目键
 	 * @param string $backup_id 备份 ID
-	 * @return bool|WP_Error
+	 * @return bool|\WP_Error
 	 */
 	public function rollback( string $item_key, string $backup_id ) {
 		$item_backups = $this->get_item_backups( $item_key );
@@ -420,7 +420,7 @@ class BackupManager {
 	 *
 	 * @param string $zip_path   ZIP 路径
 	 * @param string $target_dir 目标目录
-	 * @return bool|WP_Error
+	 * @return bool|\WP_Error
 	 */
 	private function extract_zip( string $zip_path, string $target_dir ) {
 		if ( ! class_exists( 'ZipArchive' ) ) {

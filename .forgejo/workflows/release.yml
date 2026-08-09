@@ -179,6 +179,8 @@ jobs:
             --exclude=".github" \
             --exclude=".forgejo" \
             --exclude=".gitignore" \
+            --exclude=".gitleaks.toml" \
+            --exclude=".wp-env.json" \
             --exclude=".gitattributes" \
             --exclude=".editorconfig" \
             --exclude=".env*" \
@@ -202,7 +204,6 @@ jobs:
             --exclude="Gruntfile.js" \
             --exclude="webpack.config.js" \
             --exclude="*.md" \
-            --exclude="LICENSE" \
             --exclude="Makefile" \
             ./ "$BUILD_DIR/"
 

@@ -175,11 +175,11 @@ class AdminPage {
 		}
 
 		if ( ! wp_verify_nonce( $_POST['wpbridge_nonce'] ?? '', 'wpbridge_action' ) ) {
-			wp_die( __( '安全检查失败', 'wpbridge' ) );
+			wp_die( esc_html__( '安全检查失败', 'wpbridge' ) );
 		}
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( __( '权限不足', 'wpbridge' ) );
+			wp_die( esc_html__( '权限不足', 'wpbridge' ) );
 		}
 
 		$action = sanitize_text_field( $_POST['wpbridge_action'] );
@@ -326,8 +326,15 @@ class AdminPage {
 		}
 
 		if ( $this->source_manager->delete( $source_id ) ) {
-			$registry = new SourceRegistry();
+			$registry        = new SourceRegistry();
+			$registry_source = $registry->get( $source_id );
 			$registry->delete( $source_id );
+
+			if ( ! empty( $registry_source['auth_secret_ref'] ) ) {
+				delete_option( 'wpbridge_secret_' . $registry_source['auth_secret_ref'] );
+			}
+
+			$this->clear_update_transients();
 			$this->add_notice( 'success', __( '更新源已删除', 'wpbridge' ) );
 		} else {
 			$this->add_notice( 'error', __( '删除失败，可能是预置源', 'wpbridge' ) );
@@ -420,12 +427,38 @@ class AdminPage {
 		$source_id = sanitize_text_field( $_POST['source_id'] ?? '' );
 		$enabled   = ! empty( $_POST['enabled'] );
 
-		if ( $this->source_manager->toggle( $source_id, $enabled ) ) {
+		$legacy_source   = $this->source_manager->get( $source_id );
+		$registry       = new SourceRegistry();
+		$registry_source = $registry->get( $source_id );
+
+		if ( null === $legacy_source && null === $registry_source ) {
+			wp_send_json_error( [ 'message' => __( '更新源不存在', 'wpbridge' ) ] );
+			return;
+		}
+
+		$legacy_ok = null === $legacy_source
+			|| $legacy_source->enabled === $enabled
+			|| $this->source_manager->toggle( $source_id, $enabled );
+		$registry_ok = null === $registry_source
+			|| (bool) $registry_source['enabled'] === $enabled
+			|| $registry->toggle( $source_id, $enabled );
+
+		if ( $legacy_ok && $registry_ok ) {
+			$this->clear_update_transients();
 			wp_send_json_success( [ 'message' => __( '状态已更新', 'wpbridge' ) ] );
 		} else {
 			wp_send_json_error( [ 'message' => __( '更新失败', 'wpbridge' ) ] );
 			return;
 		}
+	}
+
+	/**
+	 * 清除源状态变更后可能过期的更新结果。
+	 */
+	private function clear_update_transients(): void {
+		delete_site_transient( 'update_plugins' );
+		delete_site_transient( 'update_themes' );
+		\WPBridge\Core\Plugin::clear_all_cache();
 	}
 
 	/**
@@ -775,7 +808,7 @@ class AdminPage {
 			if ( empty( $auth_secret_ref ) ) {
 				$auth_secret_ref = 'secret_' . wp_generate_uuid4();
 			}
-			update_option( 'wpbridge_secret_' . $auth_secret_ref, $token, false );
+			update_option( 'wpbridge_secret_' . $auth_secret_ref, Encryption::encrypt( $token ), false );
 			$auth_type = SourceRegistry::AUTH_TOKEN;
 		}
 

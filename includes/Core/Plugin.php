@@ -128,68 +128,74 @@ class Plugin {
 	 * 一次性迁移旧版本数据
 	 */
 	private function maybe_migrate_legacy(): void {
-		$migrated = get_option( 'wpbridge_migration_version', '' );
+		$migrated = get_option( 'wpbridge_migration_version', '0.0.0' );
 
-		// v1.2.0: weixiaoduo-store → weixiaoduo-mall
+		// v0.6.0 引入新数据模型。旧选项仍保留，避免迁移失败导致用户数据丢失。
+		if ( version_compare( $migrated, '0.6.0', '<' ) && false !== get_option( 'wpbridge_sources' ) ) {
+			Logger::info( '检测到旧版本更新源数据，保留旧数据并启用兼容读取' );
+		}
+
+		// v1.2.0: weixiaoduo-store → weixiaoduo-mall。
 		if ( version_compare( $migrated, '1.2.0', '<' ) ) {
 			$this->migrate_vendor_id( 'weixiaoduo-store', 'weixiaoduo-mall' );
-			update_option( 'wpbridge_migration_version', WPBRIDGE_VERSION );
-			return;
 		}
 
-		if ( version_compare( $migrated, '0.6.0', '>=' ) ) {
-			return;
-		}
-
-		// 旧方案 A 的选项已不存在则无需迁移
-		$old_sources = get_option( 'wpbridge_sources' );
-		if ( false === $old_sources ) {
-			update_option( 'wpbridge_migration_version', WPBRIDGE_VERSION );
-			return;
-		}
-
-		// 标记迁移完成（旧数据保留，不影响新架构）
-		Logger::info( '旧版本数据检测完成，标记迁移版本', [ 'version' => WPBRIDGE_VERSION ] );
 		update_option( 'wpbridge_migration_version', WPBRIDGE_VERSION );
 	}
 
 	/**
-	 * 迁移供应商 ID：替换 source_registry 和 defaults 中的 vendor_ 前缀 key
+	 * 迁移供应商 ID，并同步所有保存 source key 的选项。
 	 */
 	private function migrate_vendor_id( string $old_id, string $new_id ): void {
 		$old_key = 'vendor_' . $old_id;
 		$new_key = 'vendor_' . $new_id;
 
-		// 迁移 source_registry
 		$sources = get_option( SourceRegistry::OPTION_NAME, [] );
-		if ( isset( $sources[ $old_key ] ) ) {
-			$sources[ $new_key ] = $sources[ $old_key ];
-			unset( $sources[ $old_key ] );
-			update_option( SourceRegistry::OPTION_NAME, $sources, false );
+		foreach ( $sources as &$source ) {
+			if ( ( $source['source_key'] ?? '' ) === $old_key ) {
+				$source['source_key'] = $new_key;
+			}
+			if ( ( $source['vendor_id'] ?? '' ) === $old_id ) {
+				$source['vendor_id'] = $new_id;
+			}
 		}
+		unset( $source );
+		update_option( SourceRegistry::OPTION_NAME, $sources, false );
 
-		// 迁移 defaults（项目绑定的 source_ids）
 		$defaults = get_option( DefaultsManager::OPTION_NAME, [] );
-		$changed  = false;
 		foreach ( $defaults as &$item ) {
 			if ( isset( $item['source_ids'][ $old_key ] ) ) {
 				$item['source_ids'][ $new_key ] = $item['source_ids'][ $old_key ];
 				unset( $item['source_ids'][ $old_key ] );
-				$changed = true;
+			}
+			if ( ! empty( $item['source_order'] ) ) {
+				$item['source_order'] = array_map(
+					static function ( $source_key ) use ( $old_key, $new_key ) {
+						return $old_key === $source_key ? $new_key : $source_key;
+					},
+					$item['source_order']
+				);
 			}
 		}
 		unset( $item );
-		if ( $changed ) {
-			update_option( DefaultsManager::OPTION_NAME, $defaults, false );
+		update_option( DefaultsManager::OPTION_NAME, $defaults, false );
+
+		$item_sources = get_option( ItemSourceManager::OPTION_NAME, [] );
+		foreach ( $item_sources as &$config ) {
+			if ( isset( $config['source_ids'][ $old_key ] ) ) {
+				$config['source_ids'][ $new_key ] = $config['source_ids'][ $old_key ];
+				unset( $config['source_ids'][ $old_key ] );
+			}
+		}
+		unset( $config );
+		update_option( ItemSourceManager::OPTION_NAME, $item_sources, false );
+
+		$old_slug_map = get_option( 'wpbridge_slug_map_' . $old_id, false );
+		if ( false !== $old_slug_map && false === get_option( 'wpbridge_slug_map_' . $new_id, false ) ) {
+			update_option( 'wpbridge_slug_map_' . $new_id, $old_slug_map, false );
 		}
 
-		Logger::info(
-			'供应商 ID 迁移完成',
-			[
-				'from' => $old_id,
-				'to'   => $new_id,
-			]
-		);
+		Logger::info( '供应商 ID 迁移完成', [ 'from' => $old_id, 'to' => $new_id ] );
 	}
 
 	/**

@@ -125,7 +125,13 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 								<div class="wpbridge-vendor-preset-meta">
 									<span class="wpbridge-vendor-meta-item">
 										<span class="dashicons dashicons-admin-plugins"></span>
-										<?php printf( esc_html__( '%d 个插件', 'wpbridge' ), $plugin_count ); ?>
+										<?php
+										printf(
+											/* translators: %d: plugin count */
+											esc_html__( '%d 个插件', 'wpbridge' ),
+											absint( $plugin_count )
+										);
+										?>
 									</span>
 									<?php if ( $last_sync ) : ?>
 										<span class="wpbridge-vendor-meta-item">
@@ -187,7 +193,15 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 								<?php if ( $daily_dl >= PHP_INT_MAX ) : ?>
 									<span class="wpbridge-vendor-perk"><?php esc_html_e( '无限下载', 'wpbridge' ); ?></span>
 								<?php else : ?>
-									<span class="wpbridge-vendor-perk"><?php printf( esc_html__( '%d 次/天', 'wpbridge' ), $daily_dl ); ?></span>
+									<span class="wpbridge-vendor-perk">
+										<?php
+										printf(
+											/* translators: %d: daily download limit */
+											esc_html__( '%d 次/天', 'wpbridge' ),
+											absint( $daily_dl )
+										);
+										?>
+									</span>
 								<?php endif; ?>
 								<?php if ( in_array( 'bridge_api', $features, true ) ) : ?>
 									<span class="wpbridge-vendor-perk">API</span>
@@ -256,7 +270,13 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 								<div class="wpbridge-vendor-preset-meta">
 									<span class="wpbridge-vendor-meta-item">
 										<span class="dashicons dashicons-admin-plugins"></span>
-										<?php printf( esc_html__( '%d 个插件', 'wpbridge' ), $plugin_count ); ?>
+										<?php
+										printf(
+											/* translators: %d: plugin count */
+											esc_html__( '%d 个插件', 'wpbridge' ),
+											absint( $plugin_count )
+										);
+										?>
 									</span>
 									<?php if ( $last_sync ) : ?>
 										<span class="wpbridge-vendor-meta-item">

@@ -77,3 +77,13 @@ WP 更新检查 → PluginUpdater → SourceResolver → VendorHandler → Vendo
 ## Known Issues
 - wpcy.com 使用 SQLite，WPSlug 触发 readonly 写入错误（与 WPBridge 无关）
 - 2 个纯中文产品 slug 待商城侧修复标题
+
+## 2026-08-09 — [CX] FeiCode 真源全功能审计与修复
+
+- 基线 `feicode-ssh/main@a27bd828c97e8999b205459ea1ca0af8a6873c81`；隔离分支 `codex/wpbridge-audit-20260809`，worktree `/home/parallels/Projects/wpbridge-codex-audit-20260809`。
+- 修复：双数据模型源开关、供应商 ID 迁移范围/顺序、远程 changelog 转义、自更新降级/非 HTTPS 包、注册表 token 明文、卸载遗留、PHP 7.4 兼容和发布元数据。
+- 新增 `tests/run-tests.sh`、updater/仓库契约测试、`readme.txt`、`LICENSE`；完整审计见 `docs/audits/wpbridge-full-2026-08-09.md`。
+- 验证：`npm test` exit 0；WordPress 7.0.3/PHP 8.3/MariaDB 激活、迁移、加密凭据和双存储 AJAX toggle exit 0。最终发布目录 Plugin Check 报 29 errors/396 warnings（命令 exit 0，NOT PASS）；PHPCS exit 2 / 1751 errors；PHPStan 1G exit 1 / 81 errors；gitleaks 和 npm audit exit 0。
+- 未完成：PHP 7.4/WP 5.9 多版本、multisite、浏览器 E2E、真实 Bridge/供应商联调、原子回滚、SSRF 私网 allowlist、单一 SourceRegistry 写模型。
+- FeiCode 拒绝直接 push 新分支（账号仅允许 AGit PR refs）；未擅自创建 PR，提交保留在 VM 隔离 worktree。
+- 未部署、未发布、未合并默认分支；共享目录原有未跟踪迁移和 CI 文件未覆盖。
