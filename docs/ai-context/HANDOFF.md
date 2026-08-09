@@ -114,3 +114,5 @@ WP 更新检查 → PluginUpdater → SourceResolver → VendorHandler → Vendo
 - [CX] 只读 team reviewer 任务 `wenpai-20260809-194330-2060256` 仍 pending，没有评审样本，不计 PASS。
 
 - [CX] PR #4 在 `4695393678eb3b15cc35a42f644a3ca7edcfdb4a` 快照仍 open/未合并/mergeable；gitleaks、security-scan、WordPress 插件 CI 均 waiting，显示 `Blocked by required conditions`，不计 PASS。
+
+- [CX] 最终输入边界复核提交 `c4330c67e44b3e5adf760566830769c11444a35a` 移除 3 处重复 unslash；其后 npm/PHPStan/Plugin Check final profile 均已重跑，结果不变。
