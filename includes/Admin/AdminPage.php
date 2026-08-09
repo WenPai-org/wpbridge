@@ -541,8 +541,8 @@ class AdminPage {
 		}
 
 		try {
-			$api_url   = esc_url_raw( wp_unslash( $this->post_value( 'api_url', '' ) ) );
-			$raw_token = sanitize_text_field( wp_unslash( $this->post_value( 'auth_token', '' ) ) );
+			$api_url   = esc_url_raw( $this->post_value( 'api_url', '' ) );
+			$raw_token = sanitize_text_field( $this->post_value( 'auth_token', '' ) );
 
 			if ( empty( $api_url ) ) {
 				wp_send_json_error( [ 'message' => __( '请输入更新源地址', 'wpbridge' ) ] );

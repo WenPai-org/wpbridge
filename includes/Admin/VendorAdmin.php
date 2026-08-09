@@ -949,7 +949,7 @@ class VendorAdmin {
 			return;
 		}
 
-		$slug      = sanitize_text_field( wp_unslash( $this->post_value( 'plugin_slug', '' ) ) );
+		$slug      = sanitize_text_field( $this->post_value( 'plugin_slug', '' ) );
 		$vendor_id = sanitize_key( $this->post_value( 'vendor_id', '' ) );
 		$item_type = sanitize_key( $this->post_value( 'item_type', 'plugin' ) );
 		$enabled   = (int) ( $this->post_value( 'enabled', 0 ) ) === 1;
