@@ -255,9 +255,11 @@ class WPBridge_Updater {
 		if ( null !== $body ) {
 			$args['headers']['Content-Type'] = 'application/json';
 			$args['body']                    = wp_json_encode( $body );
-			$response                        = wp_remote_post( $url, $args );
+			$args['method']                  = 'POST';
+			$response                        = \WPBridge\Security\SafeHttpClient::request( $url, $args );
 		} else {
-			$response = wp_remote_get( $url, $args );
+			$args['method'] = 'GET';
+			$response       = \WPBridge\Security\SafeHttpClient::request( $url, $args );
 		}
 
 		if ( is_wp_error( $response ) ) {

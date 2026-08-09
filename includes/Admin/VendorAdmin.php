@@ -53,6 +53,26 @@ class VendorAdmin {
 	}
 
 	/**
+	 * Return one unslashed POST value. Callers apply context-specific sanitization.
+	 *
+	 * @param string $key     Field name.
+	 * @param mixed  $default Default value.
+	 * @return mixed
+	 */
+	private function post_value( string $key, $default = null ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Central reader; every form handler verifies its nonce before using the returned value.
+		if ( ! isset( $_POST[ $key ] ) ) {
+			return $default;
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslash boundary; callers sanitize for the field context.
+		$value = wp_unslash( $_POST[ $key ] );
+		if ( is_array( $default ) ) {
+			return is_array( $value ) ? $value : $default;
+		}
+		return is_scalar( $value ) ? $value : $default;
+	}
+
+	/**
 	 * 初始化钩子
 	 *
 	 * @return void
@@ -114,12 +134,12 @@ class VendorAdmin {
 			return;
 		}
 
-		$vendor_id       = sanitize_key( $_POST['vendor_id'] ?? '' );
-		$name            = sanitize_text_field( $_POST['name'] ?? '' );
-		$type            = sanitize_text_field( $_POST['type'] ?? 'woocommerce' );
-		$api_url         = esc_url_raw( $_POST['api_url'] ?? '' );
-		$consumer_key    = sanitize_text_field( $_POST['consumer_key'] ?? '' );
-		$consumer_secret = sanitize_text_field( $_POST['consumer_secret'] ?? '' );
+		$vendor_id       = sanitize_key( $this->post_value( 'vendor_id', '' ) );
+		$name            = sanitize_text_field( $this->post_value( 'name', '' ) );
+		$type            = sanitize_text_field( $this->post_value( 'type', 'woocommerce' ) );
+		$api_url         = esc_url_raw( $this->post_value( 'api_url', '' ) );
+		$consumer_key    = sanitize_text_field( $this->post_value( 'consumer_key', '' ) );
+		$consumer_secret = sanitize_text_field( $this->post_value( 'consumer_secret', '' ) );
 
 		// 验证必填字段
 		if ( empty( $vendor_id ) ) {
@@ -180,7 +200,7 @@ class VendorAdmin {
 			return;
 		}
 
-		$vendor_id = sanitize_key( $_POST['vendor_id'] ?? '' );
+		$vendor_id = sanitize_key( $this->post_value( 'vendor_id', '' ) );
 
 		if ( empty( $vendor_id ) ) {
 			wp_send_json_error( [ 'message' => __( '供应商 ID 不能为空', 'wpbridge' ) ] );
@@ -210,7 +230,7 @@ class VendorAdmin {
 			return;
 		}
 
-		$vendor_id = sanitize_key( $_POST['vendor_id'] ?? '' );
+		$vendor_id = sanitize_key( $this->post_value( 'vendor_id', '' ) );
 
 		if ( empty( $vendor_id ) ) {
 			wp_send_json_error( [ 'message' => __( '供应商 ID 不能为空', 'wpbridge' ) ] );
@@ -240,8 +260,8 @@ class VendorAdmin {
 			return;
 		}
 
-		$vendor_id = sanitize_key( $_POST['vendor_id'] ?? '' );
-		$enabled   = (int) ( $_POST['enabled'] ?? 0 ) === 1;
+		$vendor_id = sanitize_key( $this->post_value( 'vendor_id', '' ) );
+		$enabled   = (int) ( $this->post_value( 'enabled', 0 ) ) === 1;
 
 		if ( empty( $vendor_id ) ) {
 			wp_send_json_error( [ 'message' => __( '供应商 ID 不能为空', 'wpbridge' ) ] );
@@ -288,7 +308,7 @@ class VendorAdmin {
 			return;
 		}
 
-		$vendor_id = sanitize_key( $_POST['vendor_id'] ?? '' );
+		$vendor_id = sanitize_key( $this->post_value( 'vendor_id', '' ) );
 
 		$vendor_manager = $this->get_bridge_manager()->get_vendor_manager();
 
@@ -346,9 +366,9 @@ class VendorAdmin {
 			return;
 		}
 
-		$preset_id = sanitize_key( $_POST['preset_id'] ?? '' );
-		$email     = sanitize_email( $_POST['email'] ?? '' );
-		$license   = sanitize_text_field( $_POST['license_key'] ?? '' );
+		$preset_id = sanitize_key( $this->post_value( 'preset_id', '' ) );
+		$email     = sanitize_email( $this->post_value( 'email', '' ) );
+		$license   = sanitize_text_field( $this->post_value( 'license_key', '' ) );
 
 		if ( empty( $preset_id ) ) {
 			wp_send_json_error( [ 'message' => __( '预设 ID 不能为空', 'wpbridge' ) ] );
@@ -454,7 +474,7 @@ class VendorAdmin {
 			return;
 		}
 
-		$preset_id = sanitize_key( $_POST['preset_id'] ?? '' );
+		$preset_id = sanitize_key( $this->post_value( 'preset_id', '' ) );
 
 		if ( empty( $preset_id ) ) {
 			wp_send_json_error( [ 'message' => __( '预设 ID 不能为空', 'wpbridge' ) ] );
@@ -505,9 +525,9 @@ class VendorAdmin {
 			return;
 		}
 
-		$name    = sanitize_text_field( $_POST['name'] ?? '' );
-		$api_url = esc_url_raw( $_POST['api_url'] ?? '' );
-		$api_key = sanitize_text_field( $_POST['api_key'] ?? '' );
+		$name    = sanitize_text_field( $this->post_value( 'name', '' ) );
+		$api_url = esc_url_raw( $this->post_value( 'api_url', '' ) );
+		$api_key = sanitize_text_field( $this->post_value( 'api_key', '' ) );
 
 		if ( empty( $api_url ) ) {
 			wp_send_json_error( [ 'message' => __( 'API 地址不能为空', 'wpbridge' ) ] );
@@ -570,9 +590,9 @@ class VendorAdmin {
 			return;
 		}
 
-		$plugin_slug = sanitize_key( $_POST['plugin_slug'] ?? '' );
-		$name        = sanitize_text_field( $_POST['name'] ?? '' );
-		$update_url  = esc_url_raw( $_POST['update_url'] ?? '' );
+		$plugin_slug = sanitize_key( $this->post_value( 'plugin_slug', '' ) );
+		$name        = sanitize_text_field( $this->post_value( 'name', '' ) );
+		$update_url  = esc_url_raw( $this->post_value( 'update_url', '' ) );
 
 		if ( empty( $plugin_slug ) ) {
 			wp_send_json_error( [ 'message' => __( '插件 slug 不能为空', 'wpbridge' ) ] );
@@ -607,7 +627,7 @@ class VendorAdmin {
 			return;
 		}
 
-		$plugin_slug = sanitize_key( $_POST['plugin_slug'] ?? '' );
+		$plugin_slug = sanitize_key( $this->post_value( 'plugin_slug', '' ) );
 
 		if ( empty( $plugin_slug ) ) {
 			wp_send_json_error( [ 'message' => __( '插件 slug 不能为空', 'wpbridge' ) ] );
@@ -734,8 +754,8 @@ class VendorAdmin {
 		// 商业包体较大，延长执行时间
 		set_time_limit( 600 );
 
-		$plugin_slug = sanitize_key( $_POST['plugin_slug'] ?? '' );
-		$vendor_id   = sanitize_key( $_POST['vendor_id'] ?? '' );
+		$plugin_slug = sanitize_key( $this->post_value( 'plugin_slug', '' ) );
+		$vendor_id   = sanitize_key( $this->post_value( 'vendor_id', '' ) );
 
 		if ( empty( $plugin_slug ) ) {
 			wp_send_json_error( [ 'message' => __( '插件 slug 不能为空', 'wpbridge' ) ] );
@@ -929,10 +949,10 @@ class VendorAdmin {
 			return;
 		}
 
-		$slug      = sanitize_text_field( wp_unslash( $_POST['plugin_slug'] ?? '' ) );
-		$vendor_id = sanitize_key( $_POST['vendor_id'] ?? '' );
-		$item_type = sanitize_key( $_POST['item_type'] ?? 'plugin' );
-		$enabled   = (int) ( $_POST['enabled'] ?? 0 ) === 1;
+		$slug      = sanitize_text_field( wp_unslash( $this->post_value( 'plugin_slug', '' ) ) );
+		$vendor_id = sanitize_key( $this->post_value( 'vendor_id', '' ) );
+		$item_type = sanitize_key( $this->post_value( 'item_type', 'plugin' ) );
+		$enabled   = (int) ( $this->post_value( 'enabled', 0 ) ) === 1;
 
 		if ( empty( $slug ) || empty( $vendor_id ) ) {
 			wp_send_json_error( [ 'message' => __( '参数不完整', 'wpbridge' ) ] );

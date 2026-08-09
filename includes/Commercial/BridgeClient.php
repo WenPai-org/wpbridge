@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace WPBridge\Commercial;
 
 use WPBridge\Core\Logger;
+use WPBridge\Security\SafeHttpClient;
 use WPBridge\Security\Validator;
 
 // 防止直接访问
@@ -351,7 +352,7 @@ class BridgeClient {
 			$args['body'] = wp_json_encode( $data );
 		}
 
-		$response = wp_remote_request( $url, $args );
+		$response = SafeHttpClient::request( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
 			return $response;

@@ -877,9 +877,10 @@ class WooCommerceVendor extends AbstractVendor {
 			trailingslashit( $this->config['api_url'] )
 		);
 
-		$response = wp_remote_get(
+		$response = $this->http_request(
 			$url,
 			[
+				'method'    => 'GET',
 				'timeout'   => $this->config['timeout'],
 				'sslverify' => true,
 				'headers'   => [ 'Accept' => 'application/json' ],

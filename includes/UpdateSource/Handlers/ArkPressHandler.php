@@ -137,9 +137,10 @@ class ArkPressHandler extends AbstractHandler {
 	public function check_updates_batch( array $plugins ): array {
 		$url = rtrim( $this->source->api_url, '/' ) . '/plugins/update-check';
 
-		$response = wp_remote_post(
+		$response = $this->http_request(
 			$url,
 			[
+				'method'  => 'POST',
 				'timeout' => $this->timeout,
 				'headers' => array_merge(
 					$this->get_headers(),

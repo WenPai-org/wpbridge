@@ -38,8 +38,9 @@ $installed_themes = wp_get_themes();
 $allowed_subtabs = [ 'sources', 'plugins', 'themes' ];
 $current_subtab  = 'sources';
 // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- 仅用于 UI 显示
-if ( isset( $_GET['subtab'] ) && in_array( $_GET['subtab'], $allowed_subtabs, true ) ) {
-	$current_subtab = $_GET['subtab'];
+$requested_subtab = isset( $_GET['subtab'] ) ? sanitize_key( wp_unslash( $_GET['subtab'] ) ) : '';
+if ( in_array( $requested_subtab, $allowed_subtabs, true ) ) {
+	$current_subtab = $requested_subtab;
 }
 ?>
 

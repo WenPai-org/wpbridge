@@ -13,6 +13,8 @@
 
 namespace WPBridge\Core;
 
+use WPBridge\Security\SafeHttpClient;
+
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -100,9 +102,10 @@ class RemoteConfig {
 	 * @return array|null
 	 */
 	private function fetch_remote_config() {
-		$response = wp_remote_get(
+		$response = SafeHttpClient::request(
 			self::CONFIG_URL,
 			array(
+				'method'  => 'GET',
 				'timeout' => 10,
 				'headers' => array(
 					'Accept' => 'application/json',

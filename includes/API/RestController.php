@@ -7,6 +7,8 @@
 
 namespace WPBridge\API;
 
+use WPBridge\Security\SafeHttpClient;
+
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
 use WPBridge\UpdateSource\SourceManager;
@@ -259,7 +261,7 @@ class RestController {
 			Logger::warning(
 				'API Key 通过 URL 参数传递，建议使用 Header 方式',
 				[
-					'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+					'ip' => $this->get_client_ip( $request ),
 				]
 			);
 			return sanitize_text_field( $api_key );
@@ -411,24 +413,30 @@ class RestController {
 	 * @return string
 	 */
 	private function get_client_ip( \WP_REST_Request $request ): string {
+		$remote_addr = isset( $_SERVER['REMOTE_ADDR'] )
+			? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) )
+			: '';
+		if ( false === filter_var( $remote_addr, FILTER_VALIDATE_IP ) ) {
+			$remote_addr = 'unknown';
+		}
+
 		// 检查是否配置了可信代理
 		$trusted_proxies = apply_filters( 'wpbridge_trusted_proxies', [] );
 
 		if ( ! empty( $trusted_proxies ) ) {
-			$remote_addr = $_SERVER['REMOTE_ADDR'] ?? '';
-
 			// 只有当请求来自可信代理时才信任 X-Forwarded-For
 			if ( in_array( $remote_addr, $trusted_proxies, true ) ) {
 				$forwarded = $request->get_header( 'X-Forwarded-For' );
 				if ( ! empty( $forwarded ) ) {
 					// 取第一个非代理 IP
 					$ips = array_map( 'trim', explode( ',', $forwarded ) );
-					return sanitize_text_field( $ips[0] );
+					$forwarded_ip = sanitize_text_field( $ips[0] );
+					return false !== filter_var( $forwarded_ip, FILTER_VALIDATE_IP ) ? $forwarded_ip : $remote_addr;
 				}
 			}
 		}
 
-		return sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? 'unknown' );
+		return $remote_addr;
 	}
 
 	/**
@@ -715,9 +723,10 @@ class RestController {
 
 		// 调用菲码源库 API
 		$api_url  = 'https://git.wenpai.org/api/v1/repos/' . $repo . '/releases';
-		$response = wp_remote_get(
+		$response = SafeHttpClient::request(
 			$api_url,
 			[
+				'method'  => 'GET',
 				'timeout' => $this->settings->get_request_timeout(),
 				'headers' => [
 					'Accept' => 'application/json',

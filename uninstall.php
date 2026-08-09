@@ -32,8 +32,11 @@ if ( is_multisite() ) {
 	$site_ids = get_sites( [ 'fields' => 'ids', 'number' => 0 ] );
 	foreach ( $site_ids as $site_id ) {
 		switch_to_blog( (int) $site_id );
-		wpbridge_uninstall_site();
-		restore_current_blog();
+		try {
+			wpbridge_uninstall_site();
+		} finally {
+			restore_current_blog();
+		}
 	}
 
 	global $wpdb;

@@ -476,7 +476,7 @@ class Plugin {
 			return;
 		}
 
-		$include_secrets = isset( $_POST['include_secrets'] ) && 'true' === $_POST['include_secrets'];
+		$include_secrets = isset( $_POST['include_secrets'] ) && 'true' === sanitize_text_field( wp_unslash( $_POST['include_secrets'] ) );
 
 		$config_manager = new ConfigManager();
 		$config         = $config_manager->export( $include_secrets );
@@ -500,19 +500,25 @@ class Plugin {
 			return;
 		}
 
-		if ( empty( $_POST['config'] ) ) {
+		if ( ! isset( $_POST['config'] ) || ! is_string( $_POST['config'] ) ) {
 			wp_send_json_error( array( 'message' => __( '配置数据为空', 'wpbridge' ) ) );
 			return;
 		}
 
-		$config = json_decode( wp_unslash( $_POST['config'] ), true );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON must remain structurally intact; decoded keys and values are sanitized below.
+		$raw_config = wp_unslash( $_POST['config'] );
+		if ( '' === $raw_config ) {
+			wp_send_json_error( array( 'message' => __( '配置数据为空', 'wpbridge' ) ) );
+			return;
+		}
+		$config = json_decode( $raw_config, true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
 			wp_send_json_error( array( 'message' => __( 'JSON 格式无效', 'wpbridge' ) ) );
 			return;
 		}
 
-		$merge = isset( $_POST['merge'] ) && 'true' === $_POST['merge'];
+		$merge = isset( $_POST['merge'] ) && 'true' === sanitize_text_field( wp_unslash( $_POST['merge'] ) );
 
 		$config_manager = new ConfigManager();
 		$result         = $config_manager->import( $config, $merge );

@@ -60,6 +60,26 @@ class AdminPage {
 	}
 
 	/**
+	 * Return one unslashed POST value. Callers apply context-specific sanitization.
+	 *
+	 * @param string $key     Field name.
+	 * @param mixed  $default Default value.
+	 * @return mixed
+	 */
+	private function post_value( string $key, $default = null ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Central reader; every form handler verifies its nonce before using the returned value.
+		if ( ! isset( $_POST[ $key ] ) ) {
+			return $default;
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslash boundary; callers sanitize for the field context.
+		$value = wp_unslash( $_POST[ $key ] );
+		if ( is_array( $default ) ) {
+			return is_array( $value ) ? $value : $default;
+		}
+		return is_scalar( $value ) ? $value : $default;
+	}
+
+	/**
 	 * 初始化钩子
 	 */
 	private function init_hooks(): void {
@@ -170,11 +190,12 @@ class AdminPage {
 	 * 处理表单提交
 	 */
 	public function handle_actions(): void {
-		if ( ! isset( $_POST['wpbridge_action'] ) ) {
+		if ( null === $this->post_value( 'wpbridge_action' ) ) {
 			return;
 		}
 
-		if ( ! wp_verify_nonce( $_POST['wpbridge_nonce'] ?? '', 'wpbridge_action' ) ) {
+		$nonce = sanitize_text_field( (string) $this->post_value( 'wpbridge_nonce', '' ) );
+		if ( ! wp_verify_nonce( $nonce, 'wpbridge_action' ) ) {
 			wp_die( esc_html__( '安全检查失败', 'wpbridge' ) );
 		}
 
@@ -182,7 +203,7 @@ class AdminPage {
 			wp_die( esc_html__( '权限不足', 'wpbridge' ) );
 		}
 
-		$action = sanitize_text_field( $_POST['wpbridge_action'] );
+		$action = sanitize_key( (string) $this->post_value( 'wpbridge_action', '' ) );
 
 		switch ( $action ) {
 			case 'save_source':
@@ -204,13 +225,13 @@ class AdminPage {
 	 * 处理保存源
 	 */
 	private function handle_save_source(): void {
-		$source_id = sanitize_text_field( $_POST['source_id'] ?? '' );
+		$source_id = sanitize_text_field( $this->post_value( 'source_id', '' ) );
 
 		$source          = new SourceModel();
 		$source->id      = $source_id;
-		$source->name    = sanitize_text_field( $_POST['name'] ?? '' );
-		$source->type    = sanitize_text_field( $_POST['type'] ?? SourceType::JSON );
-		$source->api_url = esc_url_raw( $_POST['api_url'] ?? '' );
+		$source->name    = sanitize_text_field( $this->post_value( 'name', '' ) );
+		$source->type    = sanitize_text_field( $this->post_value( 'type', SourceType::JSON ) );
+		$source->api_url = esc_url_raw( $this->post_value( 'api_url', '' ) );
 
 		// "Git 仓库" 选项：根据 URL 自动识别具体平台
 		if ( $source->type === 'git' ) {
@@ -233,11 +254,11 @@ class AdminPage {
 				$source->api_url = trailingslashit( $source->api_url ) . 'wp-json/bridge/v1/';
 			}
 		}
-		$source->slug      = sanitize_text_field( $_POST['slug'] ?? '' );
-		$source->item_type = sanitize_text_field( $_POST['item_type'] ?? 'plugin' );
+		$source->slug      = sanitize_text_field( $this->post_value( 'slug', '' ) );
+		$source->item_type = sanitize_text_field( $this->post_value( 'item_type', 'plugin' ) );
 
 		// 匹配模式
-		$match_mode = sanitize_text_field( $_POST['match_mode'] ?? 'auto' );
+		$match_mode = sanitize_text_field( $this->post_value( 'match_mode', 'auto' ) );
 		if ( $match_mode === 'auto' ) {
 			// 清零，完全由 URL 推断
 			$source->slug      = '';
@@ -252,7 +273,7 @@ class AdminPage {
 				}
 			}
 			// 从 slug 推断是否为主题（含 theme 关键词）
-			$slug_lower        = strtolower( $source->slug . ' ' . ( $_POST['name'] ?? '' ) );
+			$slug_lower        = strtolower( $source->slug . ' ' . ( $this->post_value( 'name', '' ) ) );
 			$source->item_type = ( strpos( $slug_lower, 'theme' ) !== false ) ? 'theme' : 'plugin';
 		}
 
@@ -267,7 +288,7 @@ class AdminPage {
 		}
 
 		// 加密存储 auth_token
-		$raw_token = sanitize_text_field( $_POST['auth_token'] ?? '' );
+		$raw_token = sanitize_text_field( $this->post_value( 'auth_token', '' ) );
 		// 如果是占位符或空值，保留原有 token
 		if ( $raw_token === '********' || empty( $raw_token ) ) {
 			$existing           = $this->source_manager->get( $source_id );
@@ -276,10 +297,10 @@ class AdminPage {
 			$source->auth_token = Encryption::encrypt( $raw_token );
 		}
 
-		$source->enabled = ! empty( $_POST['enabled'] );
+		$source->enabled = ! empty( $this->post_value( 'enabled' ) );
 
 		// 处理语义化优先级选项
-		$priority_level   = sanitize_text_field( $_POST['priority_level'] ?? 'secondary' );
+		$priority_level   = sanitize_text_field( $this->post_value( 'priority_level', 'secondary' ) );
 		$priority_map     = [
 			'primary'   => 10,  // 首选源
 			'secondary' => 50,  // 备选源
@@ -318,7 +339,7 @@ class AdminPage {
 	 * 处理删除源
 	 */
 	private function handle_delete_source(): void {
-		$source_id = sanitize_text_field( $_POST['source_id'] ?? '' );
+		$source_id = sanitize_text_field( $this->post_value( 'source_id', '' ) );
 
 		if ( empty( $source_id ) ) {
 			$this->add_notice( 'error', __( '无效的源 ID', 'wpbridge' ) );
@@ -349,12 +370,12 @@ class AdminPage {
 	 */
 	private function handle_save_settings(): void {
 		// 验证并限制请求超时范围
-		$request_timeout = (int) ( $_POST['request_timeout'] ?? 10 );
+		$request_timeout = (int) ( $this->post_value( 'request_timeout', 10 ) );
 		$request_timeout = max( 5, min( 60, $request_timeout ) );
 
 		// 验证缓存 TTL
 		$valid_ttls = [ 3600, 21600, 43200, 86400 ];
-		$cache_ttl  = (int) ( $_POST['cache_ttl'] ?? 43200 );
+		$cache_ttl  = (int) ( $this->post_value( 'cache_ttl', 43200 ) );
 		if ( ! in_array( $cache_ttl, $valid_ttls, true ) ) {
 			$cache_ttl = 43200;
 		}
@@ -362,10 +383,10 @@ class AdminPage {
 		// 保留现有的 api 设置
 		$current  = $this->settings->get_all();
 		$settings = [
-			'debug_mode'      => ( $_POST['debug_mode'] ?? '' ) === '1' || ( $_POST['debug_mode'] ?? '' ) === 'on',
+			'debug_mode'      => ( $this->post_value( 'debug_mode', '' ) ) === '1' || ( $this->post_value( 'debug_mode', '' ) ) === 'on',
 			'cache_ttl'       => $cache_ttl,
 			'request_timeout' => $request_timeout,
-			'backup_enabled'  => ! empty( $_POST['backup_enabled'] ),
+			'backup_enabled'  => ! empty( $this->post_value( 'backup_enabled' ) ),
 			'api'             => $current['api'] ?? [],
 		];
 
@@ -384,7 +405,7 @@ class AdminPage {
 	 */
 	private function handle_save_api_settings(): void {
 		// 验证速率限制范围
-		$rate_limit = (int) ( $_POST['rate_limit'] ?? 100 );
+		$rate_limit = (int) ( $this->post_value( 'rate_limit', 100 ) );
 		$rate_limit = max( 10, min( 10000, $rate_limit ) );
 
 		// 获取当前设置
@@ -392,8 +413,8 @@ class AdminPage {
 		$api_settings = $current['api'] ?? [];
 
 		// 更新 API 设置
-		$api_settings['enabled']      = ! empty( $_POST['api_enabled'] );
-		$api_settings['require_auth'] = ! empty( $_POST['require_auth'] );
+		$api_settings['enabled']      = ! empty( $this->post_value( 'api_enabled' ) );
+		$api_settings['require_auth'] = ! empty( $this->post_value( 'require_auth' ) );
 		$api_settings['rate_limit']   = $rate_limit;
 
 		// 保留现有的 keys
@@ -424,8 +445,8 @@ class AdminPage {
 			return;
 		}
 
-		$source_id = sanitize_text_field( $_POST['source_id'] ?? '' );
-		$enabled   = ! empty( $_POST['enabled'] );
+		$source_id = sanitize_text_field( $this->post_value( 'source_id', '' ) );
+		$enabled   = ! empty( $this->post_value( 'enabled' ) );
 
 		$legacy_source   = $this->source_manager->get( $source_id );
 		$registry       = new SourceRegistry();
@@ -472,7 +493,7 @@ class AdminPage {
 			return;
 		}
 
-		$source_id = sanitize_text_field( $_POST['source_id'] ?? '' );
+		$source_id = sanitize_text_field( $this->post_value( 'source_id', '' ) );
 		$source    = $this->source_manager->get( $source_id );
 
 		if ( null === $source ) {
@@ -520,8 +541,8 @@ class AdminPage {
 		}
 
 		try {
-			$api_url   = esc_url_raw( wp_unslash( $_POST['api_url'] ?? '' ) );
-			$raw_token = sanitize_text_field( wp_unslash( $_POST['auth_token'] ?? '' ) );
+			$api_url   = esc_url_raw( wp_unslash( $this->post_value( 'api_url', '' ) ) );
+			$raw_token = sanitize_text_field( wp_unslash( $this->post_value( 'auth_token', '' ) ) );
 
 			if ( empty( $api_url ) ) {
 				wp_send_json_error( [ 'message' => __( '请输入更新源地址', 'wpbridge' ) ] );
@@ -662,7 +683,7 @@ class AdminPage {
 			return;
 		}
 
-		$key_name = sanitize_text_field( $_POST['key_name'] ?? '' );
+		$key_name = sanitize_text_field( $this->post_value( 'key_name', '' ) );
 		if ( empty( $key_name ) ) {
 			$key_name = __( '未命名', 'wpbridge' );
 		}
@@ -721,7 +742,7 @@ class AdminPage {
 			return;
 		}
 
-		$key_id = sanitize_text_field( $_POST['key_id'] ?? '' );
+		$key_id = sanitize_text_field( $this->post_value( 'key_id', '' ) );
 
 		if ( empty( $key_id ) ) {
 			wp_send_json_error( [ 'message' => __( 'Key ID 不能为空', 'wpbridge' ) ] );
@@ -867,8 +888,8 @@ class AdminPage {
 			return;
 		}
 
-		$item_key   = sanitize_text_field( $_POST['item_key'] ?? '' );
-		$source_key = sanitize_text_field( $_POST['source_key'] ?? '' );
+		$item_key   = sanitize_text_field( $this->post_value( 'item_key', '' ) );
+		$source_key = sanitize_text_field( $this->post_value( 'source_key', '' ) );
 
 		if ( empty( $item_key ) ) {
 			wp_send_json_error( [ 'message' => __( '项目键不能为空', 'wpbridge' ) ] );
@@ -914,9 +935,9 @@ class AdminPage {
 			return;
 		}
 
-		$item_keys  = isset( $_POST['item_keys'] ) ? array_map( 'sanitize_text_field', (array) $_POST['item_keys'] ) : [];
-		$action     = sanitize_text_field( $_POST['bulk_action'] ?? '' );
-		$source_key = sanitize_text_field( $_POST['source_key'] ?? '' );
+		$item_keys  = array_map( 'sanitize_text_field', (array) $this->post_value( 'item_keys', [] ) );
+		$action     = sanitize_text_field( $this->post_value( 'bulk_action', '' ) );
+		$source_key = sanitize_text_field( $this->post_value( 'source_key', '' ) );
 
 		if ( empty( $item_keys ) ) {
 			wp_send_json_error( [ 'message' => __( '请选择项目', 'wpbridge' ) ] );
@@ -988,26 +1009,20 @@ class AdminPage {
 		$defaults_manager = new \WPBridge\Core\DefaultsManager();
 
 		// 全局默认 - 清理输入
-		$global_sources = isset( $_POST['global_sources'] )
-			? array_map( 'sanitize_text_field', array_keys( (array) $_POST['global_sources'] ) )
-			: [];
+		$global_sources = array_map( 'sanitize_text_field', array_keys( (array) $this->post_value( 'global_sources', [] ) ) );
 		$defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_GLOBAL, $global_sources );
 
 		// 插件默认
-		if ( ! empty( $_POST['plugin_override'] ) ) {
-			$plugin_sources = isset( $_POST['plugin_sources'] )
-				? array_map( 'sanitize_text_field', array_keys( (array) $_POST['plugin_sources'] ) )
-				: [];
+		if ( ! empty( $this->post_value( 'plugin_override' ) ) ) {
+			$plugin_sources = array_map( 'sanitize_text_field', array_keys( (array) $this->post_value( 'plugin_sources', [] ) ) );
 			$defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_PLUGIN, $plugin_sources );
 		} else {
 			$defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_PLUGIN, [] );
 		}
 
 		// 主题默认
-		if ( ! empty( $_POST['theme_override'] ) ) {
-			$theme_sources = isset( $_POST['theme_sources'] )
-				? array_map( 'sanitize_text_field', array_keys( (array) $_POST['theme_sources'] ) )
-				: [];
+		if ( ! empty( $this->post_value( 'theme_override' ) ) ) {
+			$theme_sources = array_map( 'sanitize_text_field', array_keys( (array) $this->post_value( 'theme_sources', [] ) ) );
 			$defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_THEME, $theme_sources );
 		} else {
 			$defaults_manager->set_source_order( \WPBridge\Core\DefaultsManager::SCOPE_THEME, [] );
@@ -1029,11 +1044,11 @@ class AdminPage {
 			return;
 		}
 
-		$item_key = sanitize_text_field( $_POST['item_key'] ?? '' );
-		$url      = esc_url_raw( $_POST['url'] ?? '' );
-		$type     = sanitize_text_field( $_POST['type'] ?? 'json' );
-		$name     = sanitize_text_field( $_POST['name'] ?? '' );
-		$token    = sanitize_text_field( $_POST['token'] ?? '' );
+		$item_key = sanitize_text_field( $this->post_value( 'item_key', '' ) );
+		$url      = esc_url_raw( $this->post_value( 'url', '' ) );
+		$type     = sanitize_text_field( $this->post_value( 'type', 'json' ) );
+		$name     = sanitize_text_field( $this->post_value( 'name', '' ) );
+		$token    = sanitize_text_field( $this->post_value( 'token', '' ) );
 
 		if ( empty( $item_key ) || empty( $url ) ) {
 			wp_send_json_error( [ 'message' => __( '缺少必要参数', 'wpbridge' ) ] );
@@ -1141,8 +1156,8 @@ class AdminPage {
 			return;
 		}
 
-		$item_key = sanitize_text_field( $_POST['item_key'] ?? '' );
-		$mode     = sanitize_text_field( $_POST['mode'] ?? 'default' );
+		$item_key = sanitize_text_field( $this->post_value( 'item_key', '' ) );
+		$mode     = sanitize_text_field( $this->post_value( 'mode', 'default' ) );
 
 		if ( empty( $item_key ) ) {
 			wp_send_json_error( [ 'message' => __( '缺少必要参数', 'wpbridge' ) ] );
@@ -1177,10 +1192,10 @@ class AdminPage {
 
 			case 'custom':
 				// 自定义源 - 需要 URL
-				$url   = esc_url_raw( $_POST['url'] ?? '' );
-				$type  = sanitize_text_field( $_POST['type'] ?? 'json' );
-				$name  = sanitize_text_field( $_POST['name'] ?? '' );
-				$token = sanitize_text_field( $_POST['token'] ?? '' );
+				$url   = esc_url_raw( $this->post_value( 'url', '' ) );
+				$type  = sanitize_text_field( $this->post_value( 'type', 'json' ) );
+				$name  = sanitize_text_field( $this->post_value( 'name', '' ) );
+				$token = sanitize_text_field( $this->post_value( 'token', '' ) );
 
 				if ( empty( $url ) ) {
 					wp_send_json_error( [ 'message' => __( '请输入更新地址', 'wpbridge' ) ] );

@@ -64,8 +64,11 @@ function wpbridge_activate( bool $network_wide = false ): void {
 		$site_ids = get_sites( [ 'fields' => 'ids', 'number' => 0 ] );
 		foreach ( $site_ids as $site_id ) {
 			switch_to_blog( (int) $site_id );
-			wpbridge_activate_site();
-			restore_current_blog();
+			try {
+				wpbridge_activate_site();
+			} finally {
+				restore_current_blog();
+			}
 		}
 		return;
 	}
@@ -83,8 +86,11 @@ function wpbridge_deactivate( bool $network_wide = false ): void {
 		$site_ids = get_sites( [ 'fields' => 'ids', 'number' => 0 ] );
 		foreach ( $site_ids as $site_id ) {
 			switch_to_blog( (int) $site_id );
-			Core\Plugin::deactivate();
-			restore_current_blog();
+			try {
+				Core\Plugin::deactivate();
+			} finally {
+				restore_current_blog();
+			}
 		}
 		return;
 	}
@@ -92,10 +98,62 @@ function wpbridge_deactivate( bool $network_wide = false ): void {
 	Core\Plugin::deactivate();
 }
 
+/**
+ * Whether WPBridge is active for the network.
+ */
+function wpbridge_is_network_active(): bool {
+	if ( ! function_exists( 'is_plugin_active_for_network' ) ) {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+	}
+	return is_plugin_active_for_network( WPBRIDGE_BASENAME );
+}
+
+/**
+ * Initialize a site created after network activation.
+ *
+ * Priority 200 runs after WordPress creates and populates the site's tables.
+ *
+ * @param \WP_Site $new_site New site.
+ * @param array    $args     Site initialization arguments.
+ */
+function wpbridge_initialize_new_site( \WP_Site $new_site, array $args ): void {
+	if ( ! is_multisite() || ! wpbridge_is_network_active() ) {
+		return;
+	}
+
+	switch_to_blog( (int) $new_site->blog_id );
+	try {
+		wpbridge_activate_site();
+	} finally {
+		restore_current_blog();
+	}
+}
+
+/**
+ * Clear per-site runtime state before WordPress drops a deleted site's tables.
+ *
+ * @param \WP_Site $old_site Site being removed.
+ */
+function wpbridge_uninitialize_site( \WP_Site $old_site ): void {
+	if ( ! is_multisite() || ! wpbridge_is_network_active() ) {
+		return;
+	}
+
+	switch_to_blog( (int) $old_site->blog_id );
+	try {
+		Core\Plugin::deactivate();
+	} finally {
+		restore_current_blog();
+	}
+}
+
 // 激活与停用钩子.
 register_activation_hook( __FILE__, __NAMESPACE__ . '\\wpbridge_activate' );
 
 register_deactivation_hook( __FILE__, __NAMESPACE__ . '\\wpbridge_deactivate' );
+
+add_action( 'wp_initialize_site', __NAMESPACE__ . '\\wpbridge_initialize_new_site', 200, 2 );
+add_action( 'wp_uninitialize_site', __NAMESPACE__ . '\\wpbridge_uninitialize_site', 0, 1 );
 
 // WenPai 自更新检查器.
 require_once WPBRIDGE_PATH . 'includes/class-wenpai-updater.php';

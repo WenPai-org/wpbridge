@@ -139,7 +139,7 @@ if ( class_exists( 'ZipArchive' ) ) {
     $extract_method = $reflection->getMethod( 'extract_zip' );
     $extract_method->setAccessible( true );
 
-    $result = $extract_method->invoke( $backup_manager, $malicious_zip, $target );
+    $result = $extract_method->invoke( $backup_manager, $malicious_zip, $target, 'plugin' );
     $assert( $result instanceof WP_Error, 'Zip Slip archive is rejected with WP_Error' );
 
     if ( $result instanceof WP_Error ) {
@@ -152,7 +152,7 @@ if ( class_exists( 'ZipArchive' ) ) {
     $zip->addFromString( 'plugin/readme.txt', 'ok' );
     $zip->close();
 
-    $safe_result = $extract_method->invoke( $backup_manager, $safe_zip, $target );
+    $safe_result = $extract_method->invoke( $backup_manager, $safe_zip, $target, 'plugin' );
     $assert( true === $safe_result, 'Safe backup archive extracts successfully' );
     $assert( file_exists( $target . '/plugin/readme.txt' ), 'Safe archive content extracted to target directory' );
 } else {
