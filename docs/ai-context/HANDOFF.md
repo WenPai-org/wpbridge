@@ -98,3 +98,5 @@ WP 更新检查 → PluginUpdater → SourceResolver → VendorHandler → Vendo
 - 新增历史密钥环 `WPBRIDGE_ENCRYPTION_PREVIOUS_KEYS`；不可解密返回空值并触发 `wpbridge_decryption_failed`，不回退明文。
 - 仍未完成：PHPCS、394 warnings、原子回滚、请求期 DNS/SSRF 复核、未来新增 multisite 站点初始化、真实生产凭据 Bridge/WooCommerce 联调（生产联调不在本轮授权内）。
 - 完整命令、分类和范围见 `docs/audits/wpbridge-full-2026-08-09.md` 第 6 节。
+
+- [CX] 第二轮代码提交 `c23c66f1380582154dc9ce278dd5d8c62dad01a5` 已通过 AGit refs 更新 FeiCode PR [#4](https://feicode.com/WenPai-org/wpbridge/pulls/4)；未合并、未部署、未发布。

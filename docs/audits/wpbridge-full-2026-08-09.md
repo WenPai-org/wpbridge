@@ -201,3 +201,8 @@ wp eval-file tests/wordpress/rollback-contract.php --path=/tmp/wpbridge-r2-wp7 -
 WPBRIDGE_E2E_BASE_URL=http://127.0.0.1:8899 WPBRIDGE_E2E_USER=admin WPBRIDGE_E2E_PASSWORD=pass1234 WPBRIDGE_E2E_CHROMIUM=/home/parallels/.cache/ms-playwright/chromium_headless_shell-1234/chrome-linux/headless_shell npx playwright test tests/E2E/settings-migration.spec.js --reporter=line
 # exit 0, 1 passed
 ```
+
+### 评审交付
+
+- [CX] 第二轮代码提交：`c23c66f1380582154dc9ce278dd5d8c62dad01a5`，分支 `codex/wpbridge-audit-20260809`。
+- [CX] 已通过 AGit refs 更新 FeiCode 评审 PR [#4](https://feicode.com/WenPai-org/wpbridge/pulls/4)；未合并、未部署、未发布。
