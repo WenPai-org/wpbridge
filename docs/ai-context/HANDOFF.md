@@ -112,3 +112,5 @@ WP 更新检查 → PluginUpdater → SourceResolver → VendorHandler → Vendo
 - [CX] 密钥轮换显式历史密钥环、不可解密失败关闭、当前密钥 round-trip 3/3。没有配置历史密钥时不会猜测或回退明文。
 - [CX] 代码提交 `a7a83786a76933f3a4eadbbae8722092fff7cb3e`。完整命令、警告分类和未完成项见 `docs/audits/wpbridge-full-2026-08-09.md` 第 7 节。
 - [CX] 只读 team reviewer 任务 `wenpai-20260809-194330-2060256` 仍 pending，没有评审样本，不计 PASS。
+
+- [CX] PR #4 在 `4695393678eb3b15cc35a42f644a3ca7edcfdb4a` 快照仍 open/未合并/mergeable；gitleaks、security-scan、WordPress 插件 CI 均 waiting，显示 `Blocked by required conditions`，不计 PASS。

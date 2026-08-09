@@ -274,3 +274,8 @@ wp eval-file tests/wordpress/multisite-lifecycle.php
 - [CX] WordPress.org 目录包仍不能包含私有 updater/VersionLock；若上架，应拆独立目录发行包。当前 FeiCode/WenPai 私有包保留功能。
 - [CX] 没有真实 Bridge/WooCommerce 凭据契约样本；本轮只完成本地 mock，不触碰生产。
 - [CX] 代码提交 `a7a83786a76933f3a4eadbbae8722092fff7cb3e`；文档提交和 PR/CI 状态见本节后续交接。
+
+### [CX] FeiCode PR 状态快照
+
+- [CX] 代码和文档推送到 PR #4 后，PR 保持 open、未合并、mergeable=true，评审头为 `4695393678eb3b15cc35a42f644a3ca7edcfdb4a`。
+- [CX] 该头的 3 个检查均为 pending/waiting 且显示 `Blocked by required conditions`：gitleaks、security-scan、WordPress 插件 CI；不是 PASS，也没有失败样本。聚合 commit status API 匿名读取返回 403，单项 statuses/actions runs 可读。
