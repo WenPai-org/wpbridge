@@ -100,3 +100,15 @@ WP 更新检查 → PluginUpdater → SourceResolver → VendorHandler → Vendo
 - 完整命令、分类和范围见 `docs/audits/wpbridge-full-2026-08-09.md` 第 6 节。
 
 - [CX] 第二轮代码提交 `c23c66f1380582154dc9ce278dd5d8c62dad01a5` 已通过 AGit refs 更新 FeiCode PR [#4](https://feicode.com/WenPai-org/wpbridge/pulls/4)；未合并、未部署、未发布。
+
+## 2026-08-09 — [CX] 第三轮 SSRF/原子回滚/multisite
+
+- [CX] 隔离 worktree/分支和 PR #4 不变；共享仓库未跟踪 WIP 未改，未部署、发布、合并或使用生产凭据。
+- [CX] 所有远程请求统一经过请求期 A/AAAA 公网校验、逐跳重定向复核和 cURL DNS 固定；跨源重定向剥离凭据。SSRF/DNS rebinding 12/12，Bridge/供应商 mock 14/14。
+- [CX] 回滚改为同盘 staging + 原子目录替换；swap 失败恢复原版本，恶意 ZIP 在解压前拒绝，3/3。
+- [CX] network-active 状态下未来新增站点自动初始化，删站在删表前清理；新站/删除 2/2，网络卸载清理 exit 0。
+- [CX] Plugin Check 正确发布目录为 2 个私有 updater policy errors / 299 warnings；精确私有 profile 0 error result。nonce/unslash/sanitize/文件系统 errors 已清零；274 个模板变量 warning 未机械改名。
+- [CX] final：npm test 0；PHPStan level 3 0 errors；PHP 7.4.33/WP 5.9 与 PHP 8.3.27/WP 7.0.3 通过；PHPCS 仍 FAIL（1328/41/66）；E2E 1/1。
+- [CX] 密钥轮换显式历史密钥环、不可解密失败关闭、当前密钥 round-trip 3/3。没有配置历史密钥时不会猜测或回退明文。
+- [CX] 代码提交 `a7a83786a76933f3a4eadbbae8722092fff7cb3e`。完整命令、警告分类和未完成项见 `docs/audits/wpbridge-full-2026-08-09.md` 第 7 节。
+- [CX] 只读 team reviewer 任务 `wenpai-20260809-194330-2060256` 仍 pending，没有评审样本，不计 PASS。

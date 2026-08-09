@@ -206,3 +206,71 @@ WPBRIDGE_E2E_BASE_URL=http://127.0.0.1:8899 WPBRIDGE_E2E_USER=admin WPBRIDGE_E2E
 
 - [CX] 第二轮代码提交：`c23c66f1380582154dc9ce278dd5d8c62dad01a5`，分支 `codex/wpbridge-audit-20260809`。
 - [CX] 已通过 AGit refs 更新 FeiCode 评审 PR [#4](https://feicode.com/WenPai-org/wpbridge/pulls/4)；未合并、未部署、未发布。
+
+## 7. 第三轮：请求期 SSRF、原子回滚与新增站点生命周期（2026-08-09）
+
+> [CX] 继续使用隔离 worktree `/home/parallels/Projects/wpbridge-codex-audit-20260809`、分支 `codex/wpbridge-audit-20260809` 和 FeiCode PR #4。共享目录 `/home/parallels/Projects/wpbridge` 的未跟踪迁移/CI 文件未改；未使用生产凭据，未部署、发布、合并默认分支。
+
+### [CX] 已修复
+
+- [CX] 新增 `SafeHttpClient`：每次请求和每个重定向跳点都重新解析 A/AAAA；任一私有、回环、链路本地、保留或公网/私网混合解析即拒绝；cURL `CURLOPT_RESOLVE` 固定已校验 IP，阻止校验后 DNS rebinding；跨源重定向移除 Authorization、Proxy-Authorization、X-API-Key/API-Key。Bridge、供应商、Handler、后台更新、远程配置、FeiCode release 和自更新器均切到此入口。
+- [CX] `BackupManager::rollback()` 改为同一父目录 staging：ZIP 只允许预期顶层 slug，拒绝绝对路径、盘符、`..` 和符号链接；先将现版本原子改名，再将 staging 原子换入；第二次改名失败时恢复原版本。测试过滤器只用于注入确定性失败。
+- [CX] 网络激活插件在 `wp_initialize_site` 后为未来新增站点初始化设置和 cron；`wp_uninitialize_site` 在核心删表前清运行状态。激活、停用和卸载的逐站切换全部用 `try/finally` 恢复站点上下文。
+- [CX] 修复真实 POST/REST 输入问题：统一 unslash 边界、按字段 sanitize/cast、JSON 保持结构后再净化、REMOTE_ADDR 验证、GET subtab `sanitize_key`。没有机械重命名 274 个模板局部变量。
+
+### [CX] Plugin Check 与静态检查
+
+- [CX] 按发布工作流排除项生成的正确 slug 目录，Plugin Check 从第二轮 2 errors / 394 warnings 降到 **2 errors / 299 warnings**。剩余 2 errors 均为私有分发必需的 `plugin_updater_detected`；私有 profile 精确忽略该 code 并忽略 warnings 后输出为空、exit 0。
+- [CX] 299 warnings：274 `PrefixAllGlobals` 模板局部变量，11 direct SQL，7 no-cache，3 商标词，2 update transient 修改，1 `set_time_limit`，1 `load_plugin_textdomain`。本轮已清零 Plugin Check 的 nonce、unslash/input sanitize 和文件系统 error；未把剩余 warnings 写成 PASS。
+- [CX] PHPStan level 3 全仓 final run：0 errors，exit 0。PHPCS 可比命令仍为 **FAIL**：1328 errors / 41 warnings / 66 files，exit 2；另一个包含 tests 的全目录口径为 1713/43/75。
+
+### [CX] 最终验证证据
+
+- `npm test`: exit 0。
+- PHP 7.4.33 + WordPress 5.9 + WPBridge 1.2.3：版本/加载 exit 0；SSRF 合约 12/12，exit 0。
+- PHP 8.3.27 + WordPress 7.0.3 + WPBridge 1.2.3：版本/网络激活 exit 0。
+- SSRF/重定向/DNS rebinding：12 passed / 0 failed，exit 0。
+- 本地 mock Bridge/供应商/降级包：14 passed / 0 failed，exit 0；覆盖成功、超时、非 JSON、401、403、降级版本与非安全包保留旧更新；未连接生产。
+- 原子回滚：有效替换、第二次 swap 失败恢复原版本、恶意 ZIP 解压前拒绝，3/3，exit 0。
+- multisite 新站/删除：2/2，exit 0；网络卸载逐站 option/cron 清理：exit 0。
+- 密钥：显式配置历史密钥环后，旧密钥解密、不可解密失败关闭并发事件、当前密钥 round-trip，3/3，exit 0。无历史密钥配置时旧密文不可解是预期的 fail-closed，不会回退明文。
+- Playwright 设置迁移 E2E：1 passed，exit 0。该次 E2E 后只改了回滚目录可写预检和 PHPCS 边界注释，未改迁移/UI 路径。
+- [CX] WenPai 团队只读评审任务 `wenpai-20260809-194330-2060256` 截止提交时仍为 pending，因此没有把零样本写成评审 PASS。
+
+### [CX] 命令与退出码
+
+```bash
+npm test
+# 0
+
+/home/parallels/.config/composer/vendor/bin/phpstan analyse -c phpstan.neon.dist --no-progress --memory-limit=1G --error-format=raw
+# 0, no output
+
+/home/parallels/.config/composer/vendor/bin/phpcs --standard=phpcs.xml.dist --extensions=php --ignore=node_modules,vendor,tests,backups,examples --report=summary .
+# 2, 1328 errors / 41 warnings / 66 files
+
+wp plugin check wpbridge --format=json --no-color
+# 0, report 2 private-distribution policy errors / 299 warnings
+
+wp plugin check wpbridge --ignore-codes=plugin_updater_detected --ignore-warnings --format=json --no-color
+# 0, empty result
+
+docker run --rm --network host -u 1000:1000 -v /tmp/wpbridge-r3-wp59:/var/www/html -v /home/parallels/Projects/wpbridge-codex-audit-20260809:/plugin -w /var/www/html docker.m.daocloud.io/library/wordpress:cli-php7.4 eval-file /plugin/tests/wordpress/ssrf-contract.php --skip-plugins
+# 0, 12/12
+
+wp eval-file tests/wordpress/ssrf-contract.php --skip-plugins
+# 0, 12/12
+wp eval-file tests/wordpress/bridge-contract.php 28766 --skip-plugins
+# 0, 14/14
+wp eval-file tests/wordpress/rollback-contract.php --skip-plugins
+# 0, 3/3
+wp eval-file tests/wordpress/multisite-lifecycle.php
+# 0, 2/2
+```
+
+### [CX] 未完成与边界
+
+- [CX] PHPCS 仍为历史债务；274 个模板局部变量前缀告警应通过模板作用域规则/基线治理，不应机械改变量名。direct SQL/no-cache 需逐处决定缓存失效和卸载清理语义。
+- [CX] WordPress.org 目录包仍不能包含私有 updater/VersionLock；若上架，应拆独立目录发行包。当前 FeiCode/WenPai 私有包保留功能。
+- [CX] 没有真实 Bridge/WooCommerce 凭据契约样本；本轮只完成本地 mock，不触碰生产。
+- [CX] 代码提交 `a7a83786a76933f3a4eadbbae8722092fff7cb3e`；文档提交和 PR/CI 状态见本节后续交接。
