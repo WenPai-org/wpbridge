@@ -769,7 +769,7 @@ class VendorAdmin {
 
 		if ( $is_theme ) {
 			if ( ! current_user_can( 'install_themes' ) ) {
-				@unlink( $tmpfile );
+				wp_delete_file( $tmpfile );
 				wp_send_json_error( [ 'message' => __( '没有安装主题的权限', 'wpbridge' ) ] );
 				return;
 			}
@@ -862,12 +862,13 @@ class VendorAdmin {
 	 * @return void
 	 */
 	public function render_vendor_settings(): void {
-		$vendors     = $this->get_bridge_manager()->get_vendors();
-		$custom      = $this->settings->get( 'custom_plugins', [] );
-		$all_plugins = $this->get_bridge_manager()->get_all_available_plugins();
-		$stats       = $this->get_bridge_manager()->get_stats();
+		$bridge_manager    = $this->get_bridge_manager();
+		$subscription      = $bridge_manager->get_subscription();
+		$is_feature_locked = static function ( string $feature ) use ( $subscription ): bool {
+			return ! in_array( $feature, $subscription['features'] ?? [], true );
+		};
 
-		include WPBRIDGE_PATH . 'templates/admin/vendor-settings.php';
+		include WPBRIDGE_PATH . 'templates/admin/tabs/vendors.php';
 	}
 
 	/**

@@ -737,7 +737,7 @@ class RestController {
 		if ( $status_code !== 200 ) {
 			return new \WP_Error(
 				'api_error',
-				sprintf( __( '菲码源库 API 返回错误: %d', 'wpbridge' ), $status_code ),
+				sprintf( /* translators: %d: HTTP response status code */ __( '菲码源库 API 返回错误: %d', 'wpbridge' ), $status_code ),
 				[ 'status' => $status_code ]
 			);
 		}

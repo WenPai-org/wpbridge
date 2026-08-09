@@ -122,6 +122,7 @@ class ConfigManager {
 				}
 			} catch ( \Exception $e ) {
 				$result['errors'][] = sprintf(
+					/* translators: 1: option name, 2: error message */
 					__( '导入 %1$s 失败: %2$s', 'wpbridge' ),
 					$option_name,
 					$e->getMessage()
@@ -172,6 +173,7 @@ class ConfigManager {
 		// 检查版本兼容性
 		if ( ! empty( $config['version'] ) && version_compare( $config['version'], self::CONFIG_VERSION, '>' ) ) {
 			$errors[] = sprintf(
+				/* translators: 1: imported config version, 2: supported config version */
 				__( '配置版本 %1$s 高于当前支持的版本 %2$s', 'wpbridge' ),
 				$config['version'],
 				self::CONFIG_VERSION

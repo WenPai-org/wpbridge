@@ -34,13 +34,13 @@ class Validator {
 		}
 
 		// 只允许 http 和 https
-		$scheme = parse_url( $url, PHP_URL_SCHEME );
+		$scheme = wp_parse_url( $url, PHP_URL_SCHEME );
 		if ( ! in_array( $scheme, [ 'http', 'https' ], true ) ) {
 			return false;
 		}
 
 		// 检查是否有主机名
-		$host = parse_url( $url, PHP_URL_HOST );
+		$host = wp_parse_url( $url, PHP_URL_HOST );
 		if ( empty( $host ) ) {
 			return false;
 		}
@@ -165,7 +165,7 @@ class Validator {
 
 		foreach ( $required as $field ) {
 			if ( ! isset( $data[ $field ] ) ) {
-				$errors[] = sprintf( __( '缺少必需字段: %s', 'wpbridge' ), $field );
+				$errors[] = sprintf( /* translators: %s: required field name */ __( '缺少必需字段: %s', 'wpbridge' ), $field );
 			}
 		}
 

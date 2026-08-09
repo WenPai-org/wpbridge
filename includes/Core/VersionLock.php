@@ -189,7 +189,7 @@ class VersionLock {
 	 * @return object
 	 */
 	public function filter_plugin_updates( $transient ) {
-		if ( empty( $transient ) || ! is_object( $transient ) ) {
+		if ( ! is_object( $transient ) ) {
 			return $transient;
 		}
 
@@ -236,7 +236,7 @@ class VersionLock {
 	 * @return object
 	 */
 	public function filter_theme_updates( $transient ) {
-		if ( empty( $transient ) || ! is_object( $transient ) ) {
+		if ( ! is_object( $transient ) ) {
 			return $transient;
 		}
 

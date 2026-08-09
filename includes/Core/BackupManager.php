@@ -349,7 +349,7 @@ class BackupManager {
 			// 删除文件
 			$file_path = $this->get_backup_dir() . '/' . $old_backup['filename'];
 			if ( file_exists( $file_path ) ) {
-				unlink( $file_path );
+				wp_delete_file( $file_path );
 			}
 		}
 
@@ -455,14 +455,14 @@ class BackupManager {
 					$zip->close();
 					return new \WP_Error(
 						'invalid_backup_archive',
-						sprintf( __( '备份文件包含非法路径: %s', 'wpbridge' ), $entry )
+						sprintf( /* translators: %s: unsafe archive entry path */ __( '备份文件包含非法路径: %s', 'wpbridge' ), $entry )
 					);
 				}
 			} elseif ( strpos( $resolved . '/', $real_target ) !== 0 ) {
 				$zip->close();
 				return new \WP_Error(
 					'invalid_backup_archive',
-					sprintf( __( '备份文件包含非法路径: %s', 'wpbridge' ), $entry )
+					sprintf( /* translators: %s: unsafe archive entry path */ __( '备份文件包含非法路径: %s', 'wpbridge' ), $entry )
 				);
 			}
 		}
@@ -492,7 +492,7 @@ class BackupManager {
 				// 删除文件
 				$file_path = $this->get_backup_dir() . '/' . $backup['filename'];
 				if ( file_exists( $file_path ) ) {
-					unlink( $file_path );
+					wp_delete_file( $file_path );
 				}
 
 				// 删除记录

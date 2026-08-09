@@ -524,6 +524,7 @@ class Plugin {
 			wp_send_json_success(
 				array(
 					'message'  => sprintf(
+						/* translators: %d: number of imported configuration entries */
 						__( '成功导入 %d 项配置', 'wpbridge' ),
 						count( $result['imported'] )
 					),
@@ -728,7 +729,7 @@ class Plugin {
 		// 清除对象缓存组（不使用 flush 避免影响其他插件）
 		if ( wp_using_ext_object_cache() ) {
 			if ( function_exists( 'wp_cache_flush_group' ) ) {
-				wp_cache_flush_group( 'wpbridge' );
+				call_user_func( 'wp_cache_flush_group', 'wpbridge' );
 			} else {
 				wp_cache_delete( 'wpbridge', 'wpbridge' );
 			}

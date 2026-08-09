@@ -120,3 +120,84 @@
 
 - **1.2.4**：合入本次安全/迁移/卸载修复；补 PHP 7.4 + WP 5.9、WP 6.9、WP 7.0 单站矩阵；对构建 ZIP 跑 Plugin Check；修 CI 引用和 PHPStan bootstrap。
 - **1.3**：单一 SourceRegistry 写模型；统一 HTTP/SSRF 策略；原子回滚；明确 multisite 不支持或完成网络级设计；商业模块边界稳定后再拆包。
+
+## 6. 第二轮整治（2026-08-09）
+
+> [CX] 本轮继续使用隔离 worktree `/home/parallels/Projects/wpbridge-codex-audit-20260809` 和分支 `codex/wpbridge-audit-20260809`；FeiCode `main` 基线仍为 `a27bd828c97e8999b205459ea1ca0af8a6873c81`。未部署、未发布、未合并默认分支，且没有改动共享目录 `/home/parallels/Projects/wpbridge` 的未跟踪文件。
+
+### Plugin Check
+
+- [CX] 发布目录全量检查由 29 errors / 396 warnings 降为 **2 errors / 394 warnings**，命令退出 0。27 个代码错误已消除：18 个翻译占位符注释、7 个 WordPress 文件/URL API、2 个 WordPress 5.9 静态兼容误报。
+- [CX] 剩余 2 个 error 均为 `plugin_updater_detected`：`wpbridge.php` 的 WenPai 私有自更新器和 `includes/Core/VersionLock.php` 的版本锁 transient 过滤。它们只违反 WordPress.org 目录政策；WPBridge 的 FeiCode/WenPai 私有分发需要这两项功能，未为追求目录检查结果而删除。私有分发检查使用 `--ignore-codes=plugin_updater_detected --ignore-warnings` 后退出 0、无错误结果。
+- [CX] 394 个 warning 分类：273 个模板/函数局部变量被 PrefixAllGlobals 当作全局；59 个缺少 `wp_unslash()`；20 个 nonce warning 来自 `handle_actions()` 已统一验证 nonce 后调用的私有处理方法；16 个输入净化 warning 主要是布尔/整数强制转换和 REST 服务器地址；11 个直接 SQL 与 7 个无缓存 warning 用于清理 transient/option 和更新缓存；3 个商标词、2 个预期更新 transient 修改、1 个推荐级 nonce、1 个 discouraged PHP 函数、1 个 textdomain warning。4 个安全重定向 warning 已改为 `wp_safe_redirect()`。未把其余 warning 写成 PASS；输入 unslash 与历史模板命名列为后续标准债务。
+
+### PHPStan、最低版本与多站点
+
+- [CX] `phpstan.neon.dist` 增加 WordPress 常量 bootstrap 和 WP-CLI stubs；修复缺失模板路径、Bridge JSON 标量返回、永真 transient 判断。全仓 PHPStan level 3（1G）由 81 errors 降为 **0 errors，exit 0**；安全、迁移、自更新器文件同样为 0。
+- [CX] 独立容器真实运行：PHP `7.4.33` + WordPress `5.9` + MariaDB，WPBridge `1.2.3` 安装/激活成功；WordPress `7.0.3` + PHP `8.3` 运行成功。
+- [CX] 网络激活/停用现在逐站点初始化或清理定时任务；卸载逐站点删除 WPBridge option/transient，并从网络 sitemeta 清 site transient。WordPress 7.0.3 两站网络的激活断言 `sites=2`、卸载断言 `clean_sites=2`，均 exit 0。
+
+### Bridge、供应商、回滚与浏览器
+
+- [CX] 新增仅绑定 `127.0.0.1` 的 mock server 和真实 WordPress 合约测试，不连接生产。Bridge 与供应商覆盖成功、超时、非 JSON、401、403；自更新器覆盖降级版本与 HTTP 包保留旧更新结果。结果 14 passed / 0 failed，exit 0。
+- [CX] 真实文件回滚覆盖有效 ZIP 恢复与 Zip Slip 包在解压前拒绝，2 项通过。回滚仍是覆盖式解压，不是目录原子替换；该限制保留为 1.3 结构性任务。
+- [CX] Playwright 登录真实 WordPress 后打开 WPBridge 设置页，验证 `vendor_weixiaoduo-store` 自动迁移为 `vendor_weixiaoduo-mall` 且旧 ID 不再渲染；1 passed，exit 0。VM 现有浏览器版本与 Playwright 期望 revision 不同，配置允许用 `WPBRIDGE_E2E_CHROMIUM` 显式指定已安装浏览器。
+
+### 密钥来源、轮换与失败策略
+
+- [CX] 新写入密钥优先级为 `WPBRIDGE_ENCRYPTION_KEY`、`AUTH_KEY`、`SECURE_AUTH_KEY`；不再在无密钥时静默生成新的 option 明文密钥。旧 `wpbridge_encryption_key` 只作为最后一个解密候选并继续显示迁移警告。
+- [CX] 新增 `WPBRIDGE_ENCRYPTION_PREVIOUS_KEYS`（数组或逗号分隔字符串）作为只读历史密钥环，支持主密钥轮换后解密旧 GCM/CBC 数据；新加密只使用当前第一优先密钥。
+- [CX] 所有候选密钥均无法解密时返回空字符串、不会回退明文，并触发不含密文/密钥的 `wpbridge_decryption_failed` 事件。轮换、不可解密失败关闭和当前密钥 round-trip 共 3 项通过。
+
+### 第二轮验证结果
+
+- `npm test`: exit 0。
+- PHPStan level 3 全仓：exit 0，0 errors。
+- Plugin Check 发布目录全量：exit 0，2 policy errors / 394 warnings；私有分发 profile：exit 0，0 error result。
+- PHPCS：exit 2，1354 errors / 33 warnings / 65 files，仍为 FAIL，未包装为通过。
+- PHP 7.4.33 + WordPress 5.9：激活与版本断言 exit 0。
+- WordPress 7.0.3 两站网络激活/卸载：exit 0 / exit 0。
+- Bridge/供应商/降级包 mock 合约：exit 0，14/14。
+- 密钥轮换/失败关闭：exit 0，3/3。
+- 回滚：exit 0，2/2。
+- Playwright 设置迁移：exit 0，1/1。
+
+### 未完成与版本方向
+
+- [CX] PHPCS 和 394 个 Plugin Check warning 尚未清零；优先处理 `wp_unslash`/输入边界，再按模板局部变量、文档/命名分批清理。
+- [CX] WordPress.org 目录 profile 仍会拒绝私有 updater/VersionLock；若未来上架目录，应拆出独立的目录发行包，而不是删除 FeiCode 私有发行功能。
+- [CX] 1.2.x 保留 SourceRegistry、私有 updater、VersionLock、Bridge/供应商、凭据加密和备份；精简双写旧源模型。1.3 应完成单一 SourceRegistry 写模型、请求期 SSRF 复核/内网 allowlist、原子目录回滚和新建 multisite 站点初始化。商业 Bridge/WooCommerce 适合在契约稳定后拆为可选模块，不在本轮擅自废弃。
+
+### 可复现命令与退出码
+
+```bash
+npm test
+# exit 0
+
+/home/parallels/.config/composer/vendor/bin/phpstan analyse -c phpstan.neon.dist --no-progress --memory-limit=1G --error-format=raw
+# exit 0, 0 errors
+
+wp plugin check wpbridge --path=/tmp/wpbridge-r2-wp7 --url=http://127.0.0.1:8899 --format=json --no-color
+# exit 0, report 2 policy errors / 394 warnings
+
+wp plugin check wpbridge --path=/tmp/wpbridge-r2-wp7 --url=http://127.0.0.1:8899 --ignore-codes=plugin_updater_detected --ignore-warnings --format=json --no-color
+# exit 0, no error result
+
+/home/parallels/.config/composer/vendor/bin/phpcs --standard=phpcs.xml.dist --extensions=php --ignore=node_modules,vendor,tests,backups,examples --report=summary .
+# exit 2, 1354 errors / 33 warnings / 65 files
+
+docker run --rm --network host -v /tmp/wpbridge-r2-wp59:/tmp/wpbridge-r2-wp59 -v /usr/local/bin/wp:/usr/local/bin/wp:ro -w /tmp/wpbridge-r2-wp59 wpbridge-php74 wp --allow-root plugin is-active wpbridge
+# exit 0; runtime: PHP 7.4.33 | WordPress 5.9 | WPBridge 1.2.3
+
+wp eval-file tests/wordpress/bridge-contract.php 28766 --path=/tmp/wpbridge-r2-wp7 --url=http://127.0.0.1:8899 --user=admin
+# exit 0, 14 passed / 0 failed
+
+wp eval-file tests/wordpress/encryption-rotation.php --path=/tmp/wpbridge-r2-wp7 --url=http://127.0.0.1:8899 --user=admin
+# exit 0, 3 passed
+
+wp eval-file tests/wordpress/rollback-contract.php --path=/tmp/wpbridge-r2-wp7 --url=http://127.0.0.1:8899 --user=admin
+# exit 0, 2 passed
+
+WPBRIDGE_E2E_BASE_URL=http://127.0.0.1:8899 WPBRIDGE_E2E_USER=admin WPBRIDGE_E2E_PASSWORD=pass1234 WPBRIDGE_E2E_CHROMIUM=/home/parallels/.cache/ms-playwright/chromium_headless_shell-1234/chrome-linux/headless_shell npx playwright test tests/E2E/settings-migration.spec.js --reporter=line
+# exit 0, 1 passed
+```

@@ -46,41 +46,67 @@ class Encryption {
 	/**
 	 * 获取主密钥
 	 *
-	 * 优先级: WPBRIDGE_ENCRYPTION_KEY > AUTH_KEY > SECURE_AUTH_KEY
-	 * 不再回退到 wp_options 明文存储（H1 修复）
+	 * 优先级: WPBRIDGE_ENCRYPTION_KEY > AUTH_KEY > SECURE_AUTH_KEY > 旧 option.
 	 *
 	 * @return string
 	 * @throws \RuntimeException 当无可用密钥时
 	 */
 	private static function get_key(): string {
+		$keys = self::get_decryption_keys();
+		if ( ! empty( $keys ) ) {
+			return $keys[0];
+		}
+
+		throw new \RuntimeException( 'WPBridge encryption key is not configured.' );
+	}
+
+	/**
+	 * 获取当前及轮换前的候选密钥.
+	 *
+	 * WPBRIDGE_ENCRYPTION_PREVIOUS_KEYS 可定义为数组或逗号分隔字符串；只用于解密。
+	 * 旧 option 仅为迁移兼容候选，不会覆盖新的主密钥。
+	 *
+	 * @return string[]
+	 */
+	private static function get_decryption_keys(): array {
+		$keys = [];
+
 		if ( defined( 'WPBRIDGE_ENCRYPTION_KEY' ) && WPBRIDGE_ENCRYPTION_KEY ) {
-			return WPBRIDGE_ENCRYPTION_KEY;
+			$keys[] = (string) WPBRIDGE_ENCRYPTION_KEY;
 		}
 
 		if ( defined( 'AUTH_KEY' ) && AUTH_KEY ) {
-			return AUTH_KEY;
+			$keys[] = (string) AUTH_KEY;
 		}
 
 		if ( defined( 'SECURE_AUTH_KEY' ) && SECURE_AUTH_KEY ) {
-			return SECURE_AUTH_KEY;
+			$keys[] = (string) SECURE_AUTH_KEY;
 		}
 
-		// 迁移: 如果旧版 wp_options 密钥存在，继续使用但记录警告
+		if ( defined( 'WPBRIDGE_ENCRYPTION_PREVIOUS_KEYS' ) && WPBRIDGE_ENCRYPTION_PREVIOUS_KEYS ) {
+			$previous = WPBRIDGE_ENCRYPTION_PREVIOUS_KEYS;
+			if ( is_string( $previous ) ) {
+				$previous = array_map( 'trim', explode( ',', $previous ) );
+			}
+			if ( is_array( $previous ) ) {
+				foreach ( $previous as $previous_key ) {
+					if ( is_string( $previous_key ) && '' !== $previous_key ) {
+						$keys[] = $previous_key;
+					}
+				}
+			}
+		}
+
+		// 迁移: 旧版 option 始终作为最后一个解密候选。
 		$legacy_key = get_option( 'wpbridge_encryption_key' );
 		if ( ! empty( $legacy_key ) ) {
 			if ( is_admin() ) {
 				add_action( 'admin_notices', [ __CLASS__, 'show_key_warning' ] );
 			}
-			return $legacy_key;
+			$keys[] = (string) $legacy_key;
 		}
 
-		// 无密钥可用 — 生成临时密钥并警告
-		$key = bin2hex( random_bytes( 32 ) );
-		update_option( 'wpbridge_encryption_key', $key, false );
-		if ( is_admin() ) {
-			add_action( 'admin_notices', [ __CLASS__, 'show_key_warning' ] );
-		}
-		return $key;
+		return array_values( array_unique( $keys ) );
 	}
 
 	/**
@@ -104,8 +130,10 @@ class Encryption {
 	 * @param string $purpose 用途标识 ('encrypt' 或 'mac')
 	 * @return string 32 字节二进制密钥
 	 */
-	private static function derive_key( string $purpose ): string {
-		$master = self::get_key();
+	private static function derive_key( string $purpose, string $master = '' ): string {
+		if ( '' === $master ) {
+			$master = self::get_key();
+		}
 		return hash_hkdf( 'sha256', $master, 32, 'wpbridge-' . $purpose );
 	}
 
@@ -186,18 +214,22 @@ class Encryption {
 		$iv        = substr( $raw, 0, 12 );
 		$tag       = substr( $raw, 12, self::TAG_LENGTH );
 		$encrypted = substr( $raw, $min_length );
-		$key       = self::derive_key( 'encrypt' );
+		foreach ( self::get_decryption_keys() as $master_key ) {
+			$decrypted = openssl_decrypt(
+				$encrypted,
+				self::METHOD,
+				self::derive_key( 'encrypt', $master_key ),
+				OPENSSL_RAW_DATA,
+				$iv,
+				$tag
+			);
+			if ( false !== $decrypted ) {
+				return $decrypted;
+			}
+		}
 
-		$decrypted = openssl_decrypt(
-			$encrypted,
-			self::METHOD,
-			$key,
-			OPENSSL_RAW_DATA,
-			$iv,
-			$tag
-		);
-
-		return ( false === $decrypted ) ? '' : $decrypted;
+		do_action( 'wpbridge_decryption_failed', 'gcm' );
+		return '';
 	}
 
 	/**
@@ -212,8 +244,6 @@ class Encryption {
 			return '';
 		}
 
-		// 旧版使用 SHA-256(raw_key) 作为密钥
-		$key       = hash( 'sha256', self::get_key(), true );
 		$iv_length = openssl_cipher_iv_length( self::LEGACY_METHOD );
 
 		if ( strlen( $decoded ) <= $iv_length ) {
@@ -223,9 +253,16 @@ class Encryption {
 		$iv        = substr( $decoded, 0, $iv_length );
 		$encrypted = substr( $decoded, $iv_length );
 
-		$decrypted = openssl_decrypt( $encrypted, self::LEGACY_METHOD, $key, OPENSSL_RAW_DATA, $iv );
+		foreach ( self::get_decryption_keys() as $master_key ) {
+			$key       = hash( 'sha256', $master_key, true );
+			$decrypted = openssl_decrypt( $encrypted, self::LEGACY_METHOD, $key, OPENSSL_RAW_DATA, $iv );
+			if ( false !== $decrypted ) {
+				return $decrypted;
+			}
+		}
 
-		return ( false === $decrypted ) ? '' : $decrypted;
+		do_action( 'wpbridge_decryption_failed', 'legacy' );
+		return '';
 	}
 
 	/**

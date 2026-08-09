@@ -25,7 +25,8 @@ $assert( ( $header_match[1] ?? null ) === ( $package['version'] ?? null ), 'Plug
 $assert( 'GPL-2.0-or-later' === ( $package['license'] ?? null ), 'npm metadata uses the plugin GPL license' );
 
 $uninstall = file_get_contents( $root . '/uninstall.php' );
-$assert( false !== strpos( $uninstall, "esc_like( 'wpbridge_' )" ), 'Uninstall removes all current-site WPBridge options, including dynamic keys' );
+$assert( false !== strpos( $uninstall, 'function wpbridge_uninstall_site()' ) && false !== strpos( $uninstall, "'wpbridge_'" ), 'Uninstall removes all current-site WPBridge options, including dynamic keys' );
+$assert( false !== strpos( $uninstall, 'get_sites(' ) && false !== strpos( $uninstall, 'switch_to_blog(' ), 'Uninstall iterates all sites on multisite' );
 $assert( false !== strpos( $uninstall, "'_site_transient_wpbridge_'" ), 'Uninstall removes site transient data' );
 $assert( false !== strpos( $uninstall, "wp_clear_scheduled_hook( 'wpbridge_update_sources' )" ), 'Uninstall clears the scheduled source update hook' );
 

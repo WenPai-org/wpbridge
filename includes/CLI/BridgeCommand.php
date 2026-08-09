@@ -504,7 +504,7 @@ class BridgeCommand {
 			$file_path = $args[0];
 			// 验证路径是否可写
 			$dir = dirname( $file_path );
-			if ( ! is_dir( $dir ) || ! is_writable( $dir ) ) {
+			if ( ! is_dir( $dir ) || ! wp_is_writable( $dir ) ) {
 				WP_CLI::error( '目标目录不存在或不可写' );
 			}
 			// 使用 WordPress 文件系统 API
@@ -625,7 +625,7 @@ class BridgeCommand {
 	 * @return string
 	 */
 	private function generate_source_name( string $url, string $type ): string {
-		$parsed = parse_url( $url );
+		$parsed = wp_parse_url( $url );
 		$host   = $parsed['host'] ?? '';
 		$path   = $parsed['path'] ?? '';
 

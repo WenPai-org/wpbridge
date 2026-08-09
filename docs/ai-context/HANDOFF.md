@@ -87,3 +87,14 @@ WP 更新检查 → PluginUpdater → SourceResolver → VendorHandler → Vendo
 - 未完成：PHP 7.4/WP 5.9 多版本、multisite、浏览器 E2E、真实 Bridge/供应商联调、原子回滚、SSRF 私网 allowlist、单一 SourceRegistry 写模型。
 - FeiCode 拒绝直接 push 新分支（账号仅允许 AGit PR refs）；未擅自创建 PR，提交保留在 VM 隔离 worktree。
 - 未部署、未发布、未合并默认分支；共享目录原有未跟踪迁移和 CI 文件未覆盖。
+
+## 2026-08-09 — [CX] 第二轮 Plugin Check/PHPStan/兼容矩阵
+
+- 隔离 worktree/分支不变：`/home/parallels/Projects/wpbridge-codex-audit-20260809`，`codex/wpbridge-audit-20260809`；共享 `/home/parallels/Projects/wpbridge` 未改。
+- Plugin Check 发布目录：2 个私有发行 policy errors / 394 warnings；27 个原代码 error 已修。忽略精确 policy code 的私有分发 profile 为 0 error result。PHPCS 仍 FAIL（1354/33）。
+- PHPStan level 3 全仓 0 error；`npm test` exit 0。
+- PHP 7.4.33 + WP 5.9 激活通过；WP 7.0.3 两站网络激活与卸载通过；Playwright 迁移 E2E 1/1。
+- 本地 mock：Bridge/供应商/降级包 14/14；密钥轮换/失败关闭 3/3；回滚 2/2。未接生产服务。
+- 新增历史密钥环 `WPBRIDGE_ENCRYPTION_PREVIOUS_KEYS`；不可解密返回空值并触发 `wpbridge_decryption_failed`，不回退明文。
+- 仍未完成：PHPCS、394 warnings、原子回滚、请求期 DNS/SSRF 复核、未来新增 multisite 站点初始化、真实生产凭据 Bridge/WooCommerce 联调（生产联调不在本轮授权内）。
+- 完整命令、分类和范围见 `docs/audits/wpbridge-full-2026-08-09.md` 第 6 节。

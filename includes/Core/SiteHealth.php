@@ -120,6 +120,7 @@ class SiteHealth {
 		if ( $failed > 0 ) {
 			return [
 				'label'       => sprintf(
+					/* translators: %d: number of unavailable update sources */
 					__( 'WPBridge: %d 个更新源不可用', 'wpbridge' ),
 					$failed
 				),
@@ -146,6 +147,7 @@ class SiteHealth {
 		if ( $degraded > 0 ) {
 			return [
 				'label'       => sprintf(
+					/* translators: %d: number of slow update sources */
 					__( 'WPBridge: %d 个更新源响应较慢', 'wpbridge' ),
 					$degraded
 				),
@@ -169,6 +171,7 @@ class SiteHealth {
 
 		return [
 			'label'       => sprintf(
+				/* translators: %d: number of healthy update sources */
 				__( 'WPBridge: 所有 %d 个更新源正常', 'wpbridge' ),
 				$healthy
 			),

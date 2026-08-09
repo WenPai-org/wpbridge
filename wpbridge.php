@@ -43,33 +43,68 @@ function wpbridge_init() {
 	return Core\Plugin::get_instance();
 }
 
-// 激活钩子.
-register_activation_hook(
-	__FILE__,
-	function () {
-		Core\Plugin::activate();
+/**
+ * 激活当前站点的 WPBridge 数据与任务.
+ */
+function wpbridge_activate_site(): void {
+	Core\Plugin::activate();
 
-		// 调度后台更新任务.
-		$settings = new Core\Settings();
-		$updater  = new Performance\BackgroundUpdater( $settings );
-		$updater->schedule_update();
-	}
-);
+	$settings = new Core\Settings();
+	$updater  = new Performance\BackgroundUpdater( $settings );
+	$updater->schedule_update();
+}
 
-// 停用钩子.
-register_deactivation_hook(
-	__FILE__,
-	function () {
-		Core\Plugin::deactivate();
+/**
+ * 激活插件，网络激活时初始化每个既有站点.
+ *
+ * @param bool $network_wide 是否网络激活.
+ */
+function wpbridge_activate( bool $network_wide = false ): void {
+	if ( is_multisite() && $network_wide ) {
+		$site_ids = get_sites( [ 'fields' => 'ids', 'number' => 0 ] );
+		foreach ( $site_ids as $site_id ) {
+			switch_to_blog( (int) $site_id );
+			wpbridge_activate_site();
+			restore_current_blog();
+		}
+		return;
 	}
-);
+
+	wpbridge_activate_site();
+}
+
+/**
+ * 停用插件，网络停用时清理每个站点的运行期状态.
+ *
+ * @param bool $network_wide 是否网络停用.
+ */
+function wpbridge_deactivate( bool $network_wide = false ): void {
+	if ( is_multisite() && $network_wide ) {
+		$site_ids = get_sites( [ 'fields' => 'ids', 'number' => 0 ] );
+		foreach ( $site_ids as $site_id ) {
+			switch_to_blog( (int) $site_id );
+			Core\Plugin::deactivate();
+			restore_current_blog();
+		}
+		return;
+	}
+
+	Core\Plugin::deactivate();
+}
+
+// 激活与停用钩子.
+register_activation_hook( __FILE__, __NAMESPACE__ . '\\wpbridge_activate' );
+
+register_deactivation_hook( __FILE__, __NAMESPACE__ . '\\wpbridge_deactivate' );
 
 // WenPai 自更新检查器.
 require_once WPBRIDGE_PATH . 'includes/class-wenpai-updater.php';
 new \WPBridge_Updater( WPBRIDGE_BASENAME, WPBRIDGE_VERSION );
 
 // 启动插件.
-add_action( 'plugins_loaded', __NAMESPACE__ . '\\wpbridge_init' );
+add_action( 'plugins_loaded', static function (): void {
+	wpbridge_init();
+} );
 
 // 注册 WP-CLI 命令.
 if ( defined( 'WP_CLI' ) && WP_CLI ) {

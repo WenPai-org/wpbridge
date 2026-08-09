@@ -132,7 +132,7 @@ class BridgeClient {
 			return [];
 		}
 
-		return $response ?? [];
+		return $response;
 	}
 
 	/**
@@ -219,7 +219,7 @@ class BridgeClient {
 			return [];
 		}
 
-		return $response ?? [];
+		return $response;
 	}
 
 	/**
@@ -375,7 +375,7 @@ class BridgeClient {
 		// 解析 JSON 响应
 		$decoded = json_decode( $body, true );
 
-		if ( json_last_error() !== JSON_ERROR_NONE ) {
+		if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $decoded ) ) {
 			return new \WP_Error( 'json_decode_error', 'Invalid JSON response' );
 		}
 

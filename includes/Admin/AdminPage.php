@@ -307,7 +307,7 @@ class AdminPage {
 		if ( $result ) {
 			$this->sync_source_to_registry( $source );
 			$this->add_notice( 'success', $message );
-			wp_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) );
+			wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) );
 			exit;
 		} else {
 			$this->add_notice( 'error', __( '保存失败', 'wpbridge' ) );
@@ -340,7 +340,7 @@ class AdminPage {
 			$this->add_notice( 'error', __( '删除失败，可能是预置源', 'wpbridge' ) );
 		}
 
-		wp_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) );
 		exit;
 	}
 
@@ -375,7 +375,7 @@ class AdminPage {
 			$this->add_notice( 'error', __( '保存失败', 'wpbridge' ) );
 		}
 
-		wp_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '#settings' ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '#settings' ) );
 		exit;
 	}
 
@@ -409,7 +409,7 @@ class AdminPage {
 			$this->add_notice( 'error', __( '保存失败', 'wpbridge' ) );
 		}
 
-		wp_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '#api' ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '#api' ) );
 		exit;
 	}
 
@@ -580,7 +580,7 @@ class AdminPage {
 
 			// 自动生成名称
 			if ( $type === SourceType::BRIDGE_SERVER ) {
-				$source->name = $host ? sprintf( __( 'Bridge: %s', 'wpbridge' ), $host ) : __( 'Bridge Server', 'wpbridge' );
+				$source->name = $host ? sprintf( /* translators: %s: Bridge server host */ __( 'Bridge: %s', 'wpbridge' ), $host ) : __( 'Bridge Server', 'wpbridge' );
 			} elseif ( ! empty( $source->slug ) ) {
 				$source->name = ucwords( str_replace( [ '-', '_' ], ' ', $source->slug ) );
 			} else {

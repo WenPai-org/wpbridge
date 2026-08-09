@@ -211,6 +211,7 @@ class FallbackStrategy {
 				// 阻止更新检查（不推荐）
 				throw new \RuntimeException(
 					sprintf(
+						/* translators: 1: update source name, 2: error message */
 						esc_html__( '更新源 %1$s 不可用: %2$s', 'wpbridge' ),
 						esc_html( $source->name ),
 						esc_html( $error )
@@ -236,6 +237,7 @@ class FallbackStrategy {
 		$notices[] = [
 			'type'    => 'warning',
 			'message' => sprintf(
+				/* translators: 1: update source name, 2: error message */
 				__( '更新源 "%1$s" 暂时不可用: %2$s', 'wpbridge' ),
 				$source->name,
 				$error
