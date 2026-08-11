@@ -116,3 +116,14 @@ WP 更新检查 → PluginUpdater → SourceResolver → VendorHandler → Vendo
 - [CX] PR #4 在 `4695393678eb3b15cc35a42f644a3ca7edcfdb4a` 快照仍 open/未合并/mergeable；gitleaks、security-scan、WordPress 插件 CI 均 waiting，显示 `Blocked by required conditions`，不计 PASS。
 
 - [CX] 最终输入边界复核提交 `c4330c67e44b3e5adf760566830769c11444a35a` 移除 3 处重复 unslash；其后 npm/PHPStan/Plugin Check final profile 均已重跑，结果不变。
+
+## 2026-08-11 — [CX] WPBridge 1.2.4 私有发行本地候选
+
+- [CX] 隔离仓库 `/home/parallels/Projects/wpbridge-codex-audit-20260809`、分支 `codex/wpbridge-audit-20260809`；共享 `/home/parallels/Projects/wpbridge` 未跟踪 WIP 未改。
+- [CX] 私有发行元数据统一为 1.2.4，Update URI `https://updates.wenpai.net`，最低 WP 5.9/PHP 7.4，Tested up to WP 7.0；保留私有更新器与 VersionLock。
+- [CX] private Plugin Check 0 errors / 299 warnings（仅精确豁免 updater policy，exit 0）；WordPress.org 2 policy errors / 299 warnings（exit 1）；release PHPCS exit 0；全量 PHPCS 历史债务仍 FAIL（1328/37/66）。
+- [CX] 最终回归：npm test/PHPStan exit 0；PHP 7.4+WP 5.9 与 PHP 8.3+WP 7.0 通过；SSRF 12/12、mock Bridge 14/14、原子回滚 3/3、密钥轮换 3/3、multisite 生命周期 2/2、三站网络卸载、Playwright E2E 1/1 均 exit 0。
+- [CX] 候选 ZIP `dist/wpbridge-1.2.4.zip` SHA-256 `04a432e035077a979b0df37e13ba2829a6885d68986441bfb9005203ec567775`；manifest 记录精确 HEAD 和逐文件哈希，升级/回滚见 `docs/releases/wpbridge-1.2.4-candidate.md`。
+- [CX] PR #4 远端头仍为 `b68ec90b391b8cae69fe0510b3c5cd159f25cba6`；runs 85/86/87 均 waiting 且需人工审批。FeiCode P0 Board 门未满足前，不得 push、审批 CI、合并、发布或部署。
+- [CX] 本地最终 HEAD、拟推 ref、验收与回退写入 ignored 的 `dist/devops-board-change-wpbridge-1.2.4.json`，供 devops 创建 Board change；该任务说明本身没有发布到 Board。
+- [CX] 只读 reviewer 任务 `wenpai-20260811-121324-622542` 仍 pending、无输出，不计 PASS。

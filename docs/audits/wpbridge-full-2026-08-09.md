@@ -281,3 +281,16 @@ wp eval-file tests/wordpress/multisite-lifecycle.php
 - [CX] 该头的 3 个检查均为 pending/waiting 且显示 `Blocked by required conditions`：gitleaks、security-scan、WordPress 插件 CI；不是 PASS，也没有失败样本。聚合 commit status API 匿名读取返回 403，单项 statuses/actions runs 可读。
 
 - [CX] 最终复核发现并移除 3 处中央 POST reader 后的重复 `wp_unslash()`；代码提交 `c4330c67e44b3e5adf760566830769c11444a35a`。该提交后重新运行 `npm test`、PHPStan 和两种 Plugin Check profile，分别为 exit 0、0 errors、2 policy/299 warnings、私有 profile 空结果。
+
+## 8. [CX] 1.2.4 私有发行本地候选收口（2026-08-11）
+
+- [CX] 产品边界已按批准方案固定：WPBridge 是 FeiCode/WenPai 企业私有分发插件；保留私有更新器和 VersionLock，本版只做兼容与安全修复，不删除现有功能。
+- [CX] 版本、插件头、Stable tag、npm/lockfile、POT 和 changelog 统一为 `1.2.4`；Update URI 为 `https://updates.wenpai.net`；最低 WordPress `5.9`、最低 PHP `7.4`、Tested up to `7.0`。
+- [CX] 新增明确的 Plugin Check 双 profile。private 只精确豁免 `plugin_updater_detected`，不忽略 warning/error；WordPress.org 不豁免。最终私有 profile：0 errors / 299 warnings，exit 0；WordPress.org profile：2 updater policy errors / 299 warnings，exit 1。299 warnings 已分类为 274 PrefixAllGlobals、11 DirectDatabaseQuery、7 NoCaching、3 trademarked_term、2 update_modification_detected、1 load_plugin_textdomain、1 set_time_limit；没有把 warnings 写成 PASS。
+- [CX] 新增阻断型 `phpcs.release.xml.dist`，覆盖输入、nonce、输出、安全重定向、prepared SQL、文件/远程 API 和 PHP 7.4 兼容；最终 exit 0。全量历史债务仍为 FAIL：1328 errors / 37 warnings / 66 files，exit 2。
+- [CX] 最终 HEAD 代码回归：`npm test` exit 0；PHPStan level 3 exit 0；PHP 7.4.33 + WP 5.9 + WPBridge 1.2.4 版本加载 exit 0，SSRF 12/12；PHP 8.3.27 + WP 7.0.3 + WPBridge 1.2.4 版本加载 exit 0。
+- [CX] 最终真实 WordPress 回归：SSRF/DNS rebinding 12/12；本地 mock Bridge/供应商/超时/非 JSON/401/403/降级与回退保护 14/14；原子替换和失败回滚 3/3；密钥轮换/不可解密失败关闭 3/3；multisite 新站初始化/删站 2/2；三站网络卸载清理 exit 0 并重新网络激活；Playwright 设置迁移 1/1。所有远程契约仅接本地 mock，不使用生产凭据。
+- [CX] 可复现构建脚本从干净的已提交 HEAD 使用 `git archive`、固定顺序/时间戳和 `zip -X`；两次独立构建 ZIP 字节一致，`sha256sum -c` 和 `unzip -t` 通过。候选 ZIP SHA-256：`04a432e035077a979b0df37e13ba2829a6885d68986441bfb9005203ec567775`；最终精确 HEAD 由同目录 manifest 与 devops Board 任务说明记录。
+- [CX] FeiCode PR #4 仍 open、未合并、mergeable=true，远端评审头仍为 `b68ec90b391b8cae69fe0510b3c5cd159f25cba6`。远端 runs 85（gitleaks）、86（security-scan）、87（wp-plugin-ci）均 waiting、need_approval=true、approved_by=0；没有审批或触发。
+- [CX] WenPai 只读 reviewer 任务 `wenpai-20260811-121324-622542` 截止收口仍 pending，且没有输出文件，因此不计评审 PASS。
+- [CX] FeiCode P0 `write_policy=board_required` 生效：本轮只在隔离仓库生成本地候选、ZIP/manifest 和 Board change 任务说明；未 push 最终提交、未审批 CI、未合并、未发布、未部署。共享仓库未跟踪 WIP 未覆盖。
