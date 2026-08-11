@@ -18,27 +18,23 @@ jobs:
         run: |
           parallel-lint --exclude vendor --exclude node_modules .
 
+      - name: Install locked development gates
+        run: composer install --no-interaction --prefer-source --no-progress
+
       - name: PHPCS 发布安全与兼容门
-        run: |
-          PHPCS_BIN="/home/parallels/.config/composer/vendor/bin/phpcs"
-          test -x "$PHPCS_BIN"
-          "$PHPCS_BIN" --standard=phpcs.release.xml.dist --report=full .
+        run: vendor/bin/phpcs --standard=phpcs.release.xml.dist --report=full .
 
       - name: PHPCS 全量债务报告（非发布门）
         continue-on-error: true
         run: |
-          PHPCS_BIN="/home/parallels/.config/composer/vendor/bin/phpcs"
-          test -x "$PHPCS_BIN"
-          "$PHPCS_BIN" --standard=phpcs.xml.dist --report=summary .
+          vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary .
 
       - name: Functional regression suite
         run: npm test
 
       - name: PHPStan level 3
         run: |
-          PHPSTAN_BIN="/home/parallels/.config/composer/vendor/bin/phpstan"
-          test -x "$PHPSTAN_BIN"
-          "$PHPSTAN_BIN" analyse -c phpstan.neon.dist --no-progress --memory-limit=1G --error-format=raw
+          vendor/bin/phpstan analyse -c phpstan.neon.dist --no-progress --memory-limit=1G --error-format=raw
 
       - name: Reproducible private release package
         run: |
