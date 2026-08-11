@@ -68,7 +68,7 @@ jobs:
           fi
           # npm audit 只报告 high 和 critical
           if [ -f package-lock.json ]; then
-            npm audit --audit-level=high || {
+            npm_config_registry=https://registry.npmjs.org npm audit --audit-level=high || {
               echo "::error::npm 依赖存在高危安全漏洞"
               exit 1
             }

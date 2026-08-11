@@ -20,12 +20,37 @@ jobs:
 
       - name: PHPCS 发布安全与兼容门
         run: |
-          phpcs --standard=phpcs.release.xml.dist --report=full .
+          PHPCS_BIN="$(composer global config home --absolute)/vendor/bin/phpcs"
+          test -x "$PHPCS_BIN"
+          "$PHPCS_BIN" --standard=phpcs.release.xml.dist --report=full .
 
       - name: PHPCS 全量债务报告（非发布门）
         continue-on-error: true
         run: |
-          phpcs --standard=phpcs.xml.dist --report=summary .
+          PHPCS_BIN="$(composer global config home --absolute)/vendor/bin/phpcs"
+          test -x "$PHPCS_BIN"
+          "$PHPCS_BIN" --standard=phpcs.xml.dist --report=summary .
+
+      - name: Functional regression suite
+        run: npm test
+
+      - name: PHPStan level 3
+        run: |
+          PHPSTAN_BIN="$(composer global config home --absolute)/vendor/bin/phpstan"
+          test -x "$PHPSTAN_BIN"
+          "$PHPSTAN_BIN" analyse -c phpstan.neon.dist --no-progress --memory-limit=1G --error-format=raw
+
+      - name: Reproducible private release package
+        run: |
+          output_dir="$(mktemp -d)"
+          trap 'rm -rf "$output_dir"' EXIT
+          tests/release/build-candidate.sh --version 1.2.4 --output-dir "$output_dir"
+          first_sha="$(awk '{print $1}' "$output_dir/wpbridge-1.2.4.zip.sha256")"
+          tests/release/build-candidate.sh --version 1.2.4 --output-dir "$output_dir"
+          second_sha="$(awk '{print $1}' "$output_dir/wpbridge-1.2.4.zip.sha256")"
+          test "$first_sha" = "$second_sha"
+          ( cd "$output_dir" && sha256sum -c wpbridge-1.2.4.zip.sha256 )
+          unzip -t "$output_dir/wpbridge-1.2.4.zip"
 
       - name: Gitleaks 密钥泄露扫描
         run: |
