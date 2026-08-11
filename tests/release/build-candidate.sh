@@ -62,6 +62,8 @@ git archive HEAD | tar -x -C "$tmp/source"
 
 rsync -a   --exclude=".git"   --exclude=".github"   --exclude=".forgejo"   --exclude=".gitignore"   --exclude=".gitleaks.toml"   --exclude=".wp-env.json"   --exclude=".gitattributes"   --exclude=".editorconfig"   --exclude=".env*"   --exclude=".agent"   --exclude=".vscode"   --exclude="node_modules"   --exclude="vendor"   --exclude="tests"   --exclude="docs"   --exclude="examples"   --exclude="backups"   --exclude="deploy.sh"   --exclude="lib"   --exclude="phpunit.xml*"   --exclude="phpcs*.xml*"   --exclude="phpstan.neon*"   --exclude="composer.json"   --exclude="composer.lock"   --exclude="package.json"   --exclude="package-lock.json"   --exclude="Gruntfile.js"   --exclude="webpack.config.js"   --exclude="playwright.config.js"   --exclude="*.md"   --exclude="Makefile"   "$tmp/source/" "$tmp/build/$slug/"
 
+find "$tmp/build/$slug" -type d -exec chmod 0755 {} +
+find "$tmp/build/$slug" -type f -exec chmod 0644 {} +
 find "$tmp/build/$slug" -exec touch -h -t 198001010000 {} +
 list="$tmp/file-list.txt"
 (
