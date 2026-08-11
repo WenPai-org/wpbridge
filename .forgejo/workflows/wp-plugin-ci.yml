@@ -20,14 +20,14 @@ jobs:
 
       - name: PHPCS 发布安全与兼容门
         run: |
-          PHPCS_BIN="$(composer global config home --absolute)/vendor/bin/phpcs"
+          PHPCS_BIN="/home/parallels/.config/composer/vendor/bin/phpcs"
           test -x "$PHPCS_BIN"
           "$PHPCS_BIN" --standard=phpcs.release.xml.dist --report=full .
 
       - name: PHPCS 全量债务报告（非发布门）
         continue-on-error: true
         run: |
-          PHPCS_BIN="$(composer global config home --absolute)/vendor/bin/phpcs"
+          PHPCS_BIN="/home/parallels/.config/composer/vendor/bin/phpcs"
           test -x "$PHPCS_BIN"
           "$PHPCS_BIN" --standard=phpcs.xml.dist --report=summary .
 
@@ -36,7 +36,7 @@ jobs:
 
       - name: PHPStan level 3
         run: |
-          PHPSTAN_BIN="$(composer global config home --absolute)/vendor/bin/phpstan"
+          PHPSTAN_BIN="/home/parallels/.config/composer/vendor/bin/phpstan"
           test -x "$PHPSTAN_BIN"
           "$PHPSTAN_BIN" analyse -c phpstan.neon.dist --no-progress --memory-limit=1G --error-format=raw
 
