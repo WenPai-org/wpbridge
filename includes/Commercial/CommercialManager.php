@@ -162,6 +162,7 @@ class CommercialManager {
 		}
 
 		if ( file_exists( $real_path ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Bounded local plugin-header inspection after realpath containment validation; this is not a remote URL.
 			$content = file_get_contents( $real_path, false, null, 0, 8192 );
 
 			// 检查授权相关关键词
@@ -199,6 +200,7 @@ class CommercialManager {
 			return 'unknown';
 		}
 
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Bounded local plugin-header inspection; this is not a remote URL.
 		$content = file_get_contents( $plugin_path, false, null, 0, 8192 );
 
 		// EDD Software Licensing

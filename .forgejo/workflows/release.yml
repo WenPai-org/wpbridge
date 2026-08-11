@@ -160,62 +160,22 @@ jobs:
           fi
           echo "PHP lint passed"
 
-      - name: Build ZIP
+      - name: Build reproducible ZIP and manifest
         id: build
         shell: bash
         run: |
           set -euo pipefail
           VERSION="${{ steps.version.outputs.version }}"
           SLUG="${{ env.PLUGIN_SLUG }}"
-          ZIP_NAME="${SLUG}-${VERSION}.zip"
-          BUILD_DIR="/tmp/build/${SLUG}"
           RELEASE_DIR="/tmp/release"
-
-          rm -rf "$BUILD_DIR" "$RELEASE_DIR"
-          mkdir -p "$BUILD_DIR" "$RELEASE_DIR"
-
-          rsync -a \
-            --exclude=".git" \
-            --exclude=".github" \
-            --exclude=".forgejo" \
-            --exclude=".gitignore" \
-            --exclude=".gitleaks.toml" \
-            --exclude=".wp-env.json" \
-            --exclude=".gitattributes" \
-            --exclude=".editorconfig" \
-            --exclude=".env*" \
-            --exclude=".agent" \
-            --exclude=".vscode" \
-            --exclude="node_modules" \
-            --exclude="vendor" \
-            --exclude="tests" \
-            --exclude="docs" \
-            --exclude="examples" \
-            --exclude="backups" \
-            --exclude="deploy.sh" \
-            --exclude="lib" \
-            --exclude="phpunit.xml*" \
-            --exclude="phpcs.xml*" \
-            --exclude="phpstan.neon*" \
-            --exclude="composer.json" \
-            --exclude="composer.lock" \
-            --exclude="package.json" \
-            --exclude="package-lock.json" \
-            --exclude="Gruntfile.js" \
-            --exclude="webpack.config.js" \
-            --exclude="*.md" \
-            --exclude="Makefile" \
-            ./ "$BUILD_DIR/"
-
-          (
-            cd /tmp/build
-            zip -qr "${RELEASE_DIR}/${ZIP_NAME}" "${SLUG}/"
-          )
+          tests/release/build-candidate.sh --version "$VERSION" --slug "$SLUG" --output-dir "$RELEASE_DIR"
+          ZIP_NAME="${SLUG}-${VERSION}.zip"
 
           echo "zip_path=${RELEASE_DIR}/${ZIP_NAME}" >> "$GITHUB_OUTPUT"
           echo "zip_name=${ZIP_NAME}" >> "$GITHUB_OUTPUT"
           echo "release_dir=${RELEASE_DIR}" >> "$GITHUB_OUTPUT"
-          echo "Built: ${ZIP_NAME} ($(du -h "${RELEASE_DIR}/${ZIP_NAME}" | cut -f1))"
+          echo "manifest_path=${RELEASE_DIR}/${SLUG}-${VERSION}.manifest.json" >> "$GITHUB_OUTPUT"
+          echo "Built reproducible candidate: ${ZIP_NAME}"
 
       - name: Calculate SHA-256
         id: checksum

@@ -99,12 +99,14 @@ class BackupManager {
 			// 创建 .htaccess 防止直接访问
 			$htaccess = $dir . '/.htaccess';
 			if ( ! file_exists( $htaccess ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writes a fixed marker into the plugin-owned backup directory created immediately above.
 				file_put_contents( $htaccess, "Deny from all\n" );
 			}
 
 			// 创建 index.php
 			$index = $dir . '/index.php';
 			if ( ! file_exists( $index ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writes a fixed marker into the plugin-owned backup directory created immediately above.
 				file_put_contents( $index, "<?php\n// Silence is golden.\n" );
 			}
 		}

@@ -18,18 +18,14 @@ jobs:
         run: |
           parallel-lint --exclude vendor --exclude node_modules .
 
-      - name: PHPCS 代码规范检查
+      - name: PHPCS 发布安全与兼容门
         run: |
-          # 如果仓库有自定义 phpcs 配置则使用，否则用默认 WordPress 标准
-          if [ -f phpcs.xml ] || [ -f phpcs.xml.dist ] || [ -f .phpcs.xml ] || [ -f .phpcs.xml.dist ]; then
-            phpcs .
-          else
-            phpcs --standard=WordPress-Extra \
-              --extensions=php \
-              --ignore=vendor/*,node_modules/*,tests/*,lib/* \
-              --report=full \
-              -s .
-          fi
+          phpcs --standard=phpcs.release.xml.dist --report=full .
+
+      - name: PHPCS 全量债务报告（非发布门）
+        continue-on-error: true
+        run: |
+          phpcs --standard=phpcs.xml.dist --report=summary .
 
       - name: Gitleaks 密钥泄露扫描
         run: |

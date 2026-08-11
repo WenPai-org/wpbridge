@@ -84,7 +84,7 @@ remove_filter( 'pre_http_request', $local_https_adapter, 10 );
 remove_filter( 'wpbridge_pre_resolve_host', $resolver, 10 );
 
 // Update checker: controlled HTTP fixtures verify downgrade/insecure packages preserve prior data.
-$updater  = new \WPBridge_Updater( 'wpbridge/wpbridge.php', '1.2.3' );
+$updater  = new \WPBridge_Updater( 'wpbridge/wpbridge.php', '1.2.4' );
 $previous = (object) [ 'version' => '9.9.9', 'package' => 'https://safe.example/previous.zip' ];
 $fixture  = static function ( $preempt, $request, $url ) {
 	if ( false === strpos( $url, 'updates.wenpai.net/api/v1/update-check' ) ) {

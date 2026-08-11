@@ -1,6 +1,6 @@
 {
   "name": "wpbridge",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "\u6587\u6d3e\u4e91\u6865\u63d2\u4ef6",
   "main": "index.js",
   "directories": {
