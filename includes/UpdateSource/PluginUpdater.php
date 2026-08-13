@@ -12,6 +12,8 @@ use WPBridge\Core\Logger;
 use WPBridge\UpdateSource\Handlers\UpdateInfo;
 use WPBridge\Core\ItemSourceManager;
 use WPBridge\Cache\FallbackStrategy;
+use WPBridge\Security\PackageIntegrityVerifier;
+use WPBridge\UpdateSource\Handlers\BridgeServerHandler;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -68,6 +70,7 @@ class PluginUpdater {
 	 * 初始化钩子
 	 */
 	private function init_hooks(): void {
+		PackageIntegrityVerifier::init();
 		// 插件更新检查
 		add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'check_updates' ], 10, 1 );
 
@@ -75,7 +78,7 @@ class PluginUpdater {
 		add_filter( 'plugins_api', [ $this, 'plugin_info' ], 10, 3 );
 
 		// 下载包过滤
-		add_filter( 'upgrader_pre_download', [ $this, 'filter_download' ], 10, 3 );
+		add_filter( 'upgrader_pre_download', [ $this, 'filter_download' ], 5, 3 );
 	}
 
 	/**
@@ -147,6 +150,11 @@ class PluginUpdater {
 
 			if ( false !== $cached ) {
 				if ( ! empty( $cached['update'] ) ) {
+					if ( ! $this->remember_integrity( (array) $cached['update'] ) ) {
+						unset( $transient->response[ $plugin_file ] );
+						$transient->no_update[ $plugin_file ] = (object) [ 'slug' => $slug, 'plugin' => $plugin_file, 'new_version' => $plugin_data['Version'] ];
+						continue;
+					}
 					$transient->response[ $plugin_file ] = (object) $cached['update'];
 					unset( $transient->no_update[ $plugin_file ] );
 				} elseif ( $take_over ) {
@@ -165,6 +173,11 @@ class PluginUpdater {
 			if ( null !== $update_info ) {
 				$update_object         = $update_info->to_wp_update_object();
 				$update_object->plugin = $plugin_file;
+				if ( ! $this->remember_integrity( (array) $update_object ) ) {
+					unset( $transient->response[ $plugin_file ] );
+					$transient->no_update[ $plugin_file ] = (object) [ 'slug' => $slug, 'plugin' => $plugin_file, 'new_version' => $plugin_data['Version'] ];
+					continue;
+				}
 
 				$transient->response[ $plugin_file ] = $update_object;
 				unset( $transient->no_update[ $plugin_file ] );
@@ -331,11 +344,63 @@ class PluginUpdater {
 	 * @param bool   $reply   是否已处理
 	 * @param string $package 下载包 URL
 	 * @param object $upgrader 升级器
-	 * @return bool
+	 * @return mixed Existing reply, temporary file path, or WP_Error.
 	 */
 	public function filter_download( $reply, $package, $upgrader ) {
-		// 目前不做特殊处理，直接返回
+		if ( false !== $reply || ! is_string( $package ) || 'https' !== wp_parse_url( $package, PHP_URL_SCHEME ) ) {
+			return $reply;
+		}
+		$path = (string) wp_parse_url( $package, PHP_URL_PATH );
+		if ( ! preg_match( '#/api/v1/download/([a-z0-9][a-z0-9-]{1,99})/?$#', $path, $matches ) ) {
+			return $reply;
+		}
+		$slug     = $matches[1];
+		$resolved = $this->source_resolver->resolve( $this->get_item_key_from_slug( $slug ), $slug, 'plugin' );
+		foreach ( (array) ( $resolved['sources'] ?? [] ) as $source ) {
+			$handler = $source instanceof SourceModel ? $source->get_handler() : null;
+			if ( ! $handler instanceof BridgeServerHandler || ! $handler->can_handle_download( $package, $slug ) ) {
+				continue;
+			}
+			$integrity = PackageIntegrityVerifier::expected_integrity( $package );
+			if ( empty( $integrity ) ) {
+				return new \WP_Error( 'wpbridge_protected_package_unverified', __( '受保护更新缺少可验证的包摘要。', 'wpbridge' ) );
+			}
+			$file = $handler->download_package( $slug, $integrity );
+			if ( ! is_wp_error( $file ) ) {
+				PackageIntegrityVerifier::forget( $package );
+			}
+			return $file;
+		}
 		return $reply;
+	}
+
+	/** Store digest, signature metadata and the local keyring for this update. */
+	private function remember_integrity( array $update ): bool {
+		$remembered = PackageIntegrityVerifier::remember(
+			(string) ( $update['package'] ?? '' ),
+			(string) ( $update['sha256'] ?? '' ),
+			$this->settings->get_cache_ttl(),
+			[
+				'slug'                 => $update['slug'] ?? '',
+				'version'              => $update['new_version'] ?? $update['version'] ?? '',
+				'artifact_file'        => $update['artifact_file'] ?? '',
+				'artifact_signed_at'   => $update['artifact_signed_at'] ?? '',
+				'artifact_size'        => $update['artifact_size'] ?? 0,
+				'signature_scheme'     => $update['signature_scheme'] ?? '',
+				'signature_kid'        => $update['signature_kid'] ?? '',
+				'signature'            => $update['signature'] ?? '',
+				'signature_required'   => $update['signature_required'] ?? false,
+				'artifact_public_keys' => $update['_wpbridge_artifact_keys'] ?? [],
+			]
+		);
+		if ( ! $remembered && ! empty( $update['signature_required'] ) ) {
+			Logger::error(
+				'受保护更新签名元数据无效，拒绝展示更新',
+				[ 'slug' => (string) ( $update['slug'] ?? '' ) ]
+			);
+			return false;
+		}
+		return true;
 	}
 
 	/**

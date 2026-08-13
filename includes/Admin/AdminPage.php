@@ -11,6 +11,7 @@ use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
 use WPBridge\Core\SourceRegistry;
 use WPBridge\Security\Encryption;
+use WPBridge\Commercial\UpdateAuthorizationClient;
 use WPBridge\UpdateSource\SourceManager;
 use WPBridge\UpdateSource\SourceModel;
 use WPBridge\UpdateSource\SourceType;
@@ -226,6 +227,7 @@ class AdminPage {
 	 */
 	private function handle_save_source(): void {
 		$source_id = sanitize_text_field( $this->post_value( 'source_id', '' ) );
+		$existing  = $this->source_manager->get( $source_id );
 
 		$source          = new SourceModel();
 		$source->id      = $source_id;
@@ -249,9 +251,16 @@ class AdminPage {
 
 		// Bridge Server 类型自动补全 URL
 		if ( $source->type === SourceType::BRIDGE_SERVER ) {
+			$host = strtolower( (string) wp_parse_url( $source->api_url, PHP_URL_HOST ) );
 			$path = wp_parse_url( $source->api_url, PHP_URL_PATH ) ?? '';
-			if ( strpos( $path, '/wp-json/bridge/v1' ) === false ) {
+			if ( 'updates.wenpai.net' !== $host && strpos( $path, '/wp-json/bridge/v1' ) === false ) {
 				$source->api_url = trailingslashit( $source->api_url ) . 'wp-json/bridge/v1/';
+			}
+		}
+		$source->metadata = $existing ? (array) $existing->metadata : [];
+		if ( SourceType::BRIDGE_SERVER !== $source->type ) {
+			foreach ( [ 'license_server_url', 'update_device_id', 'update_private_key', 'update_site_url', 'update_product_slug', 'update_bridge_url' ] as $metadata_key ) {
+				unset( $source->metadata[ $metadata_key ] );
 			}
 		}
 		$source->slug      = sanitize_text_field( $this->post_value( 'slug', '' ) );
@@ -291,7 +300,6 @@ class AdminPage {
 		$raw_token = sanitize_text_field( $this->post_value( 'auth_token', '' ) );
 		// 如果是占位符或空值，保留原有 token
 		if ( $raw_token === '********' || empty( $raw_token ) ) {
-			$existing           = $this->source_manager->get( $source_id );
 			$source->auth_token = $existing ? $existing->auth_token : '';
 		} else {
 			$source->auth_token = Encryption::encrypt( $raw_token );
@@ -307,6 +315,18 @@ class AdminPage {
 			'fallback'  => 90,  // 最后选择
 		];
 		$source->priority = $priority_map[ $priority_level ] ?? 50;
+
+		$pairing_code = sanitize_text_field( $this->post_value( 'update_pairing_code', '' ) );
+		if ( SourceType::BRIDGE_SERVER === $source->type && '' !== $pairing_code ) {
+			$license_url = esc_url_raw( $this->post_value( 'license_server_url', 'https://license.wenpai.net' ) );
+			$paired      = UpdateAuthorizationClient::pair( $license_url, $pairing_code, home_url( '/' ) );
+			if ( is_wp_error( $paired ) ) {
+				$this->add_notice( 'error', $paired->get_error_message() );
+				return;
+			}
+			$source->metadata = array_merge( $source->metadata, $paired );
+			$source->metadata['update_bridge_url'] = rtrim( $source->api_url, '/' );
+		}
 
 		// 验证
 		$errors = $source->validate();

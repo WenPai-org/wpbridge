@@ -15,6 +15,8 @@ namespace WPBridge\UpdateSource\Handlers;
 use WPBridge\UpdateSource\SourceModel;
 use WPBridge\Core\Logger;
 use WPBridge\Commercial\BridgeClient;
+use WPBridge\Commercial\UpdateAuthorizationClient;
+use WPBridge\Security\PackageIntegrityVerifier;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -33,6 +35,12 @@ class BridgeServerHandler extends AbstractHandler {
 	 */
 	private ?BridgeClient $client = null;
 
+	/** @var UpdateAuthorizationClient|null */
+	private ?UpdateAuthorizationClient $update_authorization = null;
+
+	/** @var string */
+	private string $paired_slug = '';
+
 	/**
 	 * 构造函数
 	 *
@@ -48,6 +56,11 @@ class BridgeServerHandler extends AbstractHandler {
 		if ( ! empty( $server_url ) ) {
 			$this->client = new BridgeClient( $server_url, $api_key );
 		}
+		$paired_bridge = rtrim( (string) ( $source->metadata['update_bridge_url'] ?? '' ), '/' );
+		if ( '' !== $paired_bridge && hash_equals( $paired_bridge, rtrim( $server_url, '/' ) ) && ! empty( $source->metadata['update_device_id'] ) && ! empty( $source->metadata['update_private_key'] ) ) {
+			$this->update_authorization = new UpdateAuthorizationClient( (array) $source->metadata );
+			$this->paired_slug          = sanitize_title( (string) ( $source->metadata['update_product_slug'] ?? '' ) );
+		}
 	}
 
 	/**
@@ -56,12 +69,7 @@ class BridgeServerHandler extends AbstractHandler {
 	 * @return array
 	 */
 	public function get_capabilities(): array {
-		return [
-			'auth'     => 'api_key',
-			'version'  => 'json',
-			'download' => 'signed_url',
-			'batch'    => true,
-		];
+		return $this->client ? $this->client->get_capabilities() : [];
 	}
 
 	/**
@@ -70,7 +78,8 @@ class BridgeServerHandler extends AbstractHandler {
 	 * @return string
 	 */
 	public function get_check_url(): string {
-		return rtrim( $this->source->api_url, '/' ) . '/api/v1/health';
+		$capabilities = $this->get_capabilities();
+		return rtrim( $this->source->api_url, '/' ) . ( $capabilities['endpoints']['health'] ?? '/health' );
 	}
 
 	/**
@@ -86,7 +95,12 @@ class BridgeServerHandler extends AbstractHandler {
 			return null;
 		}
 
-		$info = $this->client->get_plugin_info( $slug );
+		$grant = $this->metadata_grant( $slug );
+		if ( is_wp_error( $grant ) ) {
+			Logger::warning( '无法签发插件元数据授权', [ 'slug' => $slug, 'error' => $grant->get_error_code() ] );
+			return null;
+		}
+		$info = $this->client->get_plugin_info( $slug, $grant );
 
 		if ( empty( $info ) || empty( $info['version'] ) ) {
 			return null;
@@ -98,7 +112,7 @@ class BridgeServerHandler extends AbstractHandler {
 		}
 
 		// 获取签名下载 URL
-		$download_url = $this->client->get_download_url( $slug );
+		$download_url = $info['download_url'] ?? $info['download_link'] ?? $info['package'] ?? $this->client->get_download_url( $slug );
 
 		if ( empty( $download_url ) ) {
 			Logger::warning( 'Bridge Server 无法获取下载 URL', [ 'slug' => $slug ] );
@@ -106,7 +120,8 @@ class BridgeServerHandler extends AbstractHandler {
 		}
 
 		return UpdateInfo::from_array(
-			[
+			array_merge(
+				[
 				'slug'         => $slug,
 				'version'      => $info['version'],
 				'download_url' => $download_url,
@@ -119,7 +134,17 @@ class BridgeServerHandler extends AbstractHandler {
 				'banners'      => $info['banners'] ?? [],
 				'changelog'    => $info['changelog'] ?? '',
 				'description'  => $info['description'] ?? '',
-			]
+				'sha256'       => $info['sha256'] ?? $info['checksum_sha256'] ?? '',
+				'signature_scheme'   => $info['signature_scheme'] ?? '',
+				'signature_kid'      => $info['signature_kid'] ?? '',
+				'signature'          => $info['signature'] ?? '',
+				'signature_required' => ! empty( $info['signature_required'] ) || ! empty( $this->source->metadata['signature_required'] ),
+				'artifact_size'      => $info['artifact_size'] ?? 0,
+				'artifact_file'      => $info['artifact_file'] ?? '',
+				'artifact_signed_at' => $info['artifact_signed_at'] ?? '',
+				],
+				$this->artifact_trust_policy()
+			)
 		);
 	}
 
@@ -134,7 +159,11 @@ class BridgeServerHandler extends AbstractHandler {
 			return null;
 		}
 
-		$info = $this->client->get_plugin_info( $slug );
+		$grant = $this->metadata_grant( $slug );
+		if ( is_wp_error( $grant ) ) {
+			return null;
+		}
+		$info = $this->client->get_plugin_info( $slug, $grant );
 
 		if ( empty( $info ) ) {
 			return null;
@@ -173,9 +202,51 @@ class BridgeServerHandler extends AbstractHandler {
 
 		if ( $this->client->health_check() ) {
 			$elapsed = (int) ( ( microtime( true ) - $start ) * 1000 );
-			return HealthStatus::healthy( $elapsed );
+			$status          = HealthStatus::healthy( $elapsed );
+			$status->details = $this->client->get_diagnostics();
+			return $status;
 		}
 
 		return HealthStatus::failed( '连接失败' );
+	}
+
+	/** Whether this source owns a protected bridge package URL. */
+	public function can_handle_download( string $package, string $slug ): bool {
+		$expected = $this->client ? $this->client->get_download_url( $slug ) : null;
+		return $slug === $this->paired_slug && is_string( $expected ) && '' !== $expected && hash_equals( $expected, $package ) && null !== $this->update_authorization;
+	}
+
+	/** @return string|\WP_Error Temporary file path on success. */
+	public function download_package( string $slug, array $integrity ) {
+		if ( ! $this->client || ! $this->update_authorization ) {
+			return new \WP_Error( 'wpbridge_update_not_paired', __( '此更新源尚未与文派账户配对。', 'wpbridge' ) );
+		}
+		$grant = $this->update_authorization->issue_grant( $slug, 'package' );
+		if ( is_wp_error( $grant ) ) {
+			return $grant;
+		}
+		return $this->client->download_package( $slug, $grant, $integrity );
+	}
+
+	/** Locally configured artifact trust policy. Bridge metadata cannot add keys. */
+	private function artifact_trust_policy(): array {
+		$keyring = $this->source->metadata['artifact_public_keys'] ?? [];
+		if ( defined( 'WPBRIDGE_ARTIFACT_PUBLIC_KEYS' ) && is_array( WPBRIDGE_ARTIFACT_PUBLIC_KEYS ) ) {
+			$keyring = PackageIntegrityVerifier::restrict_to_deployment_keyring(
+				WPBRIDGE_ARTIFACT_PUBLIC_KEYS,
+				is_array( $keyring ) ? $keyring : []
+			);
+		}
+		return [
+			'_wpbridge_artifact_keys' => is_array( $keyring ) ? $keyring : [],
+		];
+	}
+
+	/** @return string|\WP_Error */
+	private function metadata_grant( string $slug ) {
+		if ( null === $this->update_authorization || $slug !== $this->paired_slug ) {
+			return '';
+		}
+		return $this->update_authorization->issue_grant( $slug, 'metadata' );
 	}
 }

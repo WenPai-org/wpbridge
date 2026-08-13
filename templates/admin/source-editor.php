@@ -208,6 +208,33 @@ $type_hints = [
 							</div>
 						</div>
 
+						<div class="wpbridge-form-row" id="wpbridge-wenpai-pairing"<?php echo $is_bridge ? '' : ' hidden'; ?>>
+							<label class="wpbridge-form-label"><?php esc_html_e( '文派账户', 'wpbridge' ); ?></label>
+							<div>
+								<input type="url"
+									name="license_server_url"
+									value="<?php echo esc_url( $source->metadata['license_server_url'] ?? 'https://license.wenpai.net' ); ?>"
+									class="wpbridge-form-input"
+									placeholder="https://license.wenpai.net">
+								<input type="password"
+									name="update_pairing_code"
+									value=""
+									class="wpbridge-form-input"
+									autocomplete="one-time-code"
+									pattern="WPB1-[A-Za-z0-9_-]{43}"
+									placeholder="<?php esc_attr_e( '粘贴 WooCommerce 我的账户中生成的一次性连接码', 'wpbridge' ); ?>">
+								<p class="wpbridge-form-help">
+									<?php
+									if ( ! empty( $source->metadata['update_device_id'] ) ) {
+										esc_html_e( '此站点已连接。留空不会改变现有设备授权；填写新连接码会轮换站点密钥。', 'wpbridge' );
+									} else {
+										esc_html_e( '连接码不是许可证密钥，只能使用一次。站点私钥加密保存在本地，不会发送到授权服务。', 'wpbridge' );
+									}
+									?>
+								</p>
+							</div>
+						</div>
+
 						<div class="wpbridge-form-row">
 							<label class="wpbridge-form-label"><?php esc_html_e( '优先级', 'wpbridge' ); ?></label>
 							<div>
@@ -285,6 +312,7 @@ $type_hints = [
 	var urlInput   = document.getElementById('wpbridge-source-url');
 	var matchMode  = document.getElementById('wpbridge-match-mode');
 	var manualBox  = document.getElementById('wpbridge-manual-match');
+	var pairingBox = document.getElementById('wpbridge-wenpai-pairing');
 
 	function updateHint() {
 		var val  = typeSelect.value;
@@ -292,6 +320,9 @@ $type_hints = [
 		if (hint) {
 			descEl.textContent      = hint.desc;
 			urlInput.placeholder    = hint.placeholder;
+		}
+		if (pairingBox) {
+			pairingBox.hidden = val !== 'bridge_server';
 		}
 	}
 

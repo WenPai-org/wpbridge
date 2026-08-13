@@ -144,6 +144,7 @@ class SourceResolver {
 		$model->metadata  = [
 			'auth_scheme'        => $source['auth_type'] ?? '',
 			'signature_required' => ! empty( $source['signature_required'] ),
+			'artifact_public_keys' => is_array( $source['artifact_public_keys'] ?? null ) ? $source['artifact_public_keys'] : [],
 			'vendor_id'          => $source['metadata']['vendor_id'] ?? '',
 		];
 

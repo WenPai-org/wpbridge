@@ -97,6 +97,9 @@ class WPBridge_Updater {
 	 * 注册 WordPress hooks。
 	 */
 	private function register_hooks(): void {
+		if ( class_exists( '\\WPBridge\\Security\\PackageIntegrityVerifier' ) ) {
+			\WPBridge\Security\PackageIntegrityVerifier::init();
+		}
 		// Update URI: https://updates.wenpai.net 触发此 filter.
 		add_filter(
 			'update_plugins_updates.wenpai.net',
@@ -144,10 +147,41 @@ class WPBridge_Updater {
 		$data        = $response['plugins'][ $this->plugin_file ];
 		$new_version = sanitize_text_field( (string) ( $data['version'] ?? '' ) );
 		$package     = esc_url_raw( (string) ( $data['package'] ?? '' ) );
+		$sha256      = strtolower( sanitize_text_field( (string) ( $data['sha256'] ?? $data['checksum_sha256'] ?? '' ) ) );
+		$signature_required = ! empty( $data['signature_required'] );
+		$signature_scheme   = strtolower( sanitize_text_field( (string) ( $data['signature_scheme'] ?? '' ) ) );
+		$signature_kid      = sanitize_text_field( (string) ( $data['signature_kid'] ?? '' ) );
+		$signature          = sanitize_text_field( (string) ( $data['signature'] ?? '' ) );
+		$artifact_file      = sanitize_file_name( (string) ( $data['artifact_file'] ?? '' ) );
+		$artifact_size      = max( 0, (int) ( $data['artifact_size'] ?? 0 ) );
+		$artifact_signed_at = sanitize_text_field( (string) ( $data['artifact_signed_at'] ?? '' ) );
 
 		// 失败时保留 WordPress 已有结果；拒绝降级、同版本和非 HTTPS 安装包。
 		if ( ! version_compare( $new_version, $this->version, '>' ) || 'https' !== wp_parse_url( $package, PHP_URL_SCHEME ) ) {
 			return $update;
+		}
+
+		if ( class_exists( '\\WPBridge\\Security\\PackageIntegrityVerifier' ) ) {
+			$remembered = \WPBridge\Security\PackageIntegrityVerifier::remember(
+				$package,
+				$sha256,
+				DAY_IN_SECONDS,
+				[
+					'slug'               => $this->slug,
+					'version'            => $new_version,
+					'artifact_file'      => $artifact_file,
+					'artifact_signed_at' => $artifact_signed_at,
+					'artifact_size'      => $artifact_size,
+					'signature_scheme'   => $signature_scheme,
+					'signature_kid'      => $signature_kid,
+					'signature'          => $signature,
+					'signature_required' => $signature_required,
+					'artifact_public_keys' => $this->artifact_public_keys(),
+				]
+			);
+			if ( $signature_required && ! $remembered ) {
+				return $update;
+			}
 		}
 
 		return (object) [
@@ -163,7 +197,27 @@ class WPBridge_Updater {
 			'requires'     => $data['requires'] ?? '',
 			'tested'       => $data['tested'] ?? '',
 			'requires_php' => $data['requires_php'] ?? '',
+			'sha256'       => preg_match( '/^[a-f0-9]{64}$/', $sha256 ) ? $sha256 : '',
+			'signature_scheme'   => $signature_scheme,
+			'signature_kid'      => $signature_kid,
+			'signature'          => $signature,
+			'signature_required' => $signature_required,
+			'artifact_file'      => $artifact_file,
+			'artifact_signed_at' => $artifact_signed_at,
+			'artifact_size'      => $artifact_size,
 		];
+	}
+
+	/**
+	 * Self-updater trust roots configured by deployment, indexed by key id.
+	 *
+	 * @return array
+	 */
+	private function artifact_public_keys(): array {
+		if ( ! defined( 'WPBRIDGE_ARTIFACT_PUBLIC_KEYS' ) || ! is_array( WPBRIDGE_ARTIFACT_PUBLIC_KEYS ) ) {
+			return [];
+		}
+		return WPBRIDGE_ARTIFACT_PUBLIC_KEYS;
 	}
 
 	/**
