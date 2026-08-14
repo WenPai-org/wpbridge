@@ -37,27 +37,30 @@ final class SpokeClient {
 		if ( self::has_local_upstream_credentials() ) {
 			return new \WP_Error( 'wpbridge_spoke_credentials_present', __( 'Spoke 仍保存上游或设备凭据，清除后才能接受 Hub link。', 'wpbridge' ) );
 		}
-		if ( ! $store->reserve_spoke_role( (int) call_user_func( $this->clock ) ) ) {
-			return new \WP_Error( 'wpbridge_spoke_role_busy', __( 'Hub-Spoke installation role 正在变更。', 'wpbridge' ) );
-		}
 		$origin = self::allowed_origin( $hub_url );
 		if ( is_wp_error( $origin ) || 1 !== preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $invitation_id ) || ! HubSpokeStore::valid_invitation_token( $invitation_token ) ) {
 			return is_wp_error( $origin ) ? $origin : new \WP_Error( 'wpbridge_spoke_accept_invalid', __( 'Hub 邀请参数无效。', 'wpbridge' ) );
+		}
+		if ( ! $store->reserve_spoke_role( (int) call_user_func( $this->clock ) ) ) {
+			return new \WP_Error( 'wpbridge_spoke_role_busy', __( 'Hub-Spoke installation role 正在变更。', 'wpbridge' ) );
 		}
 		$challenge = $this->json_request(
 			$origin . '/wp-json/wpbridge/v2/hub-links/' . rawurlencode( $invitation_id ) . '/challenge',
 			[ 'invitation_token' => $invitation_token ]
 		);
 		if ( is_wp_error( $challenge ) || ! self::exact_keys( $challenge, [ 'invitation_id', 'hub_installation_uuid', 'hub_public_key_fingerprint', 'scopes', 'slug_allowlist', 'expires_at' ] ) || $challenge['invitation_id'] !== $invitation_id || 1 !== preg_match( '/^[a-f0-9]{64}$/', (string) $challenge['hub_public_key_fingerprint'] ) ) {
+			$store->release_spoke_reservation();
 			return is_wp_error( $challenge ) ? $challenge : new \WP_Error( 'wpbridge_hub_challenge_invalid', __( 'Hub 邀请响应无效。', 'wpbridge' ) );
 		}
 		if ( ! InstallationIdentity::ensure() ) {
+			$store->release_spoke_reservation();
 			return new \WP_Error( 'wpbridge_link_key_unavailable', __( '安装身份密钥不可用。', 'wpbridge' ) );
 		}
 		$nonce     = InstallationIdentity::base64url( random_bytes( 32 ) );
 		$timestamp = (string) call_user_func( $this->clock );
 		$key       = InstallationIdentity::base64url_decode( InstallationIdentity::public_key() );
 		if ( ! is_string( $key ) ) {
+			$store->release_spoke_reservation();
 			return new \WP_Error( 'wpbridge_link_key_unavailable', __( '安装身份密钥不可用。', 'wpbridge' ) );
 		}
 		$canonical = "WPBRIDGE-HUB-LINK-ACCEPT-V1\n"
@@ -70,6 +73,7 @@ final class SpokeClient {
 			. 'timestamp:' . $timestamp . "\n";
 		$signature = InstallationIdentity::sign( $canonical );
 		if ( is_wp_error( $signature ) ) {
+			$store->release_spoke_reservation();
 			return $signature;
 		}
 		$request = [
@@ -85,6 +89,7 @@ final class SpokeClient {
 			$request
 		);
 		if ( is_wp_error( $response ) ) {
+			$store->release_spoke_reservation();
 			return $response;
 		}
 		$compensable = isset( $response['link_id'], $response['link_credential'] ) && is_string( $response['link_id'] ) && is_string( $response['link_credential'] ) && 1 === preg_match( '/^[0-9a-f]{8}-[0-9a-f-]{27}$/', $response['link_id'] ) && HubSpokeStore::valid_link_credential( $response['link_credential'] );
