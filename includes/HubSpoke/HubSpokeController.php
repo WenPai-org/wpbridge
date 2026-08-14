@@ -362,6 +362,10 @@ final class HubSpokeController {
 		$token = is_array( $data ) ? (string) ( $data['_wpbridge_package_stream'] ?? '' ) : '';
 		$file  = $this->package_streams[ $token ] ?? '';
 		if ( 1 !== preg_match( '#^/wpbridge/v2/hub-proxy/plugins/[a-z0-9][a-z0-9-]{1,99}/package$#', $route ) || null === $this->authorizer->current_link() || '' === $token || '' === $file || ! is_file( $file ) ) {
+			if ( '' !== $token && '' !== $file ) {
+				unset( $this->package_streams[ $token ] );
+				wp_delete_file( $file );
+			}
 			return false;
 		}
 		unset( $this->package_streams[ $token ] );
