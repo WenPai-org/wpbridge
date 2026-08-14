@@ -295,17 +295,25 @@ $compensated = ( new SpokeClient( $transport, static function () use ( $now ): i
 $compensation = $compensation_requests[2] ?? [];
 $assert( is_wp_error( $compensated ) && 'wpbridge_spoke_storage_failed' === $compensated->get_error_code(), 'Spoke local persistence failure reports failure only after authenticated Hub compensation succeeds' );
 $assert( false !== strpos( (string) ( $compensation['url'] ?? '' ), '/acceptance-compensations' ) && ( $compensation['args']['headers']['Authorization'] ?? '' ) === 'WPBridge-Link ' . $remote_credential && false === strpos( (string) ( $compensation['url'] ?? '' ), $remote_credential ), 'Spoke compensation revokes the exact Hub link with a header-only credential' );
+$assert( ( new HubSpokeStore() )->save_reconcile( 'https://hub.example', $remote_link_id, $remote_credential, $now ) && false === strpos( serialize( get_option( 'wpbridge_spoke_reconcile_v1', [] ) ), $remote_credential ), 'Failed remote compensation can persist an encrypted durable revoke reconciliation record' );
+$expired_store = new HubSpokeStore();
+$expired_invitation = $expired_store->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now );
+$assert( is_array( $expired_invitation ) && ! $expired_store->has_active_hub_state( $now + 601 ), 'Expired pending invitation no longer blocks Spoke role selection' );
 
 $controller = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeController.php' );
 $authorizer = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/LinkAuthorizer.php' );
 $pairing    = (string) file_get_contents( dirname( __DIR__ ) . '/includes/Commercial/UpdateAuthorizationClient.php' );
 $spoke      = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/SpokeClient.php' );
 $safe_http  = (string) file_get_contents( dirname( __DIR__ ) . '/includes/Security/SafeHttpClient.php' );
+$step_up    = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/StepUpVerifier.php' );
+$grant_code = (string) file_get_contents( dirname( __DIR__ ) . '/includes/Commercial/UpdateAuthorizationClient.php' );
 $assert( false !== strpos( $authorizer, 'Authorization' ) && false !== strpos( $authorizer, 'WPBridge-Link' ) && false !== strpos( $authorizer, "query['api_key']" ), 'Proxy authentication is header-only and rejects query api_key' );
 $assert( false !== strpos( $controller, "'sources:read'" ) && false !== strpos( $controller, "'updates:read'" ) && false !== strpos( $controller, "'packages:read'" ), 'Each proxy route maps to one frozen scope' );
 $assert( false !== strpos( $controller, 'safe_metadata' ) && false === strpos( substr( $controller, strpos( $controller, 'private static function safe_metadata' ) ), "'grant'" ), 'Spoke metadata allowlist never contains an upstream grant field' );
 $assert( false !== strpos( $pairing, 'wpbridge_spoke_pairing_forbidden' ), 'Active Spoke cannot consume a license pairing code' );
 $assert( false !== strpos( $spoke, 'has_local_upstream_credentials' ) && false !== strpos( $spoke, "'update_private_key'" ), 'Spoke acceptance fails while upstream or device credentials remain' );
 $assert( false !== strpos( $safe_http, 'CURLINFO_PRIMARY_IP' ) && false !== strpos( $safe_http, 'wpbridge_safe_http_peer_mismatch' ), 'Safe HTTP rechecks the connected peer IP after DNS pinning' );
+$assert( false !== strpos( $step_up, "'manage_network_options'" ) && false !== strpos( $step_up, 'is_super_admin()' ), 'Multisite Hub and Spoke management requires network capability and super-admin' );
+$assert( false !== strpos( $grant_code, 'wpbridge_spoke_grant_forbidden' ), 'Active Spoke cannot issue a direct upstream package or metadata grant' );
 
 exit( $failures > 0 ? 1 : 0 );

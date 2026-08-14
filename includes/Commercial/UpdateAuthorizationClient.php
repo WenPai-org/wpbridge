@@ -112,6 +112,9 @@ final class UpdateAuthorizationClient {
 
 	/** @return string|\WP_Error */
 	public function issue_grant( string $slug, string $action ) {
+		if ( class_exists( HubSpokeStore::class ) && ( new HubSpokeStore() )->has_active_spoke_link() ) {
+			return new \WP_Error( 'wpbridge_spoke_grant_forbidden', __( 'Active Spoke 不能直接请求上游更新授权。', 'wpbridge' ) );
+		}
 		if ( ! in_array( $action, [ 'metadata', 'package' ], true ) || ! preg_match( '/^[a-z0-9][a-z0-9-]{1,99}$/', $slug ) ) {
 			return new \WP_Error( 'wpbridge_update_grant_invalid', __( '更新授权范围无效。', 'wpbridge' ) );
 		}

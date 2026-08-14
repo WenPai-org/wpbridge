@@ -51,7 +51,8 @@ final class StepUpVerifier {
 	/** @return true|\WP_Error */
 	private function check_admin_request( \WP_REST_Request $request, bool $state_change ) {
 		unset( $state_change );
-		if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+		$capability = is_multisite() ? 'manage_network_options' : 'manage_options';
+		if ( ! is_user_logged_in() || ! current_user_can( $capability ) || ( is_multisite() && ! is_super_admin() ) ) {
 			return new \WP_Error( 'wpbridge_admin_forbidden', __( '仅管理员可执行此操作。', 'wpbridge' ), [ 'status' => 403 ] );
 		}
 		$nonce = (string) $request->get_header( 'X-WP-Nonce' );

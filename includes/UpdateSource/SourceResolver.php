@@ -151,7 +151,7 @@ class SourceResolver {
 
 		$secret_ref = $source['auth_secret_ref'] ?? '';
 		if ( ! empty( $secret_ref ) ) {
-			$secret = get_option( 'wpbridge_secret_' . $secret_ref, '' );
+			$secret = is_multisite() ? get_site_option( 'wpbridge_secret_' . $secret_ref, '' ) : get_option( 'wpbridge_secret_' . $secret_ref, '' );
 			if ( ! empty( $secret ) ) {
 				// 避免双重加密：如果已经是加密数据则直接使用
 				if ( Encryption::is_encrypted( $secret ) ) {

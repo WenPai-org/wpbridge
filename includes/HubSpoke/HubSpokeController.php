@@ -46,6 +46,7 @@ final class HubSpokeController {
 			]
 		);
 		register_rest_route( self::NAMESPACE, '/hub-links/(?P<id>[0-9a-f-]{36})/challenge', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'challenge' ], 'permission_callback' => '__return_true' ] );
+		register_rest_route( self::NAMESPACE, '/hub-invitations/(?P<id>[0-9a-f-]{36})', [ 'methods' => \WP_REST_Server::DELETABLE, 'callback' => [ $this, 'cancel_invitation' ], 'permission_callback' => [ $this, 'admin_permission' ] ] );
 		register_rest_route( self::NAMESPACE, '/hub-links/(?P<id>[0-9a-f-]{36})/acceptances', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'acceptance' ], 'permission_callback' => '__return_true' ] );
 		register_rest_route( self::NAMESPACE, '/hub-links/(?P<id>[0-9a-f-]{36})/acceptance-compensations', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'acceptance_compensation' ], 'permission_callback' => [ $this, 'acceptance_compensation_permission' ] ] );
 		register_rest_route( self::NAMESPACE, '/hub-links/(?P<id>[0-9a-f-]{36})/rotations', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'rotate_link' ], 'permission_callback' => [ $this, 'admin_permission' ] ] );
@@ -186,6 +187,17 @@ final class HubSpokeController {
 		}
 		$result = $this->store->rotate( strtolower( (string) $request['id'] ), time() );
 		return is_wp_error( $result ) ? $result : $this->response( $result, 201 );
+	}
+
+	public function cancel_invitation( \WP_REST_Request $request ) {
+		$body = $request->get_json_params();
+		if ( ! self::exact_reason( $body ) ) {
+			return self::bad_request();
+		}
+		if ( ! $this->store->cancel_invitation( strtolower( (string) $request['id'] ), time() ) ) {
+			return new \WP_Error( 'wpbridge_invitation_not_found', __( 'Pending invitation 不存在。', 'wpbridge' ), [ 'status' => 404 ] );
+		}
+		return $this->response( null, 204 );
 	}
 
 	public function revoke_link( \WP_REST_Request $request ) {

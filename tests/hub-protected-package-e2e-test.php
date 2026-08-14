@@ -9,6 +9,7 @@ namespace {
 	function wp_tempnam( string $name ): string { unset( $name ); return (string) tempnam( sys_get_temp_dir(), 'wpb-hub-e2e-' ); }
 	function wp_delete_file( string $file ): bool { return ! is_file( $file ) || unlink( $file ); }
 	function wp_remote_retrieve_response_code( array $response ): int { return (int) ( $response['response']['code'] ?? 0 ); }
+	function wp_remote_retrieve_body( array $response ): string { return (string) ( $response['body'] ?? '' ); }
 	function is_wp_error( $value ): bool { return $value instanceof WP_Error; }
 	class WP_Error {
 		private string $code;
@@ -35,9 +36,11 @@ namespace {
 	require_once dirname( __DIR__ ) . '/includes/Security/PackageIntegrityVerifier.php';
 	require_once dirname( __DIR__ ) . '/includes/Commercial/BridgeClient.php';
 	require_once dirname( __DIR__ ) . '/includes/UpdateSource/Handlers/BridgeServerHandler.php';
+	require_once dirname( __DIR__ ) . '/includes/HubSpoke/SpokeProxyClient.php';
 
 	use WPBridge\Commercial\BridgeClient;
 	use WPBridge\UpdateSource\Handlers\BridgeServerHandler;
+	use WPBridge\HubSpoke\SpokeProxyClient;
 
 	$failures = 0;
 	$assert = static function ( bool $condition, string $message ) use ( &$failures ): void {
@@ -73,6 +76,28 @@ namespace {
 	$download_body = $body . '-tampered';
 	$result = $client->download_package( $slug, str_repeat( 'b', 64 ), $record );
 	$assert( is_wp_error( $result ) && 'wpbridge_checksum_mismatch' === $result->get_error_code(), 'Real protected downloader fails closed for tampered Hub package bytes' );
+	$download_body = $body;
+	$bad_size = $record;
+	$bad_size['artifact_size'] = strlen( $body ) + 1;
+	$result = $client->download_package( $slug, str_repeat( 'c', 64 ), $bad_size );
+	$assert( is_wp_error( $result ) && 'wpbridge_artifact_size_mismatch' === $result->get_error_code(), 'Real protected downloader fails closed for mismatched artifact size' );
+	$bad_kid = $record;
+	$bad_kid['signature_kid'] = 'unknown-kid';
+	$result = $client->download_package( $slug, str_repeat( 'd', 64 ), $bad_kid );
+	$assert( is_wp_error( $result ) && 'wpbridge_signature_unknown_key' === $result->get_error_code(), 'Real protected downloader fails closed for an unapproved signing kid' );
+	$spoke_transport = static function ( string $url, array $args ) use ( $body ): array {
+		unset( $url );
+		file_put_contents( (string) $args['filename'], $body );
+		return [ 'response' => [ 'code' => 200 ] ];
+	};
+	$reflection = new ReflectionClass( SpokeProxyClient::class );
+	$constructor = $reflection->getConstructor();
+	$constructor->setAccessible( true );
+	$spoke = $reflection->newInstanceWithoutConstructor();
+	$constructor->invoke( $spoke, [ 'hub_origin' => 'https://hub.example', 'slug_allowlist' => [ $slug ], 'credential' => 'WPBL1-' . $b64( str_repeat( 'L', 32 ) ) ], $spoke_transport );
+	$result = $spoke->download( $slug, $record );
+	$assert( is_string( $result ) && is_file( $result ), 'REST-streamed Hub bytes pass the real Spoke-side signature verifier' );
+	if ( is_string( $result ) ) { wp_delete_file( $result ); }
 	$controller = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeController.php' );
 	$assert( false !== strpos( $controller, '$handler->protected_integrity( $slug, $info )' ), 'Hub controller passes the handler-built verifier record to the protected downloader' );
 	exit( $failures > 0 ? 1 : 0 );

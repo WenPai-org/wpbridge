@@ -68,7 +68,7 @@ class SourceRegistry {
 	 */
 	public function get_all(): array {
 		if ( null === $this->cached_sources ) {
-			$this->cached_sources = get_option( self::OPTION_NAME, [] );
+			$this->cached_sources = is_multisite() ? get_site_option( self::OPTION_NAME, [] ) : get_option( self::OPTION_NAME, [] );
 			$this->ensure_preset_sources();
 		}
 		return $this->cached_sources;
@@ -144,7 +144,7 @@ class SourceRegistry {
 		$sources[]            = $source;
 		$this->cached_sources = $sources;
 
-		if ( update_option( self::OPTION_NAME, $sources, false ) ) {
+		if ( is_multisite() ? update_site_option( self::OPTION_NAME, $sources ) : update_option( self::OPTION_NAME, $sources, false ) ) {
 			return $source['source_key'];
 		}
 		return false;
@@ -166,7 +166,7 @@ class SourceRegistry {
 				$sources[ $index ]               = array_merge( $source, $data );
 				$sources[ $index ]['updated_at'] = current_time( 'mysql' );
 				$this->cached_sources            = $sources;
-				return update_option( self::OPTION_NAME, $sources, false );
+				return is_multisite() ? update_site_option( self::OPTION_NAME, $sources ) : update_option( self::OPTION_NAME, $sources, false );
 			}
 		}
 		return false;
@@ -189,7 +189,7 @@ class SourceRegistry {
 				unset( $sources[ $index ] );
 				$sources              = array_values( $sources );
 				$this->cached_sources = $sources;
-				return update_option( self::OPTION_NAME, $sources, false );
+				return is_multisite() ? update_site_option( self::OPTION_NAME, $sources ) : update_option( self::OPTION_NAME, $sources, false );
 			}
 		}
 		return false;
@@ -258,7 +258,7 @@ class SourceRegistry {
 		}
 
 		if ( $needs_update ) {
-			update_option( self::OPTION_NAME, $this->cached_sources, false );
+			is_multisite() ? update_site_option( self::OPTION_NAME, $this->cached_sources ) : update_option( self::OPTION_NAME, $this->cached_sources, false );
 		}
 	}
 

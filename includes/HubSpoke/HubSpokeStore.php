@@ -20,6 +20,8 @@ final class HubSpokeStore {
 	private const SPOKE_LINKS = 'wpbridge_spoke_links_v1';
 	private const AUDIT       = 'wpbridge_hub_audit_v1';
 	private const RATE        = 'wpbridge_hub_rate_v1';
+	private const RECONCILE   = 'wpbridge_spoke_reconcile_v1';
+	private const ROLE        = 'wpbridge_hub_spoke_role_v1';
 
 	/** Frozen scopes. */
 	public const SCOPES = [ 'packages:read', 'sources:read', 'updates:read' ];
@@ -34,6 +36,11 @@ final class HubSpokeStore {
 			return $lock;
 		}
 		try {
+		$role = $this->state_option( self::ROLE );
+		if ( $this->has_active_spoke_link() || ( 'spoke-reserved' === ( $role['role'] ?? '' ) && $now < (int) ( $role['expires_at'] ?? 0 ) ) ) {
+			return new \WP_Error( 'wpbridge_spoke_cannot_be_hub', __( 'Active Spoke 不能创建 Hub link。', 'wpbridge' ), [ 'status' => 409 ] );
+		}
+		$this->expire_invitations( $now );
 		$normalized = self::normalize_policy( $scopes, $slugs );
 		if ( is_wp_error( $normalized ) ) {
 			return $normalized;
@@ -54,8 +61,13 @@ final class HubSpokeStore {
 			'nonces'                => [],
 		];
 		if ( ! $this->save( self::INVITATIONS, $rows ) || ! $this->audit( 'invitation.created', $id, $now ) ) {
-			$this->save( self::INVITATIONS, $previous_rows );
-			return new \WP_Error( 'wpbridge_hub_store_failed', __( 'Hub invitation 无法持久保存。', 'wpbridge' ), [ 'status' => 503 ] );
+			$rolled_back = $this->save( self::INVITATIONS, $previous_rows );
+			if ( ! $rolled_back ) {
+				$rows[ $id ]['status'] = 'inconsistent';
+				$rows[ $id ]['token_sha256'] = '';
+				$this->save( self::INVITATIONS, $rows );
+			}
+			return new \WP_Error( $rolled_back ? 'wpbridge_hub_store_failed' : 'wpbridge_hub_store_inconsistent', __( 'Hub invitation 无法持久保存。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
 		return [
 			'invitation_id'         => $id,
@@ -184,6 +196,31 @@ final class HubSpokeStore {
 		return array_values( $output );
 	}
 
+	/** Cancel a pending invitation without disclosing its token. */
+	public function cancel_invitation( string $id, int $now ): bool {
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
+		if ( is_wp_error( $lock ) ) {
+			return false;
+		}
+		try {
+			$rows = $this->invitations();
+			if ( ! isset( $rows[ $id ] ) || 'pending' !== ( $rows[ $id ]['status'] ?? '' ) ) {
+				return false;
+			}
+			$previous = $rows;
+			$rows[ $id ]['status'] = 'cancelled';
+			$rows[ $id ]['token_sha256'] = '';
+			$rows[ $id ]['cancelled_at'] = $now;
+			if ( ! $this->save( self::INVITATIONS, $rows ) || ! $this->audit( 'invitation.cancelled', $id, $now ) ) {
+				$this->save( self::INVITATIONS, $previous );
+				return false;
+			}
+			return true;
+		} finally {
+			$this->release_lock( 'hub-lifecycle' );
+		}
+	}
+
 	/** @return array<string,mixed>|\WP_Error */
 	public function rotate( string $id, int $now ) {
 		if ( ! self::identity_ready() ) {
@@ -210,8 +247,14 @@ final class HubSpokeStore {
 			return new \WP_Error( 'wpbridge_hub_store_failed', __( 'Hub link rotation 无法持久保存。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
 		if ( ! $this->audit( 'link.rotated', $id, $now ) ) {
-			$this->save( self::LINKS, $previous_links );
-			return new \WP_Error( 'wpbridge_hub_store_failed', __( 'Hub link rotation 审计失败，未签发凭据。', 'wpbridge' ), [ 'status' => 503 ] );
+			$rolled_back = $this->save( self::LINKS, $previous_links );
+			if ( ! $rolled_back ) {
+				$links[ $id ]['status'] = 'inconsistent';
+				$links[ $id ]['credential_sha256'] = '';
+				$links[ $id ]['previous_credential_sha256'] = '';
+				$this->save( self::LINKS, $links );
+			}
+			return new \WP_Error( $rolled_back ? 'wpbridge_hub_store_failed' : 'wpbridge_hub_store_inconsistent', __( 'Hub link rotation 审计失败，未签发凭据。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
 		return [
 			'link_id'             => $id,
@@ -248,7 +291,12 @@ final class HubSpokeStore {
 			return false;
 		}
 		if ( ! $this->audit( 'link.revoked', $id, $now ) ) {
-			$this->save( self::LINKS, $previous_links );
+			if ( ! $this->save( self::LINKS, $previous_links ) ) {
+				$links[ $id ]['status'] = 'inconsistent';
+				$links[ $id ]['credential_sha256'] = '';
+				$links[ $id ]['previous_credential_sha256'] = '';
+				$this->save( self::LINKS, $links );
+			}
 			return false;
 		}
 		return true;
@@ -301,11 +349,14 @@ final class HubSpokeStore {
 
 	/** Persist the one reusable credential only on the Spoke, under AEAD. */
 	public function save_spoke_link( string $hub_origin, array $response, int $now ): bool {
-		$lock = $this->acquire_lock( 'spoke-links' );
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
 		if ( is_wp_error( $lock ) ) {
 			return false;
 		}
 		try {
+		if ( $this->has_active_hub_state() ) {
+			return false;
+		}
 		$credential = (string) ( $response['link_credential'] ?? '' );
 		if ( ! self::valid_link_credential( $credential ) ) {
 			return false;
@@ -337,10 +388,56 @@ final class HubSpokeStore {
 			}
 			return false;
 		}
+		if ( ! $this->save( self::ROLE, [ 'role' => 'spoke-active', 'link_id' => (string) $response['link_id'], 'updated_at' => $now ] ) ) {
+			$this->save( self::SPOKE_LINKS, $previous_rows );
+			$this->disable_spoke_sources( (string) $response['link_id'] );
+			return false;
+		}
 		return true;
 		} finally {
-			$this->release_lock( 'spoke-links' );
+			$this->release_lock( 'hub-lifecycle' );
 		}
+	}
+
+	/** Atomically reserve the installation role before contacting a Hub. */
+	public function reserve_spoke_role( int $now ): bool {
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
+		if ( is_wp_error( $lock ) ) {
+			return false;
+		}
+		try {
+			if ( $this->has_active_hub_state( $now ) || $this->has_active_spoke_link() ) {
+				return false;
+			}
+			$role = $this->state_option( self::ROLE );
+			if ( 'spoke-reserved' === ( $role['role'] ?? '' ) && $now < (int) ( $role['expires_at'] ?? 0 ) ) {
+				return false;
+			}
+			return $this->save( self::ROLE, [ 'role' => 'spoke-reserved', 'expires_at' => $now + 300, 'updated_at' => $now ] );
+		} finally {
+			$this->release_lock( 'hub-lifecycle' );
+		}
+	}
+
+	public function release_spoke_reservation(): void {
+		$role = $this->state_option( self::ROLE );
+		if ( 'spoke-reserved' === ( $role['role'] ?? '' ) ) {
+			$this->save( self::ROLE, [] );
+		}
+	}
+
+	/** Persist a compensation retry without storing a plaintext link credential. */
+	public function save_reconcile( string $hub_origin, string $link_id, string $credential, int $now ): bool {
+		if ( ! self::valid_link_credential( $credential ) || 1 !== preg_match( '/^[0-9a-f-]{36}$/', $link_id ) ) {
+			return false;
+		}
+		$ciphertext = CredentialEnvelope::encrypt( $credential, $link_id, $hub_origin );
+		if ( '' === $ciphertext ) {
+			return false;
+		}
+		$rows = (array) $this->state_option( self::RECONCILE );
+		$rows[ $link_id ] = [ 'link_id' => $link_id, 'hub_origin' => $hub_origin, 'credential_ciphertext' => $ciphertext, 'status' => 'revoke_pending', 'created_at' => $now ];
+		return $this->save( self::RECONCILE, $rows );
 	}
 
 	/** Whether this installation is already an active Spoke. */
@@ -354,9 +451,10 @@ final class HubSpokeStore {
 	}
 
 	/** Whether this network already owns pending or active Hub lifecycle state. */
-	public function has_active_hub_state(): bool {
+	public function has_active_hub_state( ?int $now = null ): bool {
+		$now = $now ?? time();
 		foreach ( $this->invitations() as $row ) {
-			if ( is_array( $row ) && 'pending' === ( $row['status'] ?? '' ) ) {
+			if ( is_array( $row ) && 'pending' === ( $row['status'] ?? '' ) && $now < (int) ( $row['expires_at'] ?? 0 ) ) {
 				return true;
 			}
 		}
@@ -381,7 +479,7 @@ final class HubSpokeStore {
 
 	/** Apply a one-time rotated credential on the Spoke. */
 	public function apply_spoke_rotation( string $link_id, string $credential, int $now ): bool {
-		$lock = $this->acquire_lock( 'spoke-links' );
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
 		if ( is_wp_error( $lock ) || ! self::valid_link_credential( $credential ) ) {
 			return false;
 		}
@@ -401,19 +499,19 @@ final class HubSpokeStore {
 			$rows[ $link_id ] = $row;
 			return $this->save( self::SPOKE_LINKS, $rows );
 		} finally {
-			$this->release_lock( 'spoke-links' );
+			$this->release_lock( 'hub-lifecycle' );
 		}
 	}
 
 	public function unlink_spoke( string $link_id, int $now ): bool {
-		$lock = $this->acquire_lock( 'spoke-links' );
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
 		if ( is_wp_error( $lock ) ) {
 			return false;
 		}
 		try {
 			$rows = (array) $this->state_option( self::SPOKE_LINKS );
 			$previous_rows = $rows;
-			$previous_sources = (array) get_option( 'wpbridge_source_registry', [] );
+			$previous_sources = $this->runtime_option( 'wpbridge_source_registry' );
 			if ( ! isset( $rows[ $link_id ] ) ) {
 				return false;
 			}
@@ -434,7 +532,7 @@ final class HubSpokeStore {
 			}
 			return true;
 		} finally {
-			$this->release_lock( 'spoke-links' );
+			$this->release_lock( 'hub-lifecycle' );
 		}
 	}
 
@@ -462,8 +560,11 @@ final class HubSpokeStore {
 	}
 
 	private function save( string $option, array $value ): bool {
-		if ( in_array( $option, [ self::INVITATIONS, self::LINKS, self::SPOKE_LINKS, self::AUDIT, self::RATE ], true ) ) {
+		if ( in_array( $option, [ self::INVITATIONS, self::LINKS, self::SPOKE_LINKS, self::AUDIT, self::RATE, self::RECONCILE, self::ROLE ], true ) ) {
 			return is_multisite() ? update_site_option( $option, $value ) || $value === get_site_option( $option, [] ) : update_option( $option, $value, false ) || $value === get_option( $option, [] );
+		}
+		if ( in_array( $option, [ 'wpbridge_source_registry', 'wpbridge_defaults' ], true ) ) {
+			return $this->save_runtime_option( $option, $value );
 		}
 		return update_option( $option, $value, false ) || $value === get_option( $option, [] );
 	}
@@ -474,9 +575,9 @@ final class HubSpokeStore {
 	}
 
 	private function provision_spoke_sources( string $link_id, string $origin, array $slugs ): bool {
-		$sources = (array) get_option( 'wpbridge_source_registry', [] );
+		$sources = $this->runtime_option( 'wpbridge_source_registry' );
 		$previous_sources = $sources;
-		$previous_defaults = (array) get_option( 'wpbridge_defaults', [] );
+		$previous_defaults = $this->runtime_option( 'wpbridge_defaults' );
 		$source_keys = [];
 		foreach ( $slugs as $slug ) {
 			$id = 'hub-spoke-' . substr( str_replace( '-', '', $link_id ), 0, 12 ) . '-' . $slug;
@@ -494,7 +595,7 @@ final class HubSpokeStore {
 				$sources[] = [ 'source_key' => $id, 'name' => 'WPBridge Hub: ' . $slug, 'type' => 'hub_spoke', 'api_url' => $origin, 'slug' => $slug, 'enabled' => true, 'default_priority' => 5, 'auth_type' => 'none', 'auth_secret_ref' => '', 'signature_required' => true, 'artifact_public_keys' => [], 'metadata' => [ 'spoke_link_id' => $link_id ] ];
 			}
 		}
-		$saved = update_option( 'wpbridge_source_registry', $sources, false ) || $sources === get_option( 'wpbridge_source_registry', [] );
+		$saved = $this->save_runtime_option( 'wpbridge_source_registry', $sources );
 		$defaults = $previous_defaults;
 		$plugin = is_array( $defaults['plugin'] ?? null ) ? $defaults['plugin'] : [];
 		$order = array_values( array_unique( array_merge( $source_keys, (array) ( $plugin['source_order'] ?? [ 'wporg' ] ) ) ) );
@@ -513,14 +614,22 @@ final class HubSpokeStore {
 	}
 
 	private function disable_spoke_sources( string $link_id ): bool {
-		$sources = (array) get_option( 'wpbridge_source_registry', [] );
+		$sources = $this->runtime_option( 'wpbridge_source_registry' );
 		foreach ( $sources as &$source ) {
 			if ( is_array( $source ) && 'hub_spoke' === ( $source['type'] ?? '' ) && $link_id === ( $source['metadata']['spoke_link_id'] ?? '' ) ) {
 				$source['enabled'] = false;
 			}
 		}
 		unset( $source );
-		return update_option( 'wpbridge_source_registry', $sources, false ) || $sources === get_option( 'wpbridge_source_registry', [] );
+		return $this->save_runtime_option( 'wpbridge_source_registry', $sources );
+	}
+
+	private function runtime_option( string $name ): array {
+		return (array) ( is_multisite() ? get_site_option( $name, [] ) : get_option( $name, [] ) );
+	}
+
+	private function save_runtime_option( string $name, array $value ): bool {
+		return is_multisite() ? update_site_option( $name, $value ) || $value === get_site_option( $name, [] ) : update_option( $name, $value, false ) || $value === get_option( $name, [] );
 	}
 
 	/** @return true|\WP_Error */
@@ -557,6 +666,23 @@ final class HubSpokeStore {
 			$rows[ $link_id ]['credential_ciphertext'] = '';
 			$rows[ $link_id ]['failed_at'] = $now;
 			$this->save( self::SPOKE_LINKS, $rows );
+		}
+	}
+
+	private function expire_invitations( int $now ): void {
+		$rows = $this->invitations();
+		$changed = false;
+		foreach ( $rows as &$row ) {
+			if ( is_array( $row ) && 'pending' === ( $row['status'] ?? '' ) && $now >= (int) ( $row['expires_at'] ?? 0 ) ) {
+				$row['status'] = 'expired';
+				$row['token_sha256'] = '';
+				$row['expired_at'] = $now;
+				$changed = true;
+			}
+		}
+		unset( $row );
+		if ( $changed ) {
+			$this->save( self::INVITATIONS, $rows );
 		}
 	}
 
