@@ -7,6 +7,7 @@ namespace {
 	$GLOBALS['boundary_blog'] = 1;
 	$GLOBALS['boundary_options'] = [ 1 => [], 2 => [ 'wpbridge_sources' => [ [ 'auth_token' => 'encrypted-secret' ] ] ] ];
 	$GLOBALS['boundary_active'] = false;
+	$GLOBALS['boundary_blocked'] = false;
 	function is_multisite(): bool { return true; }
 	function get_sites( array $args = [] ): array { unset( $args ); return [ 1, 2 ]; }
 	function switch_to_blog( int $id ): void { $GLOBALS['boundary_blog'] = $id; }
@@ -36,6 +37,9 @@ namespace WPBridge\Core {
 namespace WPBridge\HubSpoke {
 	final class HubSpokeStore {
 		public function has_active_spoke_link(): bool { return (bool) $GLOBALS['boundary_active']; }
+		public function guarded_credential_write( bool $authority_increasing, callable $writer ): bool {
+			return $authority_increasing && ( ! empty( $GLOBALS['boundary_active'] ) || ! empty( $GLOBALS['boundary_blocked'] ) ) ? false : (bool) $writer();
+		}
 	}
 	require_once dirname( __DIR__ ) . '/includes/HubSpoke/CredentialBoundary.php';
 	require_once dirname( __DIR__ ) . '/includes/Core/Settings.php';
@@ -65,6 +69,10 @@ namespace WPBridge\HubSpoke {
 	$vendor_blocked = ! $vendor_manager->add_vendor_config( 'new-vendor', [ 'type' => 'unknown', 'api_key' => 'new-key' ] );
 	$vendor_delete = $vendor_manager->add_vendor_config( 'existing-vendor', [ 'type' => 'unknown', 'api_key' => '' ] );
 	$assert( $vendor_blocked && $vendor_delete, 'VendorManager public API rejects secret additions and permits credential deletion' );
+	$GLOBALS['boundary_active'] = false;
+	$GLOBALS['boundary_blocked'] = true;
+	$reserved_settings = new \WPBridge\Core\Settings();
+	$assert( ! $reserved_settings->add_source( [ 'id' => 'reservation-race', 'auth_token' => 'racing-secret' ] ), 'Spoke reservation blocks a concurrent credential writer under the shared lifecycle lock' );
 	$GLOBALS['boundary_blog'] = 2;
 	$assert( [] === get_option( 'wpbridge_source_registry', [] ) && [] === get_option( 'wpbridge_defaults', [] ), 'Source registry and defaults remain per-blog rather than becoming Stage 3A network state' );
 	exit( $failed > 0 ? 1 : 0 );

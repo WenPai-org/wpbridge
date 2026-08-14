@@ -102,12 +102,6 @@ class ConfigManager {
 			$result['errors']  = $validation['errors'];
 			return $result;
 		}
-		if ( ! CredentialBoundary::credential_write_allowed( (array) ( $config['options'] ?? [] ) ) ) {
-			$result['success'] = false;
-			$result['errors'][] = __( 'Active Spoke 不能导入上游凭据。', 'wpbridge' );
-			return $result;
-		}
-
 		// 导入选项
 		foreach ( $config['options'] as $option_name => $value ) {
 			// 只导入允许的选项
@@ -121,11 +115,17 @@ class ConfigManager {
 					$value = $this->merge_option( $option_name, $value );
 				}
 
-				if ( update_option( $option_name, $value ) ) {
+				$previous = get_option( $option_name, [] );
+				$written = CredentialBoundary::guarded_write(
+					[ $option_name => $value ],
+					[ $option_name => $previous ],
+					static function () use ( $option_name, $value ): bool { return update_option( $option_name, $value ) || $value === get_option( $option_name, [] ); }
+				);
+				if ( $written ) {
 					$result['imported'][] = $option_name;
 				} else {
-					// 值相同时 update_option 返回 false
-					$result['imported'][] = $option_name;
+					$result['success'] = false;
+					$result['errors'][] = __( 'Active Spoke 不能导入上游凭据。', 'wpbridge' );
 				}
 			} catch ( \Exception $e ) {
 				$result['errors'][] = sprintf(

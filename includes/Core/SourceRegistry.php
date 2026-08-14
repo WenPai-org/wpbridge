@@ -132,9 +132,6 @@ class SourceRegistry {
 	 * @return string|false 成功返回 source_key，失败返回 false
 	 */
 	public function add( array $source ) {
-		if ( ! CredentialBoundary::credential_write_allowed( $source ) ) {
-			return false;
-		}
 		$sources = $this->get_all();
 
 		if ( empty( $source['source_key'] ) ) {
@@ -147,9 +144,11 @@ class SourceRegistry {
 
 		$source               = $this->normalize_source( $source );
 		$sources[]            = $source;
-		$this->cached_sources = $sources;
-
-		if ( update_option( self::OPTION_NAME, $sources, false ) ) {
+		$result = CredentialBoundary::guarded_write( $source, [], function () use ( $sources ): bool {
+			$this->cached_sources = $sources;
+			return update_option( self::OPTION_NAME, $sources, false );
+		} );
+		if ( $result ) {
 			return $source['source_key'];
 		}
 		return false;
@@ -167,12 +166,13 @@ class SourceRegistry {
 
 		foreach ( $sources as $index => $source ) {
 			if ( ( $source['source_key'] ?? '' ) === $source_key ) {
-				if ( ! CredentialBoundary::credential_write_allowed( $data, $source ) ) { return false; }
 				unset( $data['source_key'] );
 				$sources[ $index ]               = array_merge( $source, $data );
 				$sources[ $index ]['updated_at'] = current_time( 'mysql' );
-				$this->cached_sources            = $sources;
-				return update_option( self::OPTION_NAME, $sources, false );
+				return CredentialBoundary::guarded_write( $data, $source, function () use ( $sources ): bool {
+					$this->cached_sources = $sources;
+					return update_option( self::OPTION_NAME, $sources, false );
+				} );
 			}
 		}
 		return false;
@@ -194,8 +194,10 @@ class SourceRegistry {
 				}
 				unset( $sources[ $index ] );
 				$sources              = array_values( $sources );
-				$this->cached_sources = $sources;
-				return update_option( self::OPTION_NAME, $sources, false );
+				return CredentialBoundary::guarded_write( [], $source, function () use ( $sources ): bool {
+					$this->cached_sources = $sources;
+					return update_option( self::OPTION_NAME, $sources, false );
+				} );
 			}
 		}
 		return false;
@@ -209,7 +211,17 @@ class SourceRegistry {
 	 * @return bool
 	 */
 	public function toggle( string $source_key, bool $enabled ): bool {
-		return $this->update( $source_key, [ 'enabled' => $enabled ] );
+		$source = $this->get( $source_key );
+		if ( null === $source ) { return false; }
+		$updated = array_merge( $source, [ 'enabled' => $enabled ] );
+		$sources = $this->get_all();
+		foreach ( $sources as $index => $candidate ) {
+			if ( ( $candidate['source_key'] ?? '' ) === $source_key ) { $sources[ $index ] = $updated; break; }
+		}
+		return CredentialBoundary::guarded_write( $updated, $enabled ? [] : $source, function () use ( $sources ): bool {
+			$this->cached_sources = $sources;
+			return update_option( self::OPTION_NAME, $sources, false );
+		} );
 	}
 
 	/**

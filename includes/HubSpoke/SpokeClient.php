@@ -166,21 +166,21 @@ final class SpokeClient {
 			return new \WP_Error( 'wpbridge_spoke_link_not_found', __( 'Spoke link 不存在。', 'wpbridge' ), [ 'status' => 404 ] );
 		}
 		$json = wp_json_encode( [ 'reason' => 'spoke_unlink' ] );
+		$now = (int) call_user_func( $this->clock );
+		if ( ! $store->save_unlink_marker( (string) $link['hub_origin'], $link_id, $now, $admin_reason ) ) {
+			return new \WP_Error( 'wpbridge_spoke_reconcile_storage_failed', __( '无法在远端撤销前持久记录本地清理状态。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
 		$response = call_user_func( $this->transport, (string) $link['hub_origin'] . '/wp-json/wpbridge/v2/hub-links/' . rawurlencode( $link_id ) . '/acceptance-compensations', [ 'method' => 'POST', 'timeout' => 15, 'redirection' => 0, 'headers' => [ 'Accept' => 'application/json', 'Content-Type' => 'application/json', 'Authorization' => 'WPBridge-Link ' . $link['credential'] ], 'body' => $json ] );
 		if ( is_wp_error( $response ) || 204 !== (int) wp_remote_retrieve_response_code( $response ) ) {
-			if ( ! $store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], (int) call_user_func( $this->clock ), 'unlink_local', $admin_reason ) ) {
-				return new \WP_Error( 'wpbridge_spoke_reconcile_storage_failed', __( '无法持久记录 Hub revoke 重试。', 'wpbridge' ), [ 'status' => 503 ] );
-			}
 			return new \WP_Error( 'wpbridge_spoke_remote_revoke_pending', __( 'Hub revoke 尚未确认，本地凭据保持并等待重试。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
-		$now = (int) call_user_func( $this->clock );
 		if ( ! $store->finalize_remote_revoke( $link_id, $now, $admin_reason ) ) {
-			if ( ! $store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], $now, 'local_cleanup', $admin_reason ) ) {
+			if ( ! $store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], $now, 'local_cleanup', $admin_reason, $now + 60 ) ) {
 				return new \WP_Error( 'wpbridge_spoke_reconcile_storage_failed', __( 'Hub 已撤销，但无法持久记录本地清理重试。', 'wpbridge' ), [ 'status' => 503 ] );
 			}
 			return new \WP_Error( 'wpbridge_spoke_local_cleanup_pending', __( 'Hub 已撤销，Spoke 本地清理等待重试。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
-		return true;
+		return $store->clear_reconcile( $link_id, $now ) ? true : new \WP_Error( 'wpbridge_spoke_reconcile_storage_failed', __( '本地清理已完成，但无法清除 durable marker。', 'wpbridge' ), [ 'status' => 503 ] );
 	}
 
 	/** @return array<string,mixed>|\WP_Error */

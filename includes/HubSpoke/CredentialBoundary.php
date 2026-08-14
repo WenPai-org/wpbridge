@@ -29,22 +29,34 @@ final class CredentialBoundary {
 	}
 
 	public static function mutation_allowed(): bool {
-		return ! class_exists( HubSpokeStore::class ) || ! ( new HubSpokeStore() )->has_active_spoke_link();
+		if ( ! class_exists( HubSpokeStore::class ) ) {
+			return true;
+		}
+		$allowed = false;
+		( new HubSpokeStore() )->guarded_credential_write( true, static function () use ( &$allowed ): bool { $allowed = true; return true; } );
+		return $allowed;
+	}
+
+	/** Execute the actual option write while holding the same lifecycle lock as role selection. */
+	public static function guarded_write( array $value, array $previous, callable $writer ): bool {
+		$increasing = self::credentials_increase( $value, $previous );
+		return ! class_exists( HubSpokeStore::class ) ? (bool) call_user_func( $writer ) : ( new HubSpokeStore() )->guarded_credential_write( $increasing, $writer );
 	}
 
 	/** A deletion/empty replacement reduces authority and remains permitted. */
 	public static function credential_write_allowed( array $value, array $previous = [] ): bool {
-		if ( self::mutation_allowed() ) {
-			return true;
-		}
+		return ! self::credentials_increase( $value, $previous ) || self::mutation_allowed();
+	}
+
+	private static function credentials_increase( array $value, array $previous = [] ): bool {
 		$new_credentials = self::credential_map( $value );
 		$old_credentials = self::credential_map( $previous );
 		foreach ( $new_credentials as $path => $credential ) {
 			if ( '' !== $credential && ( ! isset( $old_credentials[ $path ] ) || ! hash_equals( $old_credentials[ $path ], $credential ) ) ) {
-				return false;
+				return true;
 			}
 		}
-		return true;
+		return false;
 	}
 
 	public static function contains_nonempty_credentials( array $value ): bool {
@@ -62,6 +74,10 @@ final class CredentialBoundary {
 	/** Guard the generic encrypted-option API; an empty value remains authority-reducing. */
 	public static function secure_write_allowed( string $value, string $previous = '' ): bool {
 		return '' === $value || self::mutation_allowed() || ( '' !== $previous && hash_equals( $previous, $value ) );
+	}
+
+	public static function guarded_secure_write( string $value, string $previous, callable $writer ): bool {
+		return self::guarded_write( [ 'api_key' => $value ], [ 'api_key' => $previous ], $writer );
 	}
 
 	private static function current_site_has_credentials(): bool {
