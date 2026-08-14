@@ -72,6 +72,11 @@ $assert( false !== strpos( $release_builder, 'git archive HEAD' ), 'Release buil
 $assert( false !== strpos( $release_builder, 'touch -h -t 198001010000' ) && false !== strpos( $release_builder, 'zip -X' ), 'Release builder normalizes ZIP timestamps and metadata' );
 $assert( false !== strpos( $release_builder, 'manifest.json' ), 'Release builder emits a file manifest' );
 
+$release_workflow = (string) file_get_contents( $root . '/.forgejo/workflows/release.yml' );
+$assert( false !== strpos( $release_workflow, '只构建并发布 Release；目标站部署必须走独立审批和独立流程' ), 'Release workflow documents the separate deployment approval boundary' );
+$assert( false === strpos( $release_workflow, 'DEPLOY_HOST' ) && false === strpos( $release_workflow, 'DEPLOY_SSH_KEY' ), 'Release workflow cannot consume deployment host or SSH credentials' );
+$assert( false === strpos( $release_workflow, 'ssh-keyscan' ) && false === strpos( $release_workflow, 'post-release composer repair' ), 'Release workflow cannot perform target-site repair or SSH deployment' );
+
 $updater = (string) file_get_contents( $root . '/includes/class-wenpai-updater.php' );
 $assert( false !== strpos( $updater, 'version_compare( $new_version, $this->version' ), 'Self-updater rejects downgrade and same-version responses' );
 $assert( false !== strpos( $updater, 'wp_parse_url( $package, PHP_URL_SCHEME )' ), 'Self-updater rejects non-HTTPS packages' );
