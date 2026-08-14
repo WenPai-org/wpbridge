@@ -92,7 +92,14 @@ final class CredentialBoundary {
 			$previous,
 			static function () use ( $writer, $option_names ): bool {
 				global $wpdb;
-				if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! isset( $wpdb->options ) || ! method_exists( $wpdb, 'query' ) || ! method_exists( $wpdb, 'prepare' ) || ! method_exists( $wpdb, 'get_row' ) || ! method_exists( $wpdb, 'update' ) || ! method_exists( $wpdb, 'insert' ) || false === $wpdb->query( 'START TRANSACTION' ) ) {
+				if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! isset( $wpdb->options ) || ! method_exists( $wpdb, 'query' ) || ! method_exists( $wpdb, 'prepare' ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'get_row' ) || ! method_exists( $wpdb, 'update' ) || ! method_exists( $wpdb, 'insert' ) ) {
+					return false;
+				}
+				$engine = $wpdb->get_var( $wpdb->prepare( 'SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s', $wpdb->options ) );
+				if ( ! is_string( $engine ) || ! in_array( strtoupper( $engine ), [ 'INNODB', 'NDBCLUSTER', 'ROCKSDB' ], true ) ) {
+					return false;
+				}
+				if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
 					return false;
 				}
 				$committed = false;

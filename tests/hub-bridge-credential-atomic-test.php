@@ -14,6 +14,9 @@ namespace {
 	$GLOBALS['atomic_lifecycle_locked'] = false;
 	$GLOBALS['atomic_lock_failure'] = false;
 	$GLOBALS['atomic_transaction_failure'] = false;
+	$GLOBALS['atomic_engine'] = 'InnoDB';
+	$GLOBALS['atomic_db_writes'] = 0;
+	$GLOBALS['atomic_engine_queries'] = [];
 	function __( string $text, string $domain = '' ): string { return $text; }
 	function is_multisite(): bool { return false; }
 	function get_option( string $name, $default = false ) {
@@ -47,6 +50,7 @@ namespace {
 		private array $snapshot = [];
 		private array $autoload_snapshot = [];
 		public function prepare( string $query, string $value ): string { return str_replace( '%s', "'" . $value . "'", $query ); }
+		public function get_var( string $query ) { $GLOBALS['atomic_engine_queries'][] = $query; return $GLOBALS['atomic_engine']; }
 		public function get_row( string $query ) {
 			if ( ! preg_match( "/option_name = '([^']+)'/", $query, $matches ) || ! array_key_exists( $matches[1], $GLOBALS['atomic_options'] ) ) { return null; }
 			return (object) [ 'option_value' => serialize( $GLOBALS['atomic_options'][ $matches[1] ] ), 'autoload' => 'auto' ];
@@ -55,6 +59,7 @@ namespace {
 			unset( $table, $formats, $where_formats );
 			$key = (string) $where['option_name'];
 			if ( $key === $GLOBALS['atomic_fail_option'] ) { return false; }
+			++$GLOBALS['atomic_db_writes'];
 			$GLOBALS['atomic_options'][ $key ] = unserialize( $data['option_value'] );
 			if ( is_callable( $GLOBALS['atomic_update_hook'] ) ) { ( $GLOBALS['atomic_update_hook'] )(); $GLOBALS['atomic_update_hook'] = null; }
 			return 1;
@@ -63,6 +68,7 @@ namespace {
 			unset( $table, $formats );
 			$key = (string) $data['option_name'];
 			if ( $key === $GLOBALS['atomic_fail_option'] ) { return false; }
+			++$GLOBALS['atomic_db_writes'];
 			$GLOBALS['atomic_options'][ $key ] = unserialize( $data['option_value'] );
 			$GLOBALS['atomic_autoload'][ $key ] = (string) $data['autoload'];
 			if ( is_callable( $GLOBALS['atomic_update_hook'] ) ) { ( $GLOBALS['atomic_update_hook'] )(); $GLOBALS['atomic_update_hook'] = null; }
@@ -166,6 +172,15 @@ namespace WPBridge\Commercial {
 	$settings_with_concurrent_value = (array) \get_option( Settings::OPTION_SETTINGS, [] );
 	$settings_with_concurrent_value['concurrent_setting'] = 'preserve-me';
 	\update_option( Settings::OPTION_SETTINGS, $settings_with_concurrent_value );
+	$writes_before_engine_failure = $GLOBALS['atomic_db_writes'];
+	$GLOBALS['atomic_engine'] = 'MyISAM';
+	$result = $manager->set_bridge_server( 'https://myisam.example', 'myisam-key' );
+	\atomic_assert( false === $result['success'] && $writes_before_engine_failure === $GLOBALS['atomic_db_writes'] && 'https://old.example' === ( new Settings() )->get( 'bridge_server_url' ), 'Non-transactional MyISAM options table fails closed before any write' );
+	$GLOBALS['atomic_engine'] = null;
+	$result = $manager->set_bridge_server( 'https://unknown-engine.example', 'unknown-key' );
+	\atomic_assert( false === $result['success'] && $writes_before_engine_failure === $GLOBALS['atomic_db_writes'] && 'old-key' === Encryption::get_secure( 'bridge_server_api_key' ), 'Options-table engine lookup failure fails closed before any write' );
+	$GLOBALS['atomic_engine'] = 'InnoDB';
+	\atomic_assert( false !== strpos( (string) end( $GLOBALS['atomic_engine_queries'] ), "TABLE_NAME = 'wp_options'" ), 'Storage-engine verification binds the exact current-blog options table' );
 	$GLOBALS['atomic_transaction_failure'] = true;
 	$result = $manager->set_bridge_server( 'https://db-fail.example', 'db-fail-key' );
 	$GLOBALS['atomic_transaction_failure'] = false;
