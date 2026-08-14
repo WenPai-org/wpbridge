@@ -17,6 +17,9 @@ final class CredentialBoundary {
 		if ( ! is_multisite() ) {
 			return self::current_site_has_credentials();
 		}
+		if ( self::contains_nonempty_credentials( (array) get_site_option( 'wpbridge_source_registry', [] ) ) ) {
+			return true;
+		}
 		foreach ( get_sites( [ 'fields' => 'ids', 'number' => 0 ] ) as $site_id ) {
 			switch_to_blog( (int) $site_id );
 			$found = self::current_site_has_credentials();

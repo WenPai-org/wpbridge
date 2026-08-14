@@ -12,6 +12,7 @@ namespace {
 	function switch_to_blog( int $id ): void { $GLOBALS['boundary_blog'] = $id; }
 	function restore_current_blog(): void { $GLOBALS['boundary_blog'] = 1; }
 	function get_option( string $key, $default = false ) { return $GLOBALS['boundary_options'][ $GLOBALS['boundary_blog'] ][ $key ] ?? $default; }
+	function get_site_option( string $key, $default = false ) { unset( $key ); return $default; }
 }
 
 namespace WPBridge\Security {
