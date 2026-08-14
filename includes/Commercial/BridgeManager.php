@@ -91,9 +91,17 @@ class BridgeManager {
 	 * @return void
 	 */
 	private function init_bridge_client(): void {
-		$server_url = $this->settings->get( 'bridge_server_url', '' );
-		// API Key 使用加密存储
-		$api_key = Encryption::get_secure( 'bridge_server_api_key', '' );
+		$config = CredentialBoundary::guarded_read(
+			function (): array {
+				return [
+					'server_url' => (string) ( new Settings() )->get( 'bridge_server_url', '' ),
+					'api_key' => Encryption::get_secure( 'bridge_server_api_key', '' ),
+				];
+			}
+		);
+		if ( ! is_array( $config ) ) { return; }
+		$server_url = $config['server_url'];
+		$api_key = $config['api_key'];
 
 		if ( ! empty( $server_url ) ) {
 			$this->bridge_client = new BridgeClient( $server_url, $api_key );
@@ -133,11 +141,15 @@ class BridgeManager {
 			[ 'api_key' => $api_key ],
 			[],
 			[ Settings::OPTION_SETTINGS, $secure_option ],
-			static function () use ( $server_url, $api_key ): bool {
-				$fresh_settings = new Settings();
-				$url_saved = $fresh_settings->set( 'bridge_server_url', $server_url );
-				if ( ! $url_saved && $server_url !== (string) ( new Settings() )->get( 'bridge_server_url', '' ) ) { return false; }
-				return Encryption::store_secure( 'bridge_server_api_key', $api_key );
+			static function ( array $current ) use ( $server_url, $api_key, $secure_option ) {
+				$settings = (array) ( $current[ Settings::OPTION_SETTINGS ] ?? [] );
+				$settings['bridge_server_url'] = $server_url;
+				$encrypted_api_key = Encryption::encrypt( $api_key );
+				if ( '' !== $api_key && '' === $encrypted_api_key ) { return false; }
+				return [
+					Settings::OPTION_SETTINGS => $settings,
+					$secure_option => $encrypted_api_key,
+				];
 			}
 		);
 		if ( ! $committed ) {
@@ -162,39 +174,42 @@ class BridgeManager {
 	 * @return void
 	 */
 	private function init_vendors(): void {
-		$vendor_configs = $this->settings->get( 'vendors', [] );
+		CredentialBoundary::guarded_read( function (): bool {
+			$vendor_configs = ( new Settings() )->get( 'vendors', [] );
 
-		foreach ( $vendor_configs as $vendor_id => $config ) {
-			if ( empty( $config['enabled'] ) ) {
-				continue;
+			foreach ( $vendor_configs as $vendor_id => $config ) {
+				if ( empty( $config['enabled'] ) ) {
+					continue;
+				}
+
+				$type = $config['type'] ?? 'woocommerce';
+
+				// 解密敏感字段
+				$decrypted = $this->decrypt_vendor_config( $vendor_id, $config );
+
+				switch ( $type ) {
+					case 'woocommerce':
+					case 'wc_am':
+						$vendor = new Vendors\WooCommerceVendor(
+							$vendor_id,
+							$config['name'] ?? $vendor_id,
+							$decrypted
+						);
+						$this->vendor_manager->register( $vendor );
+						break;
+
+					case 'bridge_api':
+						$vendor = new Vendors\BridgeApiVendor(
+							$vendor_id,
+							$config['name'] ?? $vendor_id,
+							$decrypted
+						);
+						$this->vendor_manager->register( $vendor );
+						break;
+				}
 			}
-
-			$type = $config['type'] ?? 'woocommerce';
-
-			// 解密敏感字段
-			$decrypted = $this->decrypt_vendor_config( $vendor_id, $config );
-
-			switch ( $type ) {
-				case 'woocommerce':
-				case 'wc_am':
-					$vendor = new Vendors\WooCommerceVendor(
-						$vendor_id,
-						$config['name'] ?? $vendor_id,
-						$decrypted
-					);
-					$this->vendor_manager->register( $vendor );
-					break;
-
-				case 'bridge_api':
-					$vendor = new Vendors\BridgeApiVendor(
-						$vendor_id,
-						$config['name'] ?? $vendor_id,
-						$decrypted
-					);
-					$this->vendor_manager->register( $vendor );
-					break;
-			}
-		}
+			return true;
+		} );
 	}
 
 	/**
@@ -562,19 +577,24 @@ class BridgeManager {
 			$plain_config,
 			[],
 			$option_names,
-			function () use ( $plain_config, $config, $vendor_id, $secure_keys ): bool {
-				$fresh_settings = new Settings();
-				$vendors = (array) $fresh_settings->get( 'vendors', [] );
+			function ( array $current ) use ( $plain_config, $config, $vendor_id, $secure_keys ) {
+				$settings = (array) ( $current[ Settings::OPTION_SETTINGS ] ?? [] );
+				$vendors = (array) ( $settings['vendors'] ?? [] );
 				if ( isset( $vendors[ $vendor_id ] ) ) { return false; }
 				$vendors[ $vendor_id ] = $config;
+				$mutations = [];
 				foreach ( $secure_keys as $secure_key ) {
 					$field = substr( $secure_key, strlen( 'vendor_' . $vendor_id . '_' ) );
-					if ( ! Encryption::store_secure( $secure_key, (string) $plain_config[ $field ] ) ) { return false; }
+					$encrypted_value = Encryption::encrypt( (string) $plain_config[ $field ] );
+					if ( '' === $encrypted_value ) { return false; }
+					$mutations[ 'wpbridge_secure_' . $secure_key ] = $encrypted_value;
 				}
-				if ( ! $fresh_settings->set( 'vendors', $vendors ) ) { return false; }
-				if ( [] === $secure_keys ) { return true; }
-				$manifest = array_values( array_unique( array_merge( (array) get_option( 'wpbridge_secure_vendor_manifest', [] ), $secure_keys ) ) );
-				return update_option( 'wpbridge_secure_vendor_manifest', $manifest ) || $manifest === (array) get_option( 'wpbridge_secure_vendor_manifest', [] );
+				$settings['vendors'] = $vendors;
+				$mutations[ Settings::OPTION_SETTINGS ] = $settings;
+				if ( [] !== $secure_keys ) {
+					$mutations['wpbridge_secure_vendor_manifest'] = array_values( array_unique( array_merge( (array) ( $current['wpbridge_secure_vendor_manifest'] ?? [] ), $secure_keys ) ) );
+				}
+				return $mutations;
 			}
 		);
 		if ( ! $committed ) { $this->settings = new Settings(); return [ 'success' => false, 'message' => __( '供应商凭据无法原子保存。', 'wpbridge' ) ]; }
@@ -620,15 +640,17 @@ class BridgeManager {
 	 * @return array 解密后的配置
 	 */
 	public function decrypt_vendor_config( string $vendor_id, array $config ): array {
-		$sensitive_fields = [ 'license_key', 'api_key', 'consumer_key', 'consumer_secret' ];
-
-		foreach ( $sensitive_fields as $field ) {
-			if ( isset( $config[ $field ] ) && $config[ $field ] === '***encrypted***' ) {
-				$config[ $field ] = Encryption::get_secure( "vendor_{$vendor_id}_{$field}", '' );
+		$result = CredentialBoundary::guarded_read( static function () use ( $vendor_id, $config ): array {
+			$output = $config;
+			$sensitive_fields = [ 'license_key', 'api_key', 'consumer_key', 'consumer_secret' ];
+			foreach ( $sensitive_fields as $field ) {
+				if ( isset( $output[ $field ] ) && $output[ $field ] === '***encrypted***' ) {
+					$output[ $field ] = Encryption::get_secure( "vendor_{$vendor_id}_{$field}", '' );
+				}
 			}
-		}
-
-		return $config;
+			return $output;
+		} );
+		return is_array( $result ) ? $result : $config;
 	}
 
 	/**

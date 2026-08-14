@@ -80,21 +80,24 @@ class VendorManager {
 	 * 加载已配置的供应商
 	 */
 	private function load_vendors(): void {
-		$vendor_configs = $this->settings->get( 'vendors', [] );
+		CredentialBoundary::guarded_read( function (): bool {
+			$vendor_configs = ( new Settings() )->get( 'vendors', [] );
 
-		foreach ( $vendor_configs as $vendor_id => $config ) {
-			if ( empty( $config['enabled'] ) ) {
-				continue;
+			foreach ( $vendor_configs as $vendor_id => $config ) {
+				if ( empty( $config['enabled'] ) ) {
+					continue;
+				}
+
+				// 解密敏感字段（兼容 secure option 存储）
+				$config = self::decrypt_config( $config, $vendor_id );
+
+				$vendor = $this->create_vendor( $vendor_id, $config );
+				if ( $vendor !== null ) {
+					$this->vendors[ $vendor_id ] = $vendor;
+				}
 			}
-
-			// 解密敏感字段（兼容 secure option 存储）
-			$config = self::decrypt_config( $config, $vendor_id );
-
-			$vendor = $this->create_vendor( $vendor_id, $config );
-			if ( $vendor !== null ) {
-				$this->vendors[ $vendor_id ] = $vendor;
-			}
-		}
+			return true;
+		} );
 
 		// 允许通过 hook 注册额外供应商
 		do_action( 'wpbridge_register_vendors', $this );

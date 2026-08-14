@@ -44,6 +44,23 @@ final class HubSpokeStore {
 		}
 	}
 
+	/**
+	 * Execute a composite credential read under the installation lifecycle lock.
+	 *
+	 * @return mixed
+	 */
+	public function guarded_lifecycle_read( callable $reader ) {
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
+		if ( is_wp_error( $lock ) ) {
+			return $lock;
+		}
+		try {
+			return call_user_func( $reader );
+		} finally {
+			$this->release_lock( 'hub-lifecycle' );
+		}
+	}
+
 	/** @return array<string,mixed>|\WP_Error */
 	public function create_invitation( array $scopes, array $slugs, int $now, string $hub_origin = '' ) {
 		if ( ! self::identity_ready() ) {

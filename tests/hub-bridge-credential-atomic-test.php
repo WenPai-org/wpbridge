@@ -5,27 +5,72 @@ declare(strict_types=1);
 namespace {
 	define( 'ABSPATH', __DIR__ . '/' );
 	$GLOBALS['atomic_options'] = [];
+	$GLOBALS['atomic_autoload'] = [];
+	$GLOBALS['atomic_cache'] = [];
+	$GLOBALS['atomic_alloptions'] = [];
+	$GLOBALS['atomic_cache_deletes'] = [];
+	$GLOBALS['atomic_update_hook'] = null;
 	$GLOBALS['atomic_fail_option'] = '';
 	$GLOBALS['atomic_lifecycle_locked'] = false;
 	$GLOBALS['atomic_lock_failure'] = false;
 	$GLOBALS['atomic_transaction_failure'] = false;
 	function __( string $text, string $domain = '' ): string { return $text; }
 	function is_multisite(): bool { return false; }
-	function get_option( string $name, $default = false ) { return array_key_exists( $name, $GLOBALS['atomic_options'] ) ? $GLOBALS['atomic_options'][ $name ] : $default; }
+	function get_option( string $name, $default = false ) {
+		if ( array_key_exists( $name, $GLOBALS['atomic_alloptions'] ) ) { return $GLOBALS['atomic_alloptions'][ $name ]; }
+		if ( array_key_exists( $name, $GLOBALS['atomic_cache'] ) ) { return $GLOBALS['atomic_cache'][ $name ]; }
+		if ( ! array_key_exists( $name, $GLOBALS['atomic_options'] ) ) { return $default; }
+		$value = $GLOBALS['atomic_options'][ $name ];
+		if ( 'auto' === ( $GLOBALS['atomic_autoload'][ $name ] ?? 'auto' ) ) { $GLOBALS['atomic_alloptions'][ $name ] = $value; } else { $GLOBALS['atomic_cache'][ $name ] = $value; }
+		return $value;
+	}
 	function update_option( string $name, $value ): bool {
 		if ( $name === $GLOBALS['atomic_fail_option'] ) { return false; }
 		$GLOBALS['atomic_options'][ $name ] = $value;
+		$GLOBALS['atomic_autoload'][ $name ] = $GLOBALS['atomic_autoload'][ $name ] ?? 'auto';
+		unset( $GLOBALS['atomic_cache'][ $name ], $GLOBALS['atomic_alloptions'][ $name ] );
 		return true;
 	}
 	function delete_option( string $name ): bool { unset( $GLOBALS['atomic_options'][ $name ] ); return true; }
-	function wp_cache_delete( string $key, string $group = '' ): bool { return true; }
+	function wp_cache_delete( string $key, string $group = '' ): bool {
+		$GLOBALS['atomic_cache_deletes'][] = $group . ':' . $key;
+		if ( 'alloptions' === $key ) { $GLOBALS['atomic_alloptions'] = []; }
+		if ( 'notoptions' !== $key ) { unset( $GLOBALS['atomic_cache'][ $key ] ); }
+		return true;
+	}
+	function maybe_serialize( $value ): string { return serialize( $value ); }
+	function maybe_unserialize( string $value ) { return unserialize( $value ); }
 	function is_wp_error( $value ): bool { return $value instanceof \WP_Error; }
 	class WP_Error {}
 	final class AtomicWpdb {
+		public string $options = 'wp_options';
 		private array $snapshot = [];
+		private array $autoload_snapshot = [];
+		public function prepare( string $query, string $value ): string { return str_replace( '%s', "'" . $value . "'", $query ); }
+		public function get_row( string $query ) {
+			if ( ! preg_match( "/option_name = '([^']+)'/", $query, $matches ) || ! array_key_exists( $matches[1], $GLOBALS['atomic_options'] ) ) { return null; }
+			return (object) [ 'option_value' => serialize( $GLOBALS['atomic_options'][ $matches[1] ] ), 'autoload' => 'auto' ];
+		}
+		public function update( string $table, array $data, array $where, array $formats = [], array $where_formats = [] ) {
+			unset( $table, $formats, $where_formats );
+			$key = (string) $where['option_name'];
+			if ( $key === $GLOBALS['atomic_fail_option'] ) { return false; }
+			$GLOBALS['atomic_options'][ $key ] = unserialize( $data['option_value'] );
+			if ( is_callable( $GLOBALS['atomic_update_hook'] ) ) { ( $GLOBALS['atomic_update_hook'] )(); $GLOBALS['atomic_update_hook'] = null; }
+			return 1;
+		}
+		public function insert( string $table, array $data, array $formats = [] ) {
+			unset( $table, $formats );
+			$key = (string) $data['option_name'];
+			if ( $key === $GLOBALS['atomic_fail_option'] ) { return false; }
+			$GLOBALS['atomic_options'][ $key ] = unserialize( $data['option_value'] );
+			$GLOBALS['atomic_autoload'][ $key ] = (string) $data['autoload'];
+			if ( is_callable( $GLOBALS['atomic_update_hook'] ) ) { ( $GLOBALS['atomic_update_hook'] )(); $GLOBALS['atomic_update_hook'] = null; }
+			return 1;
+		}
 		public function query( string $sql ) {
-			if ( 'START TRANSACTION' === $sql ) { if ( $GLOBALS['atomic_transaction_failure'] ) { return false; } $this->snapshot = $GLOBALS['atomic_options']; return 1; }
-			if ( 'ROLLBACK' === $sql ) { $GLOBALS['atomic_options'] = $this->snapshot; return 1; }
+			if ( 'START TRANSACTION' === $sql ) { if ( $GLOBALS['atomic_transaction_failure'] ) { return false; } $this->snapshot = $GLOBALS['atomic_options']; $this->autoload_snapshot = $GLOBALS['atomic_autoload']; return 1; }
+			if ( 'ROLLBACK' === $sql ) { $GLOBALS['atomic_options'] = $this->snapshot; $GLOBALS['atomic_autoload'] = $this->autoload_snapshot; return 1; }
 			if ( 'COMMIT' === $sql ) { $this->snapshot = []; return 1; }
 			return false;
 		}
@@ -43,6 +88,11 @@ namespace WPBridge\HubSpoke {
 			if ( $GLOBALS['atomic_lock_failure'] || $GLOBALS['atomic_lifecycle_locked'] ) { return false; }
 			$GLOBALS['atomic_lifecycle_locked'] = true;
 			try { return (bool) $writer(); } finally { $GLOBALS['atomic_lifecycle_locked'] = false; }
+		}
+		public function guarded_lifecycle_read( callable $reader ) {
+			if ( $GLOBALS['atomic_lifecycle_locked'] ) { return false; }
+			$GLOBALS['atomic_lifecycle_locked'] = true;
+			try { return $reader(); } finally { $GLOBALS['atomic_lifecycle_locked'] = false; }
 		}
 	}
 	require_once dirname( __DIR__ ) . '/includes/HubSpoke/CredentialBoundary.php';
@@ -67,6 +117,7 @@ namespace WPBridge\Core {
 namespace WPBridge\Security {
 	use WPBridge\HubSpoke\CredentialBoundary;
 	final class Encryption {
+		public static function encrypt( string $value ): string { return 'enc:' . $value; }
 		public static function get_secure( string $key, string $default = '' ): string {
 			$value = (string) \get_option( 'wpbridge_secure_' . $key, '' );
 			return '' === $value ? $default : preg_replace( '/^enc:/', '', $value );
@@ -104,13 +155,17 @@ namespace WPBridge\Commercial {
 		Settings::OPTION_SETTINGS => [ 'bridge_server_url' => 'https://old.example' ],
 		'wpbridge_secure_bridge_server_api_key' => 'enc:old-key',
 	];
+	$GLOBALS['atomic_autoload'] = [ Settings::OPTION_SETTINGS => 'auto', 'wpbridge_secure_bridge_server_api_key' => 'no' ];
 	$manager = new BridgeManager( new Settings(), new RemoteConfig() );
+	\atomic_assert( isset( $GLOBALS['atomic_alloptions'][ Settings::OPTION_SETTINGS ], $GLOBALS['atomic_cache']['wpbridge_secure_bridge_server_api_key'] ), 'Persistent alloptions and per-option caches are prewarmed for atomicity regression' );
 	$GLOBALS['atomic_fail_option'] = 'wpbridge_secure_bridge_server_api_key';
 	$result = $manager->set_bridge_server( 'https://new.example', 'new-key' );
 	\atomic_assert( false === $result['success'] && 'https://old.example' === ( new Settings() )->get( 'bridge_server_url' ) && 'old-key' === Encryption::get_secure( 'bridge_server_api_key' ), 'Bridge server secure-write failure rolls URL and key back together' );
 
 	$GLOBALS['atomic_fail_option'] = '';
-	$GLOBALS['atomic_options'][ Settings::OPTION_SETTINGS ]['concurrent_setting'] = 'preserve-me';
+	$settings_with_concurrent_value = (array) \get_option( Settings::OPTION_SETTINGS, [] );
+	$settings_with_concurrent_value['concurrent_setting'] = 'preserve-me';
+	\update_option( Settings::OPTION_SETTINGS, $settings_with_concurrent_value );
 	$GLOBALS['atomic_transaction_failure'] = true;
 	$result = $manager->set_bridge_server( 'https://db-fail.example', 'db-fail-key' );
 	$GLOBALS['atomic_transaction_failure'] = false;
@@ -121,8 +176,16 @@ namespace WPBridge\Commercial {
 	$GLOBALS['atomic_lock_failure'] = false;
 	\atomic_assert( false === $result['success'] && 'https://old.example' === ( new Settings() )->get( 'bridge_server_url' ) && 'old-key' === Encryption::get_secure( 'bridge_server_api_key' ), 'Bridge server lifecycle-lock contention exposes neither a new origin nor a new key' );
 
+	$concurrent_cached_pair = [];
+	$concurrent_guarded_read = null;
+	$GLOBALS['atomic_update_hook'] = static function () use ( &$concurrent_cached_pair, &$concurrent_guarded_read ): void {
+		$concurrent_cached_pair = [ ( new Settings() )->get( 'bridge_server_url' ), Encryption::get_secure( 'bridge_server_api_key' ) ];
+		$concurrent_guarded_read = ( new \WPBridge\HubSpoke\HubSpokeStore() )->guarded_lifecycle_read( static fn(): bool => true );
+	};
 	$result = $manager->set_bridge_server( 'https://new.example', 'new-key' );
 	\atomic_assert( true === $result['success'] && 'https://new.example' === ( new Settings() )->get( 'bridge_server_url' ) && 'new-key' === Encryption::get_secure( 'bridge_server_api_key' ) && 'preserve-me' === ( new Settings() )->get( 'concurrent_setting' ), 'Bridge server transaction reloads locked settings and preserves a concurrent setting' );
+	\atomic_assert( [ 'https://old.example', 'old-key' ] === $concurrent_cached_pair && false === $concurrent_guarded_read, 'Direct DB staging publishes no half-generation to persistent-cache readers and composite readers wait on lifecycle lock' );
+	\atomic_assert( in_array( 'options:wpbridge_settings', $GLOBALS['atomic_cache_deletes'], true ) && in_array( 'options:alloptions', $GLOBALS['atomic_cache_deletes'], true ) && in_array( 'options:notoptions', $GLOBALS['atomic_cache_deletes'], true ) && in_array( 'options:wpbridge_secure_bridge_server_api_key', $GLOBALS['atomic_cache_deletes'], true ), 'Commit and rollback invalidate per-option, alloptions and notoptions persistent caches' );
 
 	$GLOBALS['atomic_fail_option'] = Settings::OPTION_SETTINGS;
 	$result = $manager->add_vendor_v2( 'broken', [ 'type' => 'bridge_api', 'api_key' => 'vendor-key', 'consumer_secret' => 'vendor-secret' ] );
@@ -139,7 +202,9 @@ namespace WPBridge\Commercial {
 	\atomic_assert( false === $result['success'] && false === \get_option( 'wpbridge_secure_vendor_manifest-fail_api_key', false ) && [] === ( new Settings() )->get( 'vendors', [] ), 'Vendor manifest failure rolls secure fields and vendor index back' );
 
 	$GLOBALS['atomic_fail_option'] = '';
-	$GLOBALS['atomic_options'][ Settings::OPTION_SETTINGS ]['vendors'] = [ 'concurrent' => [ 'type' => 'bridge_api', 'enabled' => true ] ];
+	$settings_with_concurrent_vendor = (array) \get_option( Settings::OPTION_SETTINGS, [] );
+	$settings_with_concurrent_vendor['vendors'] = [ 'concurrent' => [ 'type' => 'bridge_api', 'enabled' => true ] ];
+	\update_option( Settings::OPTION_SETTINGS, $settings_with_concurrent_vendor );
 	$result = $manager->add_vendor_v2( 'complete', [ 'type' => 'bridge_api', 'api_key' => 'vendor-key', 'consumer_secret' => 'vendor-secret' ] );
 	$manifest = (array) \get_option( 'wpbridge_secure_vendor_manifest', [] );
 	$committed_vendors = (array) ( new Settings() )->get( 'vendors', [] );

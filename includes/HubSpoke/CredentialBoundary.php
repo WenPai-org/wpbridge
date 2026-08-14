@@ -56,6 +56,27 @@ final class CredentialBoundary {
 	}
 
 	/**
+	 * Read a multi-option credential generation without racing its writer.
+	 *
+	 * @return mixed
+	 */
+	public static function guarded_read( callable $reader ) {
+		if ( self::$lifecycle_depth > 0 || ! class_exists( HubSpokeStore::class ) ) {
+			return call_user_func( $reader );
+		}
+		$scoped_reader = static function () use ( $reader ) {
+			++self::$lifecycle_depth;
+			try {
+				return call_user_func( $reader );
+			} finally {
+				--self::$lifecycle_depth;
+			}
+		};
+		$result = ( new HubSpokeStore() )->guarded_lifecycle_read( $scoped_reader );
+		return is_wp_error( $result ) ? false : $result;
+	}
+
+	/**
 	 * Persist a multi-option credential change as one database transaction while
 	 * holding the installation lifecycle lock. Nested Settings/Encryption writes
 	 * inherit this scope and therefore cannot release the lock between fields.
@@ -63,7 +84,7 @@ final class CredentialBoundary {
 	 * @param array    $value        Proposed credential-bearing value.
 	 * @param array    $previous     Previous credential-bearing value.
 	 * @param string[] $option_names Option cache entries touched by the writer.
-	 * @param callable $writer       Returns true only when every write persisted.
+	 * @param callable $writer       Receives committed values and returns option mutations or false.
 	 */
 	public static function transactional_write( array $value, array $previous, array $option_names, callable $writer ): bool {
 		return self::guarded_write(
@@ -71,13 +92,35 @@ final class CredentialBoundary {
 			$previous,
 			static function () use ( $writer, $option_names ): bool {
 				global $wpdb;
-				if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'query' ) || false === $wpdb->query( 'START TRANSACTION' ) ) {
+				if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! isset( $wpdb->options ) || ! method_exists( $wpdb, 'query' ) || ! method_exists( $wpdb, 'prepare' ) || ! method_exists( $wpdb, 'get_row' ) || ! method_exists( $wpdb, 'update' ) || ! method_exists( $wpdb, 'insert' ) || false === $wpdb->query( 'START TRANSACTION' ) ) {
 					return false;
 				}
 				$committed = false;
 				try {
-					if ( ! (bool) call_user_func( $writer ) ) {
+					$current = [];
+					$rows = [];
+					foreach ( array_unique( $option_names ) as $option_name ) {
+						// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- options table is the trusted current-blog table name.
+						$row = $wpdb->get_row( $wpdb->prepare( "SELECT option_value, autoload FROM {$wpdb->options} WHERE option_name = %s FOR UPDATE", $option_name ) );
+						if ( is_object( $row ) ) {
+							$rows[ $option_name ] = $row;
+							$current[ $option_name ] = maybe_unserialize( $row->option_value );
+						}
+					}
+					$mutations = call_user_func( $writer, $current );
+					if ( ! is_array( $mutations ) ) {
 						return false;
+					}
+					foreach ( $mutations as $option_name => $option_value ) {
+						if ( ! in_array( $option_name, $option_names, true ) ) { return false; }
+						$serialized = maybe_serialize( $option_value );
+						if ( isset( $rows[ $option_name ] ) ) {
+							$result = $wpdb->update( $wpdb->options, [ 'option_value' => $serialized ], [ 'option_name' => $option_name ], [ '%s' ], [ '%s' ] );
+						} else {
+							$autoload = 0 === strpos( $option_name, 'wpbridge_secure_' ) ? 'no' : 'yes';
+							$result = $wpdb->insert( $wpdb->options, [ 'option_name' => $option_name, 'option_value' => $serialized, 'autoload' => $autoload ], [ '%s', '%s', '%s' ] );
+						}
+						if ( false === $result ) { return false; }
 					}
 					$committed = false !== $wpdb->query( 'COMMIT' );
 					return $committed;
@@ -88,14 +131,24 @@ final class CredentialBoundary {
 					if ( ! $committed ) {
 						$wpdb->query( 'ROLLBACK' );
 					}
-					if ( function_exists( 'wp_cache_delete' ) ) {
-						foreach ( array_unique( $option_names ) as $option_name ) {
-							wp_cache_delete( $option_name, 'options' );
-						}
-					}
+					self::invalidate_option_caches( $option_names );
 				}
 			}
 		);
+	}
+
+	/** Invalidate public/index caches before secret caches while the lifecycle lock is held. */
+	private static function invalidate_option_caches( array $option_names ): void {
+		if ( ! function_exists( 'wp_cache_delete' ) ) { return; }
+		$names = array_unique( $option_names );
+		foreach ( $names as $option_name ) {
+			if ( 0 !== strpos( $option_name, 'wpbridge_secure_' ) ) { wp_cache_delete( $option_name, 'options' ); }
+		}
+		wp_cache_delete( 'alloptions', 'options' );
+		wp_cache_delete( 'notoptions', 'options' );
+		foreach ( $names as $option_name ) {
+			if ( 0 === strpos( $option_name, 'wpbridge_secure_' ) ) { wp_cache_delete( $option_name, 'options' ); }
+		}
 	}
 
 	/** A deletion/empty replacement reduces authority and remains permitted. */

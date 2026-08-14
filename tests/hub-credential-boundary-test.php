@@ -20,6 +20,7 @@ namespace {
 	function current_time( string $type ): string { unset( $type ); return '2026-08-14 00:00:00'; }
 	function do_action( string $hook, ...$args ): void { unset( $hook, $args ); }
 	function __( string $message, string $domain = '' ): string { unset( $domain ); return $message; }
+	function is_wp_error( $value ): bool { unset( $value ); return false; }
 	final class BoundaryWpdb {
 		public string $options = 'wp_options';
 		public function esc_like( string $value ): string { return $value; }
@@ -50,6 +51,7 @@ namespace WPBridge\HubSpoke {
 		public function guarded_credential_write( bool $authority_increasing, callable $writer ): bool {
 			return $authority_increasing && ( ! empty( $GLOBALS['boundary_active'] ) || ! empty( $GLOBALS['boundary_blocked'] ) ) ? false : (bool) $writer();
 		}
+		public function guarded_lifecycle_read( callable $reader ) { return $reader(); }
 	}
 	require_once dirname( __DIR__ ) . '/includes/HubSpoke/CredentialBoundary.php';
 	require_once dirname( __DIR__ ) . '/includes/Core/Settings.php';
