@@ -47,8 +47,9 @@ final class SafeHttpClient {
 			}
 
 			$pin_applied      = false;
+			$peer_ip          = '';
 			$was_preempted    = false;
-			$pin_callback     = static function ( $handle, $parsed_args, $request_url ) use ( $url, $target, $ip, $port, &$pin_applied ): void {
+			$pin_callback     = static function ( $handle, $parsed_args, $request_url ) use ( $url, $target, $ip, $port, &$pin_applied, &$peer_ip ): void {
 				if ( $request_url !== $url || ( $parsed_args['_wpbridge_resolved_ip'] ?? '' ) !== $ip ) {
 					return;
 				}
@@ -56,6 +57,29 @@ final class SafeHttpClient {
 				$pinned_ip = false !== strpos( $ip, ':' ) ? '[' . $ip . ']' : $ip;
 				// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- WordPress exposes this handle specifically for transport options; DNS pinning has no HTTP API argument.
 				curl_setopt( $handle, CURLOPT_RESOLVE, [ $target['host'] . ':' . $port . ':' . $pinned_ip ] );
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- disables ambient proxy bypass of DNS pinning.
+				curl_setopt( $handle, CURLOPT_PROXY, '' );
+				if ( defined( 'CURLOPT_NOPROXY' ) ) {
+					// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- disables ambient proxy bypass of DNS pinning.
+					curl_setopt( $handle, CURLOPT_NOPROXY, '*' );
+				}
+				if ( defined( 'CURLOPT_XFERINFOFUNCTION' ) ) {
+					// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- peer observation requires transport handle callback.
+					curl_setopt( $handle, CURLOPT_NOPROGRESS, false );
+					// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt -- peer observation requires transport handle callback.
+					curl_setopt(
+						$handle,
+						CURLOPT_XFERINFOFUNCTION,
+						static function ( $curl ) use ( &$peer_ip ): int {
+							// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_getinfo -- validates the connected peer after pinning.
+							$current = curl_getinfo( $curl, CURLINFO_PRIMARY_IP );
+							if ( is_string( $current ) && '' !== $current ) {
+								$peer_ip = $current;
+							}
+							return 0;
+						}
+					);
+				}
 				$pin_applied = true;
 			};
 			$preempt_callback = static function ( $preempt ) use ( &$was_preempted ) {
@@ -81,6 +105,9 @@ final class SafeHttpClient {
 			// A short-circuited request never opens a socket, so no cURL pin is required.
 			if ( ! $pin_applied && ! $was_preempted ) {
 				return new \WP_Error( 'wpbridge_safe_http_unpinned', __( '安全 HTTP 请求无法固定解析地址。', 'wpbridge' ) );
+			}
+			if ( ! $was_preempted && ( '' === $peer_ip || ! in_array( $peer_ip, $target['ips'], true ) ) ) {
+				return new \WP_Error( 'wpbridge_safe_http_peer_mismatch', __( '安全 HTTP 响应对端地址与已验证解析不一致。', 'wpbridge' ) );
 			}
 
 			$status = (int) wp_remote_retrieve_response_code( $response );

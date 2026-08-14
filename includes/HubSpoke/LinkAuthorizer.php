@@ -66,13 +66,6 @@ final class LinkAuthorizer {
 
 	private function within_rate_limit( string $link_id ): bool {
 		$limit  = defined( 'WPBRIDGE_HUB_SPOKE_RATE_LIMIT' ) ? max( 1, min( 600, (int) WPBRIDGE_HUB_SPOKE_RATE_LIMIT ) ) : 60;
-		$bucket = (int) floor( time() / 60 );
-		$key    = 'wpbridge_link_rate_' . hash( 'sha256', $link_id . ':' . $bucket );
-		$count  = (int) get_transient( $key );
-		if ( $count >= $limit ) {
-			return false;
-		}
-		set_transient( $key, $count + 1, 70 );
-		return true;
+		return $this->store->consume_rate( $link_id, (int) floor( time() / 60 ), $limit );
 	}
 }

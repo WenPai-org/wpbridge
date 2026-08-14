@@ -9,8 +9,6 @@ declare(strict_types=1);
 
 namespace WPBridge\HubSpoke;
 
-use WPBridge\Security\Encryption;
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -21,12 +19,18 @@ final class HubSpokeStore {
 	private const LINKS       = 'wpbridge_hub_links_v1';
 	private const SPOKE_LINKS = 'wpbridge_spoke_links_v1';
 	private const AUDIT       = 'wpbridge_hub_audit_v1';
+	private const RATE        = 'wpbridge_hub_rate_v1';
 
 	/** Frozen scopes. */
 	public const SCOPES = [ 'packages:read', 'sources:read', 'updates:read' ];
 
 	/** @return array<string,mixed>|\WP_Error */
 	public function create_invitation( array $scopes, array $slugs, int $now ) {
+		$lock = $this->acquire_lock( 'invitations' );
+		if ( is_wp_error( $lock ) ) {
+			return $lock;
+		}
+		try {
 		$normalized = self::normalize_policy( $scopes, $slugs );
 		if ( is_wp_error( $normalized ) ) {
 			return $normalized;
@@ -55,6 +59,9 @@ final class HubSpokeStore {
 			'slug_allowlist'        => $normalized['slug_allowlist'],
 			'expires_at'            => gmdate( 'c', $now + 600 ),
 		];
+		} finally {
+			$this->release_lock( 'invitations' );
+		}
 	}
 
 	/** @return array<string,mixed>|\WP_Error */
@@ -67,6 +74,7 @@ final class HubSpokeStore {
 		return [
 			'invitation_id'         => $id,
 			'hub_installation_uuid' => (string) $row['hub_installation_uuid'],
+			'hub_public_key_fingerprint' => hash( 'sha256', (string) InstallationIdentity::base64url_decode( InstallationIdentity::public_key() ) ),
 			'scopes'                => $row['scopes'],
 			'slug_allowlist'        => $row['slug_allowlist'],
 			'expires_at'            => gmdate( 'c', (int) $row['expires_at'] ),
@@ -75,6 +83,11 @@ final class HubSpokeStore {
 
 	/** @return array<string,mixed>|\WP_Error */
 	public function accept( string $id, array $request, int $now ) {
+		$lock = $this->acquire_lock( 'invitations' );
+		if ( is_wp_error( $lock ) ) {
+			return $lock;
+		}
+		try {
 		$rows = $this->invitations();
 		$row  = $rows[ $id ] ?? null;
 		$token = (string) ( $request['invitation_token'] ?? '' );
@@ -127,6 +140,9 @@ final class HubSpokeStore {
 			'slug_allowlist'  => $row['slug_allowlist'],
 			'expires_at'      => null,
 		];
+		} finally {
+			$this->release_lock( 'invitations' );
+		}
 	}
 
 	/** @return array<int,array<string,mixed>> */
@@ -150,6 +166,11 @@ final class HubSpokeStore {
 
 	/** @return array<string,mixed>|\WP_Error */
 	public function rotate( string $id, int $now ) {
+		$lock = $this->acquire_lock( 'links' );
+		if ( is_wp_error( $lock ) ) {
+			return $lock;
+		}
+		try {
 		$links = $this->links();
 		$row   = $links[ $id ] ?? null;
 		if ( ! is_array( $row ) || 'active' !== $row['status'] ) {
@@ -170,9 +191,17 @@ final class HubSpokeStore {
 			'scopes'              => $row['scopes'],
 			'slug_allowlist'      => $row['slug_allowlist'],
 		];
+		} finally {
+			$this->release_lock( 'links' );
+		}
 	}
 
 	public function revoke( string $id, int $now ): bool {
+		$lock = $this->acquire_lock( 'links' );
+		if ( is_wp_error( $lock ) ) {
+			return false;
+		}
+		try {
 		$links = $this->links();
 		if ( ! isset( $links[ $id ] ) || 'active' !== $links[ $id ]['status'] ) {
 			return false;
@@ -185,6 +214,9 @@ final class HubSpokeStore {
 		$this->save( self::LINKS, $links );
 		$this->audit( 'link.revoked', $id, $now );
 		return true;
+		} finally {
+			$this->release_lock( 'links' );
+		}
 	}
 
 	/** @return array<string,mixed>|null */
@@ -204,28 +236,71 @@ final class HubSpokeStore {
 		return null;
 	}
 
+	/** Persistent, lock-serialized per-link minute bucket. */
+	public function consume_rate( string $link_id, int $minute, int $limit ): bool {
+		$lock = $this->acquire_lock( 'rate:' . $link_id );
+		if ( is_wp_error( $lock ) ) {
+			return false;
+		}
+		try {
+			$rows = (array) get_option( self::RATE, [] );
+			foreach ( $rows as $key => $row ) {
+				if ( ! is_array( $row ) || (int) ( $row['minute'] ?? 0 ) < $minute - 2 ) {
+					unset( $rows[ $key ] );
+				}
+			}
+			$key = hash( 'sha256', $link_id . ':' . $minute );
+			$count = (int) ( $rows[ $key ]['count'] ?? 0 );
+			if ( $count >= $limit ) {
+				return false;
+			}
+			$rows[ $key ] = [ 'minute' => $minute, 'count' => $count + 1 ];
+			return $this->save( self::RATE, $rows );
+		} finally {
+			$this->release_lock( 'rate:' . $link_id );
+		}
+	}
+
 	/** Persist the one reusable credential only on the Spoke, under AEAD. */
 	public function save_spoke_link( string $hub_origin, array $response, int $now ): bool {
+		$lock = $this->acquire_lock( 'spoke-links' );
+		if ( is_wp_error( $lock ) ) {
+			return false;
+		}
+		try {
 		$credential = (string) ( $response['link_credential'] ?? '' );
 		if ( ! self::valid_link_credential( $credential ) ) {
 			return false;
 		}
-		$ciphertext = Encryption::encrypt( $credential );
+		$ciphertext = CredentialEnvelope::encrypt( $credential, (string) $response['link_id'], $hub_origin );
 		if ( '' === $ciphertext ) {
 			return false;
 		}
 		$rows = (array) get_option( self::SPOKE_LINKS, [] );
+		$previous_rows = $rows;
 		$rows[ (string) $response['link_id'] ] = [
 			'link_id'               => (string) $response['link_id'],
 			'hub_origin'            => $hub_origin,
 			'credential_ciphertext' => $ciphertext,
-			'key_version'           => defined( 'WPBRIDGE_ENCRYPTION_KEY_VERSION' ) ? (string) WPBRIDGE_ENCRYPTION_KEY_VERSION : 'default',
+			'key_version'           => CredentialEnvelope::version( $ciphertext ),
+			'hub_public_key_fingerprint' => (string) ( $response['hub_public_key_fingerprint'] ?? '' ),
+			'spoke_public_key_fingerprint' => hash( 'sha256', (string) InstallationIdentity::base64url_decode( InstallationIdentity::public_key() ) ),
 			'scopes'                => $response['scopes'],
 			'slug_allowlist'        => $response['slug_allowlist'],
 			'status'                => 'active',
 			'created_at'            => $now,
 		];
-		return $this->save( self::SPOKE_LINKS, $rows );
+		if ( ! $this->save( self::SPOKE_LINKS, $rows ) ) {
+			return false;
+		}
+		if ( ! $this->provision_spoke_sources( (string) $response['link_id'], $hub_origin, (array) $response['slug_allowlist'] ) ) {
+			$this->save( self::SPOKE_LINKS, $previous_rows );
+			return false;
+		}
+		return true;
+		} finally {
+			$this->release_lock( 'spoke-links' );
+		}
 	}
 
 	/** Whether this installation is already an active Spoke. */
@@ -236,6 +311,75 @@ final class HubSpokeStore {
 			}
 		}
 		return false;
+	}
+
+	/** @return array<string,mixed>|null */
+	public function active_spoke_link( string $link_id = '' ): ?array {
+		foreach ( (array) get_option( self::SPOKE_LINKS, [] ) as $id => $row ) {
+			if ( is_array( $row ) && 'active' === ( $row['status'] ?? '' ) && ( '' === $link_id || hash_equals( $link_id, (string) $id ) ) ) {
+				$row['credential'] = CredentialEnvelope::decrypt( (string) $row['credential_ciphertext'], (string) $row['link_id'], (string) $row['hub_origin'] );
+				return '' === $row['credential'] ? null : $row;
+			}
+		}
+		return null;
+	}
+
+	/** Apply a one-time rotated credential on the Spoke. */
+	public function apply_spoke_rotation( string $link_id, string $credential, int $now ): bool {
+		$lock = $this->acquire_lock( 'spoke-links' );
+		if ( is_wp_error( $lock ) || ! self::valid_link_credential( $credential ) ) {
+			return false;
+		}
+		try {
+			$rows = (array) get_option( self::SPOKE_LINKS, [] );
+			$row  = $rows[ $link_id ] ?? null;
+			if ( ! is_array( $row ) || 'active' !== $row['status'] ) {
+				return false;
+			}
+			$ciphertext = CredentialEnvelope::encrypt( $credential, $link_id, (string) $row['hub_origin'] );
+			if ( '' === $ciphertext ) {
+				return false;
+			}
+			$row['credential_ciphertext'] = $ciphertext;
+			$row['key_version'] = CredentialEnvelope::version( $ciphertext );
+			$row['rotated_at'] = $now;
+			$rows[ $link_id ] = $row;
+			return $this->save( self::SPOKE_LINKS, $rows );
+		} finally {
+			$this->release_lock( 'spoke-links' );
+		}
+	}
+
+	public function unlink_spoke( string $link_id, int $now ): bool {
+		$lock = $this->acquire_lock( 'spoke-links' );
+		if ( is_wp_error( $lock ) ) {
+			return false;
+		}
+		try {
+			$rows = (array) get_option( self::SPOKE_LINKS, [] );
+			if ( ! isset( $rows[ $link_id ] ) ) {
+				return false;
+			}
+			$rows[ $link_id ]['credential_ciphertext'] = '';
+			$rows[ $link_id ]['status'] = 'revoked';
+			$rows[ $link_id ]['revoked_at'] = $now;
+			return $this->save( self::SPOKE_LINKS, $rows ) && $this->disable_spoke_sources( $link_id );
+		} finally {
+			$this->release_lock( 'spoke-links' );
+		}
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	public function spoke_statuses(): array {
+		$output = [];
+		foreach ( (array) get_option( self::SPOKE_LINKS, [] ) as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			unset( $row['credential_ciphertext'] );
+			$output[] = $row;
+		}
+		return $output;
 	}
 
 	/** @return array<string,array<string,mixed>> */
@@ -250,6 +394,67 @@ final class HubSpokeStore {
 
 	private function save( string $option, array $value ): bool {
 		return update_option( $option, $value, false ) || $value === get_option( $option, [] );
+	}
+
+	private function provision_spoke_sources( string $link_id, string $origin, array $slugs ): bool {
+		$sources = (array) get_option( 'wpbridge_source_registry', [] );
+		$source_keys = [];
+		foreach ( $slugs as $slug ) {
+			$id = 'hub-spoke-' . substr( str_replace( '-', '', $link_id ), 0, 12 ) . '-' . $slug;
+			$source_keys[] = $id;
+			$found = false;
+			foreach ( $sources as &$source ) {
+				if ( is_array( $source ) && ( $source['source_key'] ?? '' ) === $id ) {
+					$source['enabled'] = true;
+					$found = true;
+					break;
+				}
+			}
+			unset( $source );
+			if ( ! $found ) {
+				$sources[] = [ 'source_key' => $id, 'name' => 'WPBridge Hub: ' . $slug, 'type' => 'hub_spoke', 'api_url' => $origin, 'slug' => $slug, 'enabled' => true, 'default_priority' => 5, 'auth_type' => 'none', 'auth_secret_ref' => '', 'signature_required' => true, 'artifact_public_keys' => [], 'metadata' => [ 'spoke_link_id' => $link_id ] ];
+			}
+		}
+		$saved = update_option( 'wpbridge_source_registry', $sources, false ) || $sources === get_option( 'wpbridge_source_registry', [] );
+		$defaults = (array) get_option( 'wpbridge_defaults', [] );
+		$plugin = is_array( $defaults['plugin'] ?? null ) ? $defaults['plugin'] : [];
+		$order = array_values( array_unique( array_merge( $source_keys, (array) ( $plugin['source_order'] ?? [ 'wporg' ] ) ) ) );
+		$plugin['source_order'] = $order;
+		$plugin['fallback_to_wporg'] = true;
+		$defaults['plugin'] = $plugin;
+		return $saved && ( update_option( 'wpbridge_defaults', $defaults, false ) || $defaults === get_option( 'wpbridge_defaults', [] ) );
+	}
+
+	private function disable_spoke_sources( string $link_id ): bool {
+		$sources = (array) get_option( 'wpbridge_source_registry', [] );
+		foreach ( $sources as &$source ) {
+			if ( is_array( $source ) && 'hub_spoke' === ( $source['type'] ?? '' ) && $link_id === ( $source['metadata']['spoke_link_id'] ?? '' ) ) {
+				$source['enabled'] = false;
+			}
+		}
+		unset( $source );
+		return update_option( 'wpbridge_source_registry', $sources, false ) || $sources === get_option( 'wpbridge_source_registry', [] );
+	}
+
+	/** @return true|\WP_Error */
+	private function acquire_lock( string $domain ) {
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
+			return new \WP_Error( 'wpbridge_hub_store_lock_unavailable', __( 'Hub link 持久锁不可用。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
+		$name = 'wpbridge:' . substr( hash( 'sha256', $domain . ':' . InstallationIdentity::uuid() ), 0, 48 );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepare is required and performed immediately above.
+		$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $name, 5 ) );
+		return '1' === (string) $result ? true : new \WP_Error( 'wpbridge_hub_store_busy', __( 'Hub link 状态正在更新。', 'wpbridge' ), [ 'status' => 503 ] );
+	}
+
+	private function release_lock( string $domain ): void {
+		global $wpdb;
+		$name = 'wpbridge:' . substr( hash( 'sha256', $domain . ':' . InstallationIdentity::uuid() ), 0, 48 );
+		if ( isset( $wpdb ) && is_object( $wpdb ) && method_exists( $wpdb, 'get_var' ) ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared advisory lock release.
+			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $name ) );
+		}
 	}
 
 	private function audit( string $action, string $resource, int $now ): void {

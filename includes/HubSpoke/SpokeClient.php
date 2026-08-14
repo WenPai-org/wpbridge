@@ -41,7 +41,7 @@ final class SpokeClient {
 			$origin . '/wp-json/wpbridge/v2/hub-links/' . rawurlencode( $invitation_id ) . '/challenge',
 			[ 'invitation_token' => $invitation_token ]
 		);
-		if ( is_wp_error( $challenge ) || ! self::exact_keys( $challenge, [ 'invitation_id', 'hub_installation_uuid', 'scopes', 'slug_allowlist', 'expires_at' ] ) || $challenge['invitation_id'] !== $invitation_id ) {
+		if ( is_wp_error( $challenge ) || ! self::exact_keys( $challenge, [ 'invitation_id', 'hub_installation_uuid', 'hub_public_key_fingerprint', 'scopes', 'slug_allowlist', 'expires_at' ] ) || $challenge['invitation_id'] !== $invitation_id || 1 !== preg_match( '/^[a-f0-9]{64}$/', (string) $challenge['hub_public_key_fingerprint'] ) ) {
 			return is_wp_error( $challenge ) ? $challenge : new \WP_Error( 'wpbridge_hub_challenge_invalid', __( 'Hub 邀请响应无效。', 'wpbridge' ) );
 		}
 		if ( ! InstallationIdentity::ensure() ) {
@@ -84,6 +84,7 @@ final class SpokeClient {
 		if ( is_wp_error( $policy ) || $policy['scopes'] !== $challenge['scopes'] || $policy['slug_allowlist'] !== $challenge['slug_allowlist'] ) {
 			return new \WP_Error( 'wpbridge_hub_policy_mismatch', __( 'Hub link 权限与邀请不一致。', 'wpbridge' ) );
 		}
+		$response['hub_public_key_fingerprint'] = $challenge['hub_public_key_fingerprint'];
 		$store = new HubSpokeStore();
 		if ( ! $store->save_spoke_link( $origin, $response, (int) call_user_func( $this->clock ) ) ) {
 			return new \WP_Error( 'wpbridge_spoke_storage_failed', __( 'Spoke credential 无法安全保存。', 'wpbridge' ) );
@@ -155,6 +156,11 @@ final class SpokeClient {
 				if ( ! empty( $metadata[ $key ] ) ) {
 					return true;
 				}
+			}
+		}
+		foreach ( (array) get_option( 'wpbridge_source_registry', [] ) as $source ) {
+			if ( is_array( $source ) && ( ! empty( $source['auth_secret_ref'] ) || ! empty( $source['headers'] ) ) ) {
+				return true;
 			}
 		}
 		return false;

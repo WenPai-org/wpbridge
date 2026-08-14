@@ -38,6 +38,7 @@ class SourceRegistry {
 	const TYPE_JSON     = 'json';
 	const TYPE_ARKPRESS = 'arkpress';
 	const TYPE_VENDOR   = 'vendor';
+	const TYPE_HUB_SPOKE = 'hub_spoke';
 
 	/**
 	 * 签名方案

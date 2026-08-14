@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Bridge Server 处理器类
  */
-class BridgeServerHandler extends AbstractHandler {
+class BridgeServerHandler extends AbstractHandler implements ProtectedPackageHandlerInterface {
 
 	/**
 	 * Bridge 客户端

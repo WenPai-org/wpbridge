@@ -137,7 +137,7 @@ class SourceResolver {
 		$model->type      = $type;
 		$model->api_url   = $api_url;
 		$model->item_type = $item_type;
-		$model->slug      = $force_slug ? $slug : '';
+		$model->slug      = $force_slug ? $slug : (string) ( $source['slug'] ?? '' );
 		$model->enabled   = ! empty( $source['enabled'] );
 		$model->priority  = (int) ( $source['priority'] ?? $source['default_priority'] ?? 50 );
 		$model->is_preset = ! empty( $source['is_preset'] );
@@ -146,6 +146,7 @@ class SourceResolver {
 			'signature_required' => ! empty( $source['signature_required'] ),
 			'artifact_public_keys' => is_array( $source['artifact_public_keys'] ?? null ) ? $source['artifact_public_keys'] : [],
 			'vendor_id'          => $source['metadata']['vendor_id'] ?? '',
+			'spoke_link_id'       => $source['metadata']['spoke_link_id'] ?? '',
 		];
 
 		$secret_ref = $source['auth_secret_ref'] ?? '';
@@ -197,6 +198,9 @@ class SourceResolver {
 
 			case SourceRegistry::TYPE_VENDOR:
 				return SourceType::VENDOR;
+
+			case SourceRegistry::TYPE_HUB_SPOKE:
+				return SourceType::HUB_SPOKE;
 
 			default:
 				return null;

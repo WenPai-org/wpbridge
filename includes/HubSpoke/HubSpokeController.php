@@ -50,6 +50,9 @@ final class HubSpokeController {
 		register_rest_route( self::NAMESPACE, '/hub-links/(?P<id>[0-9a-f-]{36})/rotations', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'rotate_link' ], 'permission_callback' => [ $this, 'admin_permission' ] ] );
 		register_rest_route( self::NAMESPACE, '/hub-links/(?P<id>[0-9a-f-]{36})', [ 'methods' => \WP_REST_Server::DELETABLE, 'callback' => [ $this, 'revoke_link' ], 'permission_callback' => [ $this, 'admin_permission' ] ] );
 		register_rest_route( self::NAMESPACE, '/spoke-links/accept', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'accept_local' ], 'permission_callback' => [ $this, 'admin_permission' ] ] );
+		register_rest_route( self::NAMESPACE, '/spoke-links', [ 'methods' => \WP_REST_Server::READABLE, 'callback' => [ $this, 'spoke_status' ], 'permission_callback' => [ $this, 'admin_permission' ] ] );
+		register_rest_route( self::NAMESPACE, '/spoke-links/(?P<id>[0-9a-f-]{36})/rotations', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'apply_spoke_rotation' ], 'permission_callback' => [ $this, 'admin_permission' ] ] );
+		register_rest_route( self::NAMESPACE, '/spoke-links/(?P<id>[0-9a-f-]{36})', [ 'methods' => \WP_REST_Server::DELETABLE, 'callback' => [ $this, 'unlink_spoke' ], 'permission_callback' => [ $this, 'admin_permission' ] ] );
 
 		register_rest_route( self::NAMESPACE, '/hub-proxy/sources', [ 'methods' => \WP_REST_Server::READABLE, 'callback' => [ $this, 'proxy_sources' ], 'permission_callback' => [ $this, 'sources_permission' ] ] );
 		register_rest_route( self::NAMESPACE, '/hub-proxy/sources/(?P<slug>[a-z0-9][a-z0-9-]{1,99})', [ 'methods' => \WP_REST_Server::READABLE, 'callback' => [ $this, 'proxy_source' ], 'permission_callback' => [ $this, 'source_permission' ] ] );
@@ -169,6 +172,30 @@ final class HubSpokeController {
 		}
 		$result = ( new SpokeClient() )->accept( (string) $body['hub_url'], strtolower( (string) $body['invitation_id'] ), (string) $body['invitation_token'] );
 		return is_wp_error( $result ) ? $result : $this->response( $result, 201 );
+	}
+
+	public function spoke_status( \WP_REST_Request $request ): \WP_REST_Response {
+		unset( $request );
+		return $this->response( $this->store->spoke_statuses(), 200 );
+	}
+
+	public function apply_spoke_rotation( \WP_REST_Request $request ) {
+		$body = $request->get_json_params();
+		if ( ! self::exact_keys( $body, [ 'link_credential' ] ) || ! is_string( $body['link_credential'] ) || ! $this->store->apply_spoke_rotation( strtolower( (string) $request['id'] ), $body['link_credential'], time() ) ) {
+			return self::bad_request();
+		}
+		return $this->response( [ 'link_id' => strtolower( (string) $request['id'] ), 'status' => 'active' ], 200 );
+	}
+
+	public function unlink_spoke( \WP_REST_Request $request ) {
+		$body = $request->get_json_params();
+		if ( ! self::exact_reason( $body ) ) {
+			return self::bad_request();
+		}
+		if ( ! $this->store->unlink_spoke( strtolower( (string) $request['id'] ), time() ) ) {
+			return new \WP_Error( 'wpbridge_spoke_link_not_found', __( 'Spoke link 不存在。', 'wpbridge' ), [ 'status' => 404 ] );
+		}
+		return $this->response( null, 204 );
 	}
 
 	public function proxy_sources( \WP_REST_Request $request ): \WP_REST_Response {

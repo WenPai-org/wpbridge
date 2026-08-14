@@ -13,7 +13,7 @@ use WPBridge\UpdateSource\Handlers\UpdateInfo;
 use WPBridge\Core\ItemSourceManager;
 use WPBridge\Cache\FallbackStrategy;
 use WPBridge\Security\PackageIntegrityVerifier;
-use WPBridge\UpdateSource\Handlers\BridgeServerHandler;
+use WPBridge\UpdateSource\Handlers\ProtectedPackageHandlerInterface;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -351,14 +351,14 @@ class PluginUpdater {
 			return $reply;
 		}
 		$path = (string) wp_parse_url( $package, PHP_URL_PATH );
-		if ( ! preg_match( '#/api/v1/download/([a-z0-9][a-z0-9-]{1,99})/?$#', $path, $matches ) ) {
+		if ( ! preg_match( '#/(?:api/v1/download|wp-json/wpbridge/v2/hub-proxy/plugins)/([a-z0-9][a-z0-9-]{1,99})(?:/package)?/?$#', $path, $matches ) ) {
 			return $reply;
 		}
 		$slug     = $matches[1];
 		$resolved = $this->source_resolver->resolve( $this->get_item_key_from_slug( $slug ), $slug, 'plugin' );
 		foreach ( (array) ( $resolved['sources'] ?? [] ) as $source ) {
 			$handler = $source instanceof SourceModel ? $source->get_handler() : null;
-			if ( ! $handler instanceof BridgeServerHandler || ! $handler->can_handle_download( $package, $slug ) ) {
+			if ( ! $handler instanceof ProtectedPackageHandlerInterface || ! $handler->can_handle_download( $package, $slug ) ) {
 				continue;
 			}
 			$integrity = PackageIntegrityVerifier::expected_integrity( $package );
