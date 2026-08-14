@@ -22,6 +22,7 @@ run "Updater regressions" php tests/updater-regression-test.php
 run "Update authorization" php tests/update-authorization-test.php
 run "Hub-Spoke contract" php tests/hub-spoke-contract-test.php
 run "Hub credential boundary" php tests/hub-credential-boundary-test.php
+run "Hub bridge credential atomicity" php tests/hub-bridge-credential-atomic-test.php
 run "Hub feature-off cleanup" php tests/hub-flag-off-cleanup-test.php
 run "Hub multisite uninstall" php tests/hub-multisite-uninstall-test.php
 run "Hub protected package E2E" php tests/hub-protected-package-e2e-test.php

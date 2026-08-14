@@ -232,10 +232,14 @@ $assert( count( $lifecycle_acquires ) >= 7 && 1 === count( array_unique( $lifecy
 $GLOBALS['wpbridge_test_options']['wpbridge_sources'] = [ [ 'id' => 'late-race', 'auth_token' => 'late-secret' ] ];
 $late_inventory_blocked = ! $store->save_spoke_link( 'https://hub.example', $rotated, $now + 2 );
 $GLOBALS['wpbridge_test_options']['wpbridge_sources'] = [];
+$GLOBALS['wpbridge_test_options']['wpbridge_secure_vendor_manifest'] = [ 'vendor_orphan_api_key' ];
+$GLOBALS['wpbridge_test_options']['wpbridge_secure_vendor_orphan_api_key'] = 'encrypted-orphan';
+$orphan_inventory_blocked = ! $store->save_spoke_link( 'https://hub.example', $rotated, $now + 2 );
+unset( $GLOBALS['wpbridge_test_options']['wpbridge_secure_vendor_manifest'], $GLOBALS['wpbridge_test_options']['wpbridge_secure_vendor_orphan_api_key'] );
 $spoke_saved = $store->save_spoke_link( 'https://hub.example', $rotated, $now + 2 );
 $spoke_rows  = get_option( 'wpbridge_spoke_links_v1', [] );
 $spoke_row   = $spoke_rows[ $accepted['link_id'] ] ?? [];
-$assert( $late_inventory_blocked && $spoke_saved && 'test-v1' === CredentialEnvelope::version( (string) ( $spoke_row['credential_ciphertext'] ?? '' ) ), 'Final lifecycle-locked inventory rejects a late credential before Spoke activation' );
+$assert( $late_inventory_blocked && $orphan_inventory_blocked && $spoke_saved && 'test-v1' === CredentialEnvelope::version( (string) ( $spoke_row['credential_ciphertext'] ?? '' ) ), 'Final lifecycle-locked inventory rejects late and orphaned vendor credentials before Spoke activation' );
 $assert( false === strpos( serialize( $spoke_rows ), $rotated['link_credential'] ), 'Spoke option does not contain the plaintext credential' );
 $assert( $store->has_active_spoke_link(), 'Installation role recognizes the active Spoke link' );
 $assert( ! CredentialBoundary::credential_write_allowed( [ 'auth_token' => 'new-secret' ] ) && CredentialBoundary::credential_write_allowed( [ 'auth_token' => '' ] ), 'Active network Spoke blocks credential creation while allowing credential deletion' );

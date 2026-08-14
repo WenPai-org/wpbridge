@@ -12,6 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class CredentialBoundary {
 	private const SENSITIVE_KEYS = [ 'auth_token', 'auth_secret_ref', 'headers', 'api_key', 'api_secret', 'license_key', 'consumer_key', 'consumer_secret', 'token', 'access_token', 'refresh_token', 'update_private_key', 'update_device_id' ];
+	private static int $lifecycle_depth = 0;
 
 	public static function has_upstream_credentials(): bool {
 		if ( ! is_multisite() ) {
@@ -39,8 +40,62 @@ final class CredentialBoundary {
 
 	/** Execute the actual option write while holding the same lifecycle lock as role selection. */
 	public static function guarded_write( array $value, array $previous, callable $writer ): bool {
+		if ( self::$lifecycle_depth > 0 ) {
+			return (bool) call_user_func( $writer );
+		}
 		$increasing = self::credentials_increase( $value, $previous );
-		return ! class_exists( HubSpokeStore::class ) ? (bool) call_user_func( $writer ) : ( new HubSpokeStore() )->guarded_credential_write( $increasing, $writer );
+		$scoped_writer = static function () use ( $writer ): bool {
+			++self::$lifecycle_depth;
+			try {
+				return (bool) call_user_func( $writer );
+			} finally {
+				--self::$lifecycle_depth;
+			}
+		};
+		return ! class_exists( HubSpokeStore::class ) ? $scoped_writer() : ( new HubSpokeStore() )->guarded_credential_write( $increasing, $scoped_writer );
+	}
+
+	/**
+	 * Persist a multi-option credential change as one database transaction while
+	 * holding the installation lifecycle lock. Nested Settings/Encryption writes
+	 * inherit this scope and therefore cannot release the lock between fields.
+	 *
+	 * @param array    $value        Proposed credential-bearing value.
+	 * @param array    $previous     Previous credential-bearing value.
+	 * @param string[] $option_names Option cache entries touched by the writer.
+	 * @param callable $writer       Returns true only when every write persisted.
+	 */
+	public static function transactional_write( array $value, array $previous, array $option_names, callable $writer ): bool {
+		return self::guarded_write(
+			$value,
+			$previous,
+			static function () use ( $writer, $option_names ): bool {
+				global $wpdb;
+				if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'query' ) || false === $wpdb->query( 'START TRANSACTION' ) ) {
+					return false;
+				}
+				$committed = false;
+				try {
+					if ( ! (bool) call_user_func( $writer ) ) {
+						return false;
+					}
+					$committed = false !== $wpdb->query( 'COMMIT' );
+					return $committed;
+				} catch ( \Throwable $error ) {
+					unset( $error );
+					return false;
+				} finally {
+					if ( ! $committed ) {
+						$wpdb->query( 'ROLLBACK' );
+					}
+					if ( function_exists( 'wp_cache_delete' ) ) {
+						foreach ( array_unique( $option_names ) as $option_name ) {
+							wp_cache_delete( $option_name, 'options' );
+						}
+					}
+				}
+			}
+		);
 	}
 
 	/** A deletion/empty replacement reduces authority and remains permitted. */
@@ -95,6 +150,19 @@ final class CredentialBoundary {
 				if ( '' !== (string) Encryption::get_secure( 'vendor_' . $vendor_id . '_' . $field, '' ) ) {
 					return true;
 				}
+			}
+		}
+		$manifest = (array) get_option( 'wpbridge_secure_vendor_manifest', [] );
+		foreach ( $manifest as $secure_key ) {
+			if ( is_string( $secure_key ) && 0 === strpos( $secure_key, 'vendor_' ) && ! empty( get_option( 'wpbridge_secure_' . $secure_key, '' ) ) ) { return true; }
+		}
+		global $wpdb;
+		if ( isset( $wpdb ) && is_object( $wpdb ) && isset( $wpdb->options ) && method_exists( $wpdb, 'get_col' ) && method_exists( $wpdb, 'prepare' ) && method_exists( $wpdb, 'esc_like' ) ) {
+			$like = $wpdb->esc_like( 'wpbridge_secure_vendor_' ) . '%';
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- options table is the trusted current-blog table name.
+			$names = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $like ) );
+			foreach ( (array) $names as $option_name ) {
+				if ( 'wpbridge_secure_vendor_manifest' !== $option_name && ! empty( get_option( (string) $option_name, '' ) ) ) { return true; }
 			}
 		}
 		return false;

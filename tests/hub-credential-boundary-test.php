@@ -20,6 +20,16 @@ namespace {
 	function current_time( string $type ): string { unset( $type ); return '2026-08-14 00:00:00'; }
 	function do_action( string $hook, ...$args ): void { unset( $hook, $args ); }
 	function __( string $message, string $domain = '' ): string { unset( $domain ); return $message; }
+	final class BoundaryWpdb {
+		public string $options = 'wp_options';
+		public function esc_like( string $value ): string { return $value; }
+		public function prepare( string $query, string $value ): string { return str_replace( '%s', $value, $query ); }
+		public function get_col( string $query ): array {
+			unset( $query );
+			return array_values( array_filter( array_keys( $GLOBALS['boundary_options'][ $GLOBALS['boundary_blog'] ] ), static fn( string $key ): bool => 0 === strpos( $key, 'wpbridge_secure_vendor_' ) ) );
+		}
+	}
+	$GLOBALS['wpdb'] = new BoundaryWpdb();
 }
 
 namespace WPBridge\Security {
@@ -51,6 +61,9 @@ namespace WPBridge\HubSpoke {
 		$failed += $condition ? 0 : 1;
 	};
 	$assert( CredentialBoundary::has_upstream_credentials(), 'Credential inventory rejects a network Spoke when another blog retains a source token' );
+	$GLOBALS['boundary_options'][2]['wpbridge_sources'] = [];
+	$GLOBALS['boundary_options'][2]['wpbridge_secure_vendor_orphan_api_key'] = 'enc:orphan-key';
+	$assert( CredentialBoundary::has_upstream_credentials(), 'Credential inventory scans an unindexed secure vendor namespace on another blog' );
 	$GLOBALS['boundary_active'] = true;
 	$assert( ! CredentialBoundary::credential_write_allowed( [ 'headers' => [ 'Authorization' => 'secret' ] ] ) && CredentialBoundary::credential_write_allowed( [ 'headers' => [] ] ), 'Every blog blocks active-network-Spoke credential additions but permits deletion' );
 	$settings = new \WPBridge\Core\Settings();

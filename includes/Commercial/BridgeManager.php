@@ -128,11 +128,23 @@ class BridgeManager {
 			];
 		}
 
-		// 保存配置（URL 明文存储，API Key 加密存储）
-		$this->settings->set( 'bridge_server_url', $server_url );
-		if ( ! Encryption::store_secure( 'bridge_server_api_key', $api_key ) ) {
+		$secure_option = 'wpbridge_secure_bridge_server_api_key';
+		$committed = CredentialBoundary::transactional_write(
+			[ 'api_key' => $api_key ],
+			[],
+			[ Settings::OPTION_SETTINGS, $secure_option ],
+			static function () use ( $server_url, $api_key ): bool {
+				$fresh_settings = new Settings();
+				$url_saved = $fresh_settings->set( 'bridge_server_url', $server_url );
+				if ( ! $url_saved && $server_url !== (string) ( new Settings() )->get( 'bridge_server_url', '' ) ) { return false; }
+				return Encryption::store_secure( 'bridge_server_api_key', $api_key );
+			}
+		);
+		if ( ! $committed ) {
+			$this->settings = new Settings();
 			return [ 'success' => false, 'message' => __( 'Active Spoke 不能保存上游凭据。', 'wpbridge' ) ];
 		}
+		$this->settings = new Settings();
 
 		$this->bridge_client = $client;
 
@@ -522,7 +534,7 @@ class BridgeManager {
 	 */
 	public function add_vendor_v2( string $vendor_id, array $config ): array {
 		if ( CredentialBoundary::contains_nonempty_credentials( $config ) && ! CredentialBoundary::mutation_allowed() ) { return [ 'success' => false, 'message' => __( 'Active Spoke 不能保存供应商凭据。', 'wpbridge' ) ]; }
-		$vendors = $this->settings->get( 'vendors', [] );
+		$vendors = (array) ( new Settings() )->get( 'vendors', [] );
 
 		if ( isset( $vendors[ $vendor_id ] ) ) {
 			return [
@@ -531,16 +543,13 @@ class BridgeManager {
 			];
 		}
 
-		// 敏感字段加密存储
+		$plain_config = $config;
 		$sensitive_fields = [ 'license_key', 'api_key', 'consumer_key', 'consumer_secret' ];
-		$stored_fields = [];
+		$secure_keys = [];
 		foreach ( $sensitive_fields as $field ) {
 			if ( ! empty( $config[ $field ] ) ) {
-				if ( ! Encryption::store_secure( "vendor_{$vendor_id}_{$field}", $config[ $field ] ) ) {
-					foreach ( $stored_fields as $stored_field ) { Encryption::delete_secure( "vendor_{$vendor_id}_{$stored_field}" ); }
-					return [ 'success' => false, 'message' => __( 'Active Spoke 不能保存供应商凭据。', 'wpbridge' ) ];
-				}
-				$stored_fields[] = $field;
+				$secure_key = "vendor_{$vendor_id}_{$field}";
+				$secure_keys[] = $secure_key;
 				$config[ $field ] = '***encrypted***';
 			}
 		}
@@ -548,8 +557,28 @@ class BridgeManager {
 		$config['enabled']    = $config['enabled'] ?? true;
 		$config['created_at'] = time();
 
-		$vendors[ $vendor_id ] = $config;
-		$this->settings->set( 'vendors', $vendors );
+		$option_names = array_merge( [ Settings::OPTION_SETTINGS, 'wpbridge_secure_vendor_manifest' ], array_map( static fn( string $key ): string => 'wpbridge_secure_' . $key, $secure_keys ) );
+		$committed = CredentialBoundary::transactional_write(
+			$plain_config,
+			[],
+			$option_names,
+			function () use ( $plain_config, $config, $vendor_id, $secure_keys ): bool {
+				$fresh_settings = new Settings();
+				$vendors = (array) $fresh_settings->get( 'vendors', [] );
+				if ( isset( $vendors[ $vendor_id ] ) ) { return false; }
+				$vendors[ $vendor_id ] = $config;
+				foreach ( $secure_keys as $secure_key ) {
+					$field = substr( $secure_key, strlen( 'vendor_' . $vendor_id . '_' ) );
+					if ( ! Encryption::store_secure( $secure_key, (string) $plain_config[ $field ] ) ) { return false; }
+				}
+				if ( ! $fresh_settings->set( 'vendors', $vendors ) ) { return false; }
+				if ( [] === $secure_keys ) { return true; }
+				$manifest = array_values( array_unique( array_merge( (array) get_option( 'wpbridge_secure_vendor_manifest', [] ), $secure_keys ) ) );
+				return update_option( 'wpbridge_secure_vendor_manifest', $manifest ) || $manifest === (array) get_option( 'wpbridge_secure_vendor_manifest', [] );
+			}
+		);
+		if ( ! $committed ) { $this->settings = new Settings(); return [ 'success' => false, 'message' => __( '供应商凭据无法原子保存。', 'wpbridge' ) ]; }
+		$this->settings = new Settings();
 
 		// 解密后实例化
 		$decrypted = $this->decrypt_vendor_config( $vendor_id, $config );
