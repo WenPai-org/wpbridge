@@ -7,6 +7,8 @@
 
 namespace WPBridge\Core;
 
+use WPBridge\HubSpoke\CredentialBoundary;
+
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -98,6 +100,11 @@ class ConfigManager {
 		if ( ! $validation['valid'] ) {
 			$result['success'] = false;
 			$result['errors']  = $validation['errors'];
+			return $result;
+		}
+		if ( ! CredentialBoundary::credential_write_allowed( (array) ( $config['options'] ?? [] ) ) ) {
+			$result['success'] = false;
+			$result['errors'][] = __( 'Active Spoke 不能导入上游凭据。', 'wpbridge' );
 			return $result;
 		}
 

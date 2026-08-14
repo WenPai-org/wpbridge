@@ -38,6 +38,7 @@ require_once dirname( __DIR__ ) . '/includes/UpdateSource/SourceManager.php';
 require_once dirname( __DIR__ ) . '/includes/Commercial/BridgeClient.php';
 require_once dirname( __DIR__ ) . '/includes/UpdateSource/Handlers/BridgeServerHandler.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeStore.php';
+require_once dirname( __DIR__ ) . '/includes/HubSpoke/HostCanonicalizer.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/LinkAuthorizer.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/SpokeProxyClient.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeController.php';

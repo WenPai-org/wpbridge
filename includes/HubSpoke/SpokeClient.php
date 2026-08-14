@@ -84,12 +84,15 @@ final class SpokeClient {
 			'timestamp'              => $timestamp,
 			'signature'              => $signature,
 		];
+		if ( ! $store->save_uncertain_accept( $origin, $invitation_id, $invitation_token, (int) call_user_func( $this->clock ) ) ) {
+			$store->release_spoke_reservation();
+			return new \WP_Error( 'wpbridge_spoke_reconcile_storage_failed', __( '无法持久记录 acceptance recovery 状态。', 'wpbridge' ) );
+		}
 		$response = $this->json_request(
 			$origin . '/wp-json/wpbridge/v2/hub-links/' . rawurlencode( $invitation_id ) . '/acceptances',
 			$request
 		);
 		if ( is_wp_error( $response ) ) {
-			$store->release_spoke_reservation();
 			return $response;
 		}
 		$compensable = isset( $response['link_id'], $response['link_credential'] ) && is_string( $response['link_id'] ) && is_string( $response['link_credential'] ) && 1 === preg_match( '/^[0-9a-f]{8}-[0-9a-f-]{27}$/', $response['link_id'] ) && HubSpokeStore::valid_link_credential( $response['link_credential'] );
@@ -99,6 +102,7 @@ final class SpokeClient {
 				$store->save_reconcile( $origin, $response['link_id'], $response['link_credential'], (int) call_user_func( $this->clock ) );
 			}
 			if ( $compensated ) {
+				$store->clear_uncertain_accept( $invitation_id );
 				$store->release_spoke_reservation();
 			}
 			return new \WP_Error( 'wpbridge_hub_acceptance_invalid', __( 'Hub link 响应无效。', 'wpbridge' ) );
@@ -108,6 +112,7 @@ final class SpokeClient {
 			if ( ! $this->compensate_acceptance( $origin, (string) $response['link_id'], (string) $response['link_credential'] ) ) {
 				$store->save_reconcile( $origin, (string) $response['link_id'], (string) $response['link_credential'], (int) call_user_func( $this->clock ) );
 			} else {
+				$store->clear_uncertain_accept( $invitation_id );
 				$store->release_spoke_reservation();
 			}
 			return new \WP_Error( 'wpbridge_hub_policy_mismatch', __( 'Hub link 权限与邀请不一致。', 'wpbridge' ) );
@@ -118,9 +123,13 @@ final class SpokeClient {
 			if ( ! $compensated ) {
 				$store->save_reconcile( $origin, (string) $response['link_id'], (string) $response['link_credential'], (int) call_user_func( $this->clock ) );
 			} else {
+				$store->clear_uncertain_accept( $invitation_id );
 				$store->release_spoke_reservation();
 			}
 			return new \WP_Error( $compensated ? 'wpbridge_spoke_storage_failed' : 'wpbridge_spoke_reconcile_required', __( 'Spoke credential 无法安全保存，Hub link 已撤销或需要管理员核对。', 'wpbridge' ) );
+		}
+		if ( ! $store->clear_uncertain_accept( $invitation_id ) ) {
+			return new \WP_Error( 'wpbridge_spoke_recovery_clear_failed', __( 'Spoke link 已保存，但 acceptance recovery 状态无法清理。', 'wpbridge' ) );
 		}
 		unset( $response['link_credential'] );
 		return $response;
@@ -144,7 +153,7 @@ final class SpokeClient {
 	}
 
 	/** Revoke the remote Hub link before wiping the only local credential copy. */
-	public function unlink( string $link_id ) {
+	public function unlink( string $link_id, string $admin_reason = '' ) {
 		$store = new HubSpokeStore();
 		$link = $store->active_spoke_link( $link_id );
 		if ( null === $link ) {
@@ -153,12 +162,12 @@ final class SpokeClient {
 		$json = wp_json_encode( [ 'reason' => 'spoke_unlink' ] );
 		$response = call_user_func( $this->transport, (string) $link['hub_origin'] . '/wp-json/wpbridge/v2/hub-links/' . rawurlencode( $link_id ) . '/acceptance-compensations', [ 'method' => 'POST', 'timeout' => 15, 'redirection' => 0, 'headers' => [ 'Accept' => 'application/json', 'Content-Type' => 'application/json', 'Authorization' => 'WPBridge-Link ' . $link['credential'] ], 'body' => $json ] );
 		if ( is_wp_error( $response ) || 204 !== (int) wp_remote_retrieve_response_code( $response ) ) {
-			$store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], (int) call_user_func( $this->clock ), 'unlink_local' );
+			$store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], (int) call_user_func( $this->clock ), 'unlink_local', $admin_reason );
 			return new \WP_Error( 'wpbridge_spoke_remote_revoke_pending', __( 'Hub revoke 尚未确认，本地凭据保持并等待重试。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
 		$now = (int) call_user_func( $this->clock );
-		if ( ! $store->unlink_spoke( $link_id, $now ) ) {
-			$store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], $now, 'local_cleanup' );
+		if ( ! $store->finalize_remote_revoke( $link_id, $now, $admin_reason ) ) {
+			$store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], $now, 'local_cleanup', $admin_reason );
 			return new \WP_Error( 'wpbridge_spoke_local_cleanup_pending', __( 'Hub 已撤销，Spoke 本地清理等待重试。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
 		return true;
@@ -215,26 +224,6 @@ final class SpokeClient {
 
 	/** A Spoke must not retain source, marketplace, pairing or device credentials. */
 	private static function has_local_upstream_credentials(): bool {
-		foreach ( (array) get_option( 'wpbridge_sources', [] ) as $source ) {
-			if ( ! is_array( $source ) ) {
-				continue;
-			}
-			if ( ! empty( $source['auth_token'] ) ) {
-				return true;
-			}
-			$metadata = is_array( $source['metadata'] ?? null ) ? $source['metadata'] : [];
-			foreach ( [ 'update_private_key', 'update_device_id', 'license_key', 'api_key', 'access_token' ] as $key ) {
-				if ( ! empty( $metadata[ $key ] ) ) {
-					return true;
-				}
-			}
-		}
-		$registry = is_multisite() ? get_site_option( 'wpbridge_source_registry', [] ) : get_option( 'wpbridge_source_registry', [] );
-		foreach ( (array) $registry as $source ) {
-			if ( is_array( $source ) && ( ! empty( $source['auth_secret_ref'] ) || ! empty( $source['headers'] ) ) ) {
-				return true;
-			}
-		}
-		return false;
+		return CredentialBoundary::has_upstream_credentials();
 	}
 }

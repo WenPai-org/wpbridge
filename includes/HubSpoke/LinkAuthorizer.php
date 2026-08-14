@@ -41,9 +41,11 @@ final class LinkAuthorizer {
 		if ( null === $link ) {
 			return new \WP_Error( 'wpbridge_link_credential_invalid', __( 'Hub link credential 无效。', 'wpbridge' ), [ 'status' => 401 ] );
 		}
-		$host = strtolower( rtrim( (string) $request->get_header( 'Host' ), '.' ) );
-		$request_origin = '' === $host ? '' : 'https://' . $host;
-		if ( '' === $request_origin || empty( $link['hub_origin'] ) || ! hash_equals( (string) $link['hub_origin'], $request_origin ) || ! hash_equals( $this->store->network_origin(), $request_origin ) ) {
+		$request_origin = HostCanonicalizer::origin( (string) $request->get_header( 'Host' ) );
+		if ( is_wp_error( $request_origin ) ) {
+			return $request_origin;
+		}
+		if ( empty( $link['hub_origin'] ) || ! hash_equals( (string) $link['hub_origin'], $request_origin ) || ! hash_equals( $this->store->network_origin(), $request_origin ) ) {
 			return new \WP_Error( 'wpbridge_hub_origin_mismatch', __( '请求 Host 不属于此 Hub network origin。', 'wpbridge' ), [ 'status' => 401 ] );
 		}
 		if ( ! in_array( $scope, (array) $link['scopes'], true ) ) {

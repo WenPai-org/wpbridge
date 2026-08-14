@@ -17,6 +17,7 @@ class WP_REST_Response {
 	public function get_data() { return $this->data; }
 }
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeStore.php';
+require_once dirname( __DIR__ ) . '/includes/HubSpoke/HostCanonicalizer.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/LinkAuthorizer.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeController.php';
 use WPBridge\HubSpoke\HubSpokeController;

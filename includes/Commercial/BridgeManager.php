@@ -17,6 +17,7 @@ use WPBridge\Core\RemoteConfig;
 use WPBridge\Core\Logger;
 use WPBridge\Commercial\Vendors\VendorManager;
 use WPBridge\Security\Encryption;
+use WPBridge\HubSpoke\CredentialBoundary;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -116,6 +117,7 @@ class BridgeManager {
 	 * @return array
 	 */
 	public function set_bridge_server( string $server_url, string $api_key ): array {
+		if ( '' !== $api_key && ! CredentialBoundary::mutation_allowed() ) { return [ 'success' => false, 'message' => __( 'Active Spoke 不能保存上游凭据。', 'wpbridge' ) ]; }
 		// 验证连接
 		$client = new BridgeClient( $server_url, $api_key );
 
@@ -517,6 +519,7 @@ class BridgeManager {
 	 * @return array
 	 */
 	public function add_vendor_v2( string $vendor_id, array $config ): array {
+		if ( CredentialBoundary::contains_nonempty_credentials( $config ) && ! CredentialBoundary::mutation_allowed() ) { return [ 'success' => false, 'message' => __( 'Active Spoke 不能保存供应商凭据。', 'wpbridge' ) ]; }
 		$vendors = $this->settings->get( 'vendors', [] );
 
 		if ( isset( $vendors[ $vendor_id ] ) ) {

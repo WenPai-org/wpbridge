@@ -10,6 +10,8 @@
 
 namespace WPBridge\Core;
 
+use WPBridge\HubSpoke\CredentialBoundary;
+
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -130,6 +132,9 @@ class SourceRegistry {
 	 * @return string|false 成功返回 source_key，失败返回 false
 	 */
 	public function add( array $source ) {
+		if ( ! CredentialBoundary::credential_write_allowed( $source ) ) {
+			return false;
+		}
 		$sources = $this->get_all();
 
 		if ( empty( $source['source_key'] ) ) {
@@ -158,6 +163,9 @@ class SourceRegistry {
 	 * @return bool
 	 */
 	public function update( string $source_key, array $data ): bool {
+		if ( ! CredentialBoundary::credential_write_allowed( $data ) ) {
+			return false;
+		}
 		$sources = $this->get_all();
 
 		foreach ( $sources as $index => $source ) {

@@ -21,6 +21,8 @@ run "Security regressions" php tests/security-regression-test.php
 run "Updater regressions" php tests/updater-regression-test.php
 run "Update authorization" php tests/update-authorization-test.php
 run "Hub-Spoke contract" php tests/hub-spoke-contract-test.php
+run "Hub credential boundary" php tests/hub-credential-boundary-test.php
+run "Hub multisite uninstall" php tests/hub-multisite-uninstall-test.php
 run "Hub protected package E2E" php tests/hub-protected-package-e2e-test.php
 run "Hub stream guard" php tests/hub-stream-guard-test.php
 run "Hub controller package E2E" php tests/hub-controller-package-e2e-test.php

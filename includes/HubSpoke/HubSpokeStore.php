@@ -23,6 +23,7 @@ final class HubSpokeStore {
 	private const RECONCILE   = 'wpbridge_spoke_reconcile_v1';
 	private const ROLE        = 'wpbridge_hub_spoke_role_v1';
 	private const ORIGIN      = 'wpbridge_hub_network_origin_v1';
+	private const UNCERTAIN   = 'wpbridge_spoke_uncertain_accept_v1';
 
 	/** Frozen scopes. */
 	public const SCOPES = [ 'packages:read', 'sources:read', 'updates:read' ];
@@ -45,7 +46,7 @@ final class HubSpokeStore {
 			return new \WP_Error( 'wpbridge_hub_store_failed', __( 'Hub network origin 无法持久保存。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
 		$role = $this->state_option( self::ROLE );
-		if ( $this->has_active_spoke_link() || ( 'spoke-reserved' === ( $role['role'] ?? '' ) && $now < (int) ( $role['expires_at'] ?? 0 ) ) ) {
+		if ( [] !== $this->state_option( self::UNCERTAIN ) || $this->has_active_spoke_link() || ( 'spoke-reserved' === ( $role['role'] ?? '' ) && $now < (int) ( $role['expires_at'] ?? 0 ) ) ) {
 			return new \WP_Error( 'wpbridge_spoke_cannot_be_hub', __( 'Active Spoke 不能创建 Hub link。', 'wpbridge' ), [ 'status' => 409 ] );
 		}
 		$this->expire_invitations( $now );
@@ -150,6 +151,7 @@ final class HubSpokeStore {
 		$previous_invitations = $rows;
 		$links[ $link_id ] = [
 			'link_id'                    => $link_id,
+			'invitation_id'              => $id,
 			'hub_installation_uuid'      => (string) $row['hub_installation_uuid'],
 			'hub_origin'                 => (string) $row['hub_origin'],
 			'spoke_installation_uuid'    => strtolower( (string) $request['spoke_installation_uuid'] ),
@@ -195,6 +197,7 @@ final class HubSpokeStore {
 		foreach ( $this->links() as $row ) {
 			$output[] = [
 				'link_id'                 => $row['link_id'],
+				'invitation_id'           => $row['invitation_id'] ?? '',
 				'spoke_installation_uuid' => $row['spoke_installation_uuid'],
 				'spoke_public_key_sha256' => $row['spoke_public_key_sha256'],
 				'scopes'                  => $row['scopes'],
@@ -209,7 +212,7 @@ final class HubSpokeStore {
 	}
 
 	/** Cancel a pending invitation without disclosing its token. */
-	public function cancel_invitation( string $id, int $now ): bool {
+	public function cancel_invitation( string $id, int $now, string $reason = 'admin_cancel' ): bool {
 		$lock = $this->acquire_lock( 'hub-lifecycle' );
 		if ( is_wp_error( $lock ) ) {
 			return false;
@@ -224,7 +227,7 @@ final class HubSpokeStore {
 			$rows[ $id ]['error'] = 'cancelled_by_admin';
 			$rows[ $id ]['token_sha256'] = '';
 			$rows[ $id ]['cancelled_at'] = $now;
-			if ( ! $this->save( self::INVITATIONS, $rows ) || ! $this->audit( 'invitation.cancelled', $id, $now ) ) {
+			if ( ! $this->save( self::INVITATIONS, $rows ) || ! $this->audit( 'invitation.cancelled', $id, $now, $reason, 'admin' ) ) {
 				if ( ! $this->save( self::INVITATIONS, $previous ) ) {
 					$rows[ $id ]['status'] = 'expired';
 					$rows[ $id ]['error'] = 'storage_inconsistent';
@@ -239,7 +242,7 @@ final class HubSpokeStore {
 	}
 
 	/** @return array<string,mixed>|\WP_Error */
-	public function rotate( string $id, int $now ) {
+	public function rotate( string $id, int $now, string $reason = 'admin_rotation' ) {
 		if ( ! self::identity_ready() ) {
 			return self::identity_error();
 		}
@@ -263,7 +266,7 @@ final class HubSpokeStore {
 		if ( ! $this->save( self::LINKS, $links ) ) {
 			return new \WP_Error( 'wpbridge_hub_store_failed', __( 'Hub link rotation 无法持久保存。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
-		if ( ! $this->audit( 'link.rotated', $id, $now ) ) {
+		if ( ! $this->audit( 'link.rotated', $id, $now, $reason, 'admin' ) ) {
 			$rolled_back = $this->save( self::LINKS, $previous_links );
 			if ( ! $rolled_back ) {
 				$links[ $id ]['status'] = 'revoked';
@@ -286,7 +289,7 @@ final class HubSpokeStore {
 		}
 	}
 
-	public function revoke( string $id, int $now ): bool {
+	public function revoke( string $id, int $now, string $reason = 'admin_revoke', string $actor = 'admin', string $presented_credential = '' ): bool {
 		if ( ! self::identity_ready() ) {
 			return false;
 		}
@@ -302,13 +305,15 @@ final class HubSpokeStore {
 		}
 		$links[ $id ]['status']                     = 'revoked';
 		$links[ $id ]['credential_sha256']          = '';
+		$receipt_hash = self::valid_link_credential( $presented_credential ) ? hash( 'sha256', $presented_credential ) : (string) $previous_links[ $id ]['credential_sha256'];
+		$links[ $id ]['revoked_credential_receipts'] = [ [ 'sha256' => $receipt_hash ] ];
 		$links[ $id ]['previous_credential_sha256'] = '';
 		$links[ $id ]['previous_valid_until']       = 0;
 		$links[ $id ]['revoked_at']                 = $now;
 		if ( ! $this->save( self::LINKS, $links ) ) {
 			return false;
 		}
-		if ( ! $this->audit( 'link.revoked', $id, $now ) ) {
+		if ( ! $this->audit( 'link.revoked', $id, $now, $reason, $actor ) ) {
 			if ( ! $this->save( self::LINKS, $previous_links ) ) {
 				$links[ $id ]['status'] = 'revoked';
 				$links[ $id ]['error'] = 'storage_inconsistent';
@@ -339,6 +344,23 @@ final class HubSpokeStore {
 			}
 		}
 		return null;
+	}
+
+	/** Idempotent compensation receipt: revoked credential may only confirm same-link cleanup. */
+	public function compensation_receipt( string $credential, string $link_id ): bool {
+		if ( ! self::valid_link_credential( $credential ) ) {
+			return false;
+		}
+		$row = $this->links()[ $link_id ] ?? null;
+		if ( ! is_array( $row ) || 'revoked' !== ( $row['status'] ?? '' ) ) {
+			return false;
+		}
+		foreach ( (array) ( $row['revoked_credential_receipts'] ?? [] ) as $receipt ) {
+			if ( is_array( $receipt ) && hash_equals( (string) ( $receipt['sha256'] ?? '' ), hash( 'sha256', $credential ) ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public function network_origin(): string {
@@ -433,7 +455,7 @@ final class HubSpokeStore {
 			return false;
 		}
 		try {
-			if ( $this->has_active_hub_state( $now ) || $this->has_active_spoke_link() ) {
+			if ( [] !== $this->state_option( self::UNCERTAIN ) || $this->has_active_hub_state( $now ) || $this->has_active_spoke_link() ) {
 				return false;
 			}
 			$role = $this->state_option( self::ROLE );
@@ -454,7 +476,17 @@ final class HubSpokeStore {
 	}
 
 	/** Persist a compensation retry without storing a plaintext link credential. */
-	public function save_reconcile( string $hub_origin, string $link_id, string $credential, int $now, string $action = 'remote_revoke' ): bool {
+	public function save_reconcile( string $hub_origin, string $link_id, string $credential, int $now, string $action = 'remote_revoke', string $admin_reason = '' ): bool {
+		$lock = $this->acquire_lock( 'reconcile' );
+		if ( is_wp_error( $lock ) ) {
+			return false;
+		}
+		try {
+		if ( 'local_cleanup' === $action && 1 === preg_match( '/^[0-9a-f-]{36}$/', $link_id ) ) {
+			$rows = (array) $this->state_option( self::RECONCILE );
+			$rows[ $link_id ] = [ 'link_id' => $link_id, 'hub_origin' => $hub_origin, 'credential_ciphertext' => '', 'reconcile_state' => 'pending', 'action' => 'local_cleanup', 'reason' => 'spoke_unlink', 'admin_reason_sha256' => '' === $admin_reason ? '' : hash( 'sha256', $admin_reason ), 'created_at' => $now ];
+			return $this->save( self::RECONCILE, $rows );
+		}
 		if ( ! self::valid_link_credential( $credential ) || 1 !== preg_match( '/^[0-9a-f-]{36}$/', $link_id ) ) {
 			return false;
 		}
@@ -463,23 +495,32 @@ final class HubSpokeStore {
 			return false;
 		}
 		$rows = (array) $this->state_option( self::RECONCILE );
-		$rows[ $link_id ] = [ 'link_id' => $link_id, 'hub_origin' => $hub_origin, 'credential_ciphertext' => $ciphertext, 'status' => 'revoke_pending', 'action' => in_array( $action, [ 'remote_revoke', 'unlink_local', 'local_cleanup' ], true ) ? $action : 'remote_revoke', 'created_at' => $now ];
+		$reason = 'unlink_local' === $action ? 'spoke_unlink' : 'spoke_storage_failed';
+		$rows[ $link_id ] = [ 'link_id' => $link_id, 'hub_origin' => $hub_origin, 'credential_ciphertext' => $ciphertext, 'reconcile_state' => 'pending', 'action' => in_array( $action, [ 'remote_revoke', 'unlink_local', 'local_cleanup' ], true ) ? $action : 'remote_revoke', 'reason' => $reason, 'admin_reason_sha256' => '' === $admin_reason ? '' : hash( 'sha256', $admin_reason ), 'created_at' => $now ];
 		return $this->save( self::RECONCILE, $rows );
+		} finally {
+			$this->release_lock( 'reconcile' );
+		}
 	}
 
 	/** Retry all durable remote-revoke compensations. */
 	public function process_reconciles( ?callable $transport = null, ?int $now = null ): array {
+		$lock = $this->acquire_lock( 'reconcile' );
+		if ( is_wp_error( $lock ) ) {
+			return [ 'processed' => 0, 'resolved' => 0, 'failed' => 0, 'busy' => 1 ];
+		}
+		try {
 		$transport = $transport ?? [ \WPBridge\Security\SafeHttpClient::class, 'request' ];
 		$now = $now ?? time();
 		$rows = (array) $this->state_option( self::RECONCILE );
 		$result = [ 'processed' => 0, 'resolved' => 0, 'failed' => 0 ];
 		foreach ( $rows as $id => &$row ) {
-			if ( ! is_array( $row ) || 'revoke_pending' !== ( $row['status'] ?? '' ) || $now < (int) ( $row['next_attempt_at'] ?? 0 ) ) {
+			if ( ! is_array( $row ) || 'pending' !== ( $row['reconcile_state'] ?? '' ) || $now < (int) ( $row['next_attempt_at'] ?? 0 ) ) {
 				continue;
 			}
 			++$result['processed'];
 			if ( 'local_cleanup' === ( $row['action'] ?? '' ) ) {
-				if ( $this->unlink_spoke( (string) $row['link_id'], $now ) ) {
+				if ( $this->cleanup_revoked_spoke( (string) $row['link_id'], $now, '', (string) ( $row['admin_reason_sha256'] ?? '' ) ) ) {
 					unset( $rows[ $id ] );
 					++$result['resolved'];
 				} else {
@@ -492,10 +533,11 @@ final class HubSpokeStore {
 				continue;
 			}
 			$credential = CredentialEnvelope::decrypt( (string) $row['credential_ciphertext'], (string) $row['link_id'], (string) $row['hub_origin'] );
-			$response = '' === $credential ? new \WP_Error( 'wpbridge_reconcile_key_unavailable' ) : call_user_func( $transport, (string) $row['hub_origin'] . '/wp-json/wpbridge/v2/hub-links/' . rawurlencode( (string) $row['link_id'] ) . '/acceptance-compensations', [ 'method' => 'POST', 'timeout' => 15, 'redirection' => 0, 'headers' => [ 'Accept' => 'application/json', 'Content-Type' => 'application/json', 'Authorization' => 'WPBridge-Link ' . $credential ], 'body' => wp_json_encode( [ 'reason' => 'spoke_storage_failed' ] ) ] );
+			$response = '' === $credential ? new \WP_Error( 'wpbridge_reconcile_key_unavailable' ) : call_user_func( $transport, (string) $row['hub_origin'] . '/wp-json/wpbridge/v2/hub-links/' . rawurlencode( (string) $row['link_id'] ) . '/acceptance-compensations', [ 'method' => 'POST', 'timeout' => 15, 'redirection' => 0, 'headers' => [ 'Accept' => 'application/json', 'Content-Type' => 'application/json', 'Authorization' => 'WPBridge-Link ' . $credential ], 'body' => wp_json_encode( [ 'reason' => (string) ( $row['reason'] ?? 'spoke_storage_failed' ) ] ) ] );
 			if ( ! is_wp_error( $response ) && 204 === (int) wp_remote_retrieve_response_code( $response ) ) {
-				if ( 'unlink_local' === ( $row['action'] ?? '' ) && ! $this->unlink_spoke( (string) $row['link_id'], $now ) ) {
+				if ( 'unlink_local' === ( $row['action'] ?? '' ) && ! $this->finalize_remote_revoke( (string) $row['link_id'], $now, '', (string) ( $row['admin_reason_sha256'] ?? '' ) ) ) {
 					$row['action'] = 'local_cleanup';
+					$row['credential_ciphertext'] = '';
 					$row['error'] = 'local_cleanup_failed';
 					$row['next_attempt_at'] = $now + 120;
 					++$result['failed'];
@@ -523,6 +565,9 @@ final class HubSpokeStore {
 			$this->release_spoke_reservation();
 		}
 		return $result;
+		} finally {
+			$this->release_lock( 'reconcile' );
+		}
 	}
 
 	public function reconcile_statuses(): array {
@@ -530,10 +575,64 @@ final class HubSpokeStore {
 		foreach ( $this->state_option( self::RECONCILE ) as $row ) {
 			if ( is_array( $row ) ) {
 				unset( $row['credential_ciphertext'] );
+				unset( $row['admin_reason_sha256'] );
+				$output[] = $row;
+			}
+		}
+		foreach ( $this->state_option( self::UNCERTAIN ) as $row ) {
+			if ( is_array( $row ) ) {
+				unset( $row['invitation_token_sha256'] );
+				$row['kind'] = 'uncertain_accept';
 				$output[] = $row;
 			}
 		}
 		return $output;
+	}
+
+	public function save_uncertain_accept( string $origin, string $invitation_id, string $token, int $now ): bool {
+		$rows = $this->state_option( self::UNCERTAIN );
+		$rows[ $invitation_id ] = [ 'invitation_id' => $invitation_id, 'hub_origin' => $origin, 'invitation_token_sha256' => hash( 'sha256', $token ), 'spoke_installation_uuid' => InstallationIdentity::uuid(), 'reconcile_state' => 'manual_recovery', 'created_at' => $now ];
+		return $this->save( self::UNCERTAIN, $rows );
+	}
+
+	public function clear_uncertain_accept( string $invitation_id ): bool {
+		$rows = $this->state_option( self::UNCERTAIN );
+		unset( $rows[ $invitation_id ] );
+		return $this->save( self::UNCERTAIN, $rows );
+	}
+
+	/** Clear only after an administrator has confirmed that the Hub orphan is revoked. */
+	public function resolve_uncertain_accept( string $invitation_id, int $now, string $reason, string $resolution = 'hub_link_revoked' ): bool {
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
+		if ( is_wp_error( $lock ) ) {
+			return false;
+		}
+		try {
+			$rows = $this->state_option( self::UNCERTAIN );
+			if ( ! isset( $rows[ $invitation_id ] ) ) {
+				return false;
+			}
+			if ( ! in_array( $resolution, [ 'hub_link_revoked', 'local_link_active' ], true ) || ( 'local_link_active' === $resolution && ! $this->has_active_spoke_link() ) ) {
+				return false;
+			}
+			$previous = $rows;
+			$previous_audit = $this->state_option( self::AUDIT );
+			unset( $rows[ $invitation_id ] );
+			if ( ! $this->save( self::UNCERTAIN, $rows ) || ! $this->audit( 'spoke.uncertain_accept.resolved', $invitation_id, $now, $reason, 'admin' ) ) {
+				$this->save( self::UNCERTAIN, $previous );
+				$this->save( self::AUDIT, $previous_audit );
+				return false;
+			}
+			$role = $this->state_option( self::ROLE );
+			if ( 'spoke-reserved' === ( $role['role'] ?? '' ) && ! $this->save( self::ROLE, [] ) ) {
+				$this->save( self::UNCERTAIN, $previous );
+				$this->save( self::AUDIT, $previous_audit );
+				return false;
+			}
+			return true;
+		} finally {
+			$this->release_lock( 'hub-lifecycle' );
+		}
 	}
 
 	public function sweep_expired_invitations( ?int $now = null ): void {
@@ -654,6 +753,33 @@ final class HubSpokeStore {
 		}
 	}
 
+	private function mark_spoke_remote_revoked( string $link_id, int $now ): bool {
+		$rows = $this->state_option( self::SPOKE_LINKS );
+		if ( ! isset( $rows[ $link_id ] ) ) { return false; }
+		$rows[ $link_id ]['credential_ciphertext'] = '';
+		$rows[ $link_id ]['status'] = 'revoked';
+		$rows[ $link_id ]['revoked_at'] = $now;
+		return $this->save( self::SPOKE_LINKS, $rows );
+	}
+
+	/** Remote authority is gone: wipe first, then cleanup without restoring credential. */
+	public function finalize_remote_revoke( string $link_id, int $now, string $admin_reason = '', string $admin_reason_hash = '' ): bool {
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
+		if ( is_wp_error( $lock ) ) { return false; }
+		try {
+			if ( ! $this->mark_spoke_remote_revoked( $link_id, $now ) ) { return false; }
+			return $this->cleanup_revoked_spoke( $link_id, $now, $admin_reason, $admin_reason_hash );
+		} finally {
+			$this->release_lock( 'hub-lifecycle' );
+		}
+	}
+
+	private function cleanup_revoked_spoke( string $link_id, int $now, string $reason = '', string $reason_hash = '' ): bool {
+		return $this->disable_spoke_sources( $link_id )
+			&& $this->audit( 'spoke.link.unlinked', $link_id, $now, $reason, 'admin', $reason_hash )
+			&& $this->save( self::ROLE, [] );
+	}
+
 	/** @return array<int,array<string,mixed>> */
 	public function spoke_statuses(): array {
 		$output = [];
@@ -678,7 +804,7 @@ final class HubSpokeStore {
 	}
 
 	private function save( string $option, array $value ): bool {
-		if ( in_array( $option, [ self::INVITATIONS, self::LINKS, self::SPOKE_LINKS, self::AUDIT, self::RATE, self::RECONCILE, self::ROLE, self::ORIGIN ], true ) ) {
+		if ( in_array( $option, [ self::INVITATIONS, self::LINKS, self::SPOKE_LINKS, self::AUDIT, self::RATE, self::RECONCILE, self::ROLE, self::ORIGIN, self::UNCERTAIN ], true ) ) {
 			return is_multisite() ? update_site_option( $option, $value ) || $value === get_site_option( $option, [] ) : update_option( $option, $value, false ) || $value === get_option( $option, [] );
 		}
 		if ( in_array( $option, [ 'wpbridge_source_registry', 'wpbridge_defaults' ], true ) ) {
@@ -777,9 +903,10 @@ final class HubSpokeStore {
 		}
 	}
 
-	private function audit( string $action, string $resource, int $now ): bool {
+	private function audit( string $action, string $resource, int $now, string $reason = '', string $actor = 'system', string $reason_hash = '' ): bool {
 		$rows   = (array) $this->state_option( self::AUDIT );
-		$rows[] = [ 'action' => $action, 'resource_sha256' => hash( 'sha256', $resource ), 'occurred_at' => $now, 'user_id' => get_current_user_id() ];
+		$reason_code = in_array( $reason, [ 'spoke_storage_failed', 'spoke_unlink', 'admin_rotation', 'admin_revoke' ], true ) ? $reason : ( '' === $reason ? 'unspecified' : 'admin_supplied' );
+		$rows[] = [ 'action' => $action, 'resource_sha256' => hash( 'sha256', $resource ), 'reason_code' => $reason_code, 'reason_sha256' => '' !== $reason_hash ? $reason_hash : ( '' === $reason ? '' : hash( 'sha256', $reason ) ), 'actor' => in_array( $actor, [ 'admin', 'link', 'system' ], true ) ? $actor : 'system', 'occurred_at' => $now, 'user_id' => 'admin' === $actor ? get_current_user_id() : 0 ];
 		return $this->save( self::AUDIT, array_slice( $rows, -500 ) );
 	}
 
@@ -797,17 +924,28 @@ final class HubSpokeStore {
 	private function expire_invitations( int $now ): void {
 		$rows = $this->invitations();
 		$previous = $rows;
+		$previous_audit = $this->state_option( self::AUDIT );
 		$changed = false;
-		foreach ( $rows as &$row ) {
+		$expired_ids = [];
+		foreach ( $rows as $expired_id => &$row ) {
 			if ( is_array( $row ) && 'pending' === ( $row['status'] ?? '' ) && $now >= (int) ( $row['expires_at'] ?? 0 ) ) {
 				$row['status'] = 'expired';
 				$row['token_sha256'] = '';
 				$row['expired_at'] = $now;
 				$changed = true;
+				$expired_ids[] = (string) $expired_id;
 			}
 		}
 		unset( $row );
-		if ( $changed && ( ! $this->save( self::INVITATIONS, $rows ) || ! $this->audit( 'invitation.expired', 'sweep', $now ) ) ) {
+		$audit_ok = true;
+		$state_ok = ! $changed || $this->save( self::INVITATIONS, $rows );
+		if ( $state_ok ) {
+			foreach ( $expired_ids as $expired_id ) {
+				$audit_ok = $this->audit( 'invitation.expired', $expired_id, $now ) && $audit_ok;
+			}
+		}
+		if ( $changed && ( ! $state_ok || ! $audit_ok ) ) {
+			$this->save( self::AUDIT, $previous_audit );
 			if ( ! $this->save( self::INVITATIONS, $previous ) ) {
 				foreach ( $rows as &$failed_row ) {
 					if ( is_array( $failed_row ) && 'expired' === ( $failed_row['status'] ?? '' ) ) {
