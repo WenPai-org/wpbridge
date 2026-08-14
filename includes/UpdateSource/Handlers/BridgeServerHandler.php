@@ -40,22 +40,27 @@ class BridgeServerHandler extends AbstractHandler implements ProtectedPackageHan
 
 	/** @var string */
 	private string $paired_slug = '';
+	/** @var callable|null */
+	private $grant_issuer = null;
 
 	/**
 	 * 构造函数
 	 *
 	 * @param SourceModel $source 源模型
 	 */
-	public function __construct( SourceModel $source ) {
+	public function __construct( SourceModel $source, ?BridgeClient $client = null, ?callable $grant_issuer = null ) {
 		parent::__construct( $source );
 
 		// 从 source 配置初始化客户端
 		$server_url = $source->api_url;
 		$api_key    = $this->get_auth_token();
 
-		if ( ! empty( $server_url ) ) {
+		if ( null !== $client ) {
+			$this->client = $client;
+		} elseif ( ! empty( $server_url ) ) {
 			$this->client = new BridgeClient( $server_url, $api_key );
 		}
+		$this->grant_issuer = $grant_issuer;
 		$paired_bridge = rtrim( (string) ( $source->metadata['update_bridge_url'] ?? '' ), '/' );
 		if ( '' !== $paired_bridge && hash_equals( $paired_bridge, rtrim( $server_url, '/' ) ) && ! empty( $source->metadata['update_device_id'] ) && ! empty( $source->metadata['update_private_key'] ) ) {
 			$this->update_authorization = new UpdateAuthorizationClient( (array) $source->metadata );
@@ -218,10 +223,10 @@ class BridgeServerHandler extends AbstractHandler implements ProtectedPackageHan
 
 	/** @return string|\WP_Error Temporary file path on success. */
 	public function download_package( string $slug, array $integrity ) {
-		if ( ! $this->client || ! $this->update_authorization ) {
+		if ( ! $this->client || ( ! $this->update_authorization && null === $this->grant_issuer ) ) {
 			return new \WP_Error( 'wpbridge_update_not_paired', __( '此更新源尚未与文派账户配对。', 'wpbridge' ) );
 		}
-		$grant = $this->update_authorization->issue_grant( $slug, 'package' );
+		$grant = null !== $this->grant_issuer ? call_user_func( $this->grant_issuer, $slug, 'package' ) : $this->update_authorization->issue_grant( $slug, 'package' );
 		if ( is_wp_error( $grant ) ) {
 			return $grant;
 		}
@@ -267,6 +272,9 @@ class BridgeServerHandler extends AbstractHandler implements ProtectedPackageHan
 
 	/** @return string|\WP_Error */
 	private function metadata_grant( string $slug ) {
+		if ( null !== $this->grant_issuer ) {
+			return call_user_func( $this->grant_issuer, $slug, 'metadata' );
+		}
 		if ( null === $this->update_authorization || $slug !== $this->paired_slug ) {
 			return '';
 		}

@@ -14,6 +14,7 @@ use WPBridge\UpdateSource\SourceModel;
 use WPBridge\UpdateSource\SourceType;
 use WPBridge\Cache\HealthChecker;
 use WPBridge\Performance\BackgroundUpdater;
+use WPBridge\HubSpoke\HubSpokeStore;
 use WP_CLI;
 use WP_CLI\Utils;
 
@@ -61,6 +62,23 @@ class BridgeCommand {
 	public function __construct() {
 		$this->settings       = new Settings();
 		$this->source_manager = new SourceManager( $this->settings );
+	}
+
+	/**
+	 * Show or retry durable Hub-Spoke compensation records.
+	 *
+	 * [--process]
+	 * : Retry due remote revocations before printing status.
+	 *
+	 * @subcommand hub-reconcile
+	 */
+	public function hub_reconcile( $args, $assoc_args ): void {
+		unset( $args );
+		$store = new HubSpokeStore();
+		if ( Utils\get_flag_value( $assoc_args, 'process', false ) ) {
+			WP_CLI::log( wp_json_encode( $store->process_reconciles() ) );
+		}
+		WP_CLI::log( wp_json_encode( $store->reconcile_statuses() ) );
 	}
 
 	/**

@@ -26,6 +26,7 @@ function wpbridge_uninstall_site(): void {
 	}
 
 	wp_clear_scheduled_hook( 'wpbridge_update_sources' );
+	wp_clear_scheduled_hook( 'wpbridge_hub_spoke_reconcile' );
 }
 
 if ( is_multisite() ) {

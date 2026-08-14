@@ -143,6 +143,27 @@ final class SpokeClient {
 		return ! is_wp_error( $response ) && 204 === (int) wp_remote_retrieve_response_code( $response );
 	}
 
+	/** Revoke the remote Hub link before wiping the only local credential copy. */
+	public function unlink( string $link_id ) {
+		$store = new HubSpokeStore();
+		$link = $store->active_spoke_link( $link_id );
+		if ( null === $link ) {
+			return new \WP_Error( 'wpbridge_spoke_link_not_found', __( 'Spoke link 不存在。', 'wpbridge' ), [ 'status' => 404 ] );
+		}
+		$json = wp_json_encode( [ 'reason' => 'spoke_unlink' ] );
+		$response = call_user_func( $this->transport, (string) $link['hub_origin'] . '/wp-json/wpbridge/v2/hub-links/' . rawurlencode( $link_id ) . '/acceptance-compensations', [ 'method' => 'POST', 'timeout' => 15, 'redirection' => 0, 'headers' => [ 'Accept' => 'application/json', 'Content-Type' => 'application/json', 'Authorization' => 'WPBridge-Link ' . $link['credential'] ], 'body' => $json ] );
+		if ( is_wp_error( $response ) || 204 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+			$store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], (int) call_user_func( $this->clock ), 'unlink_local' );
+			return new \WP_Error( 'wpbridge_spoke_remote_revoke_pending', __( 'Hub revoke 尚未确认，本地凭据保持并等待重试。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
+		$now = (int) call_user_func( $this->clock );
+		if ( ! $store->unlink_spoke( $link_id, $now ) ) {
+			$store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], $now, 'local_cleanup' );
+			return new \WP_Error( 'wpbridge_spoke_local_cleanup_pending', __( 'Hub 已撤销，Spoke 本地清理等待重试。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
+		return true;
+	}
+
 	/** @return array<string,mixed>|\WP_Error */
 	private function json_request( string $url, array $body ) {
 		$json = wp_json_encode( $body );

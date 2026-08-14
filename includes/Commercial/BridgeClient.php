@@ -50,6 +50,8 @@ class BridgeClient {
 
 	/** @var callable */
 	private $package_transport;
+	/** @var callable */
+	private $api_transport;
 
 	/** @var array|null */
 	private ?array $capabilities = null;
@@ -61,7 +63,7 @@ class BridgeClient {
 	 * @param string $api_key    API Key
 	 * @param int    $timeout    请求超时（秒）
 	 */
-	public function __construct( string $server_url, string $api_key, int $timeout = 30, ?callable $package_transport = null ) {
+	public function __construct( string $server_url, string $api_key, int $timeout = 30, ?callable $package_transport = null, ?callable $api_transport = null ) {
 		$server_url = rtrim( $server_url, '/' );
 
 		// H3/H4: 强制 HTTPS
@@ -84,6 +86,7 @@ class BridgeClient {
 		$this->api_key    = $api_key;
 		$this->timeout    = $timeout;
 		$this->package_transport = $package_transport ?? [ SafeHttpClient::class, 'request' ];
+		$this->api_transport = $api_transport ?? [ SafeHttpClient::class, 'request' ];
 	}
 
 	/**
@@ -454,7 +457,7 @@ class BridgeClient {
 			$args['body'] = wp_json_encode( $data );
 		}
 
-		$response = SafeHttpClient::request( $url, $args );
+		$response = call_user_func( $this->api_transport, $url, $args );
 
 		if ( is_wp_error( $response ) ) {
 			return $response;

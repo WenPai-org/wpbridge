@@ -20,11 +20,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 /** Registers local management, possession proof and least-privilege proxy routes. */
 final class HubSpokeController {
 	public const NAMESPACE = 'wpbridge/v2';
+	public const RECONCILE_HOOK = 'wpbridge_hub_spoke_reconcile';
 
 	private HubSpokeStore $store;
 	private StepUpVerifier $step_up;
 	private LinkAuthorizer $authorizer;
 	private SourceManager $sources;
+	/** @var array<string,string> */
+	private array $package_streams = [];
 
 	public function __construct( Settings $settings ) {
 		$this->store      = new HubSpokeStore();
@@ -33,6 +36,10 @@ final class HubSpokeController {
 		$this->sources    = new SourceManager( $settings );
 		add_action( 'rest_api_init', [ $this, 'register_routes' ] );
 		add_filter( 'rest_pre_serve_request', [ $this, 'serve_package' ], 10, 4 );
+		add_action( self::RECONCILE_HOOK, [ $this, 'process_reconcile' ] );
+		if ( ! wp_next_scheduled( self::RECONCILE_HOOK ) ) {
+			wp_schedule_event( time() + 60, 'hourly', self::RECONCILE_HOOK );
+		}
 	}
 
 	public function register_routes(): void {
@@ -127,7 +134,7 @@ final class HubSpokeController {
 		if ( is_wp_error( $origin ) ) {
 			return $origin;
 		}
-		$result = $this->store->create_invitation( $body['scopes'], $body['slug_allowlist'], time() );
+		$result = $this->store->create_invitation( $body['scopes'], $body['slug_allowlist'], time(), $origin );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -152,6 +159,10 @@ final class HubSpokeController {
 		if ( is_wp_error( $identity ) ) {
 			return $identity;
 		}
+		$origin = self::request_origin( $request );
+		if ( is_wp_error( $origin ) || ! hash_equals( $this->store->network_origin(), $origin ) ) {
+			return is_wp_error( $origin ) ? $origin : new \WP_Error( 'wpbridge_hub_origin_mismatch', __( '请求 Host 不属于此 Hub network origin。', 'wpbridge' ), [ 'status' => 401 ] );
+		}
 		$body = $request->get_json_params();
 		if ( ! self::exact_keys( $body, [ 'invitation_token' ] ) || ! is_string( $body['invitation_token'] ) ) {
 			return self::bad_request();
@@ -167,6 +178,10 @@ final class HubSpokeController {
 		$identity = self::ensure_hub_identity();
 		if ( is_wp_error( $identity ) ) {
 			return $identity;
+		}
+		$origin = self::request_origin( $request );
+		if ( is_wp_error( $origin ) || ! hash_equals( $this->store->network_origin(), $origin ) ) {
+			return is_wp_error( $origin ) ? $origin : new \WP_Error( 'wpbridge_hub_origin_mismatch', __( '请求 Host 不属于此 Hub network origin。', 'wpbridge' ), [ 'status' => 401 ] );
 		}
 		$body = $request->get_json_params();
 		if ( ! self::exact_keys( $body, [ 'invitation_token', 'spoke_installation_uuid', 'spoke_public_key', 'nonce', 'timestamp', 'signature' ] ) ) {
@@ -217,7 +232,7 @@ final class HubSpokeController {
 
 	public function acceptance_compensation( \WP_REST_Request $request ) {
 		$body = $request->get_json_params();
-		if ( ! self::exact_keys( $body, [ 'reason' ] ) || 'spoke_storage_failed' !== ( $body['reason'] ?? '' ) ) {
+		if ( ! self::exact_keys( $body, [ 'reason' ] ) || ! in_array( $body['reason'] ?? '', [ 'spoke_storage_failed', 'spoke_unlink' ], true ) ) {
 			return self::bad_request();
 		}
 		if ( ! $this->store->revoke( strtolower( (string) $request['id'] ), time() ) ) {
@@ -237,12 +252,21 @@ final class HubSpokeController {
 
 	public function spoke_status( \WP_REST_Request $request ): \WP_REST_Response {
 		unset( $request );
-		return $this->response( $this->store->spoke_statuses(), 200 );
+		return $this->response( [ 'links' => $this->store->spoke_statuses(), 'reconcile' => $this->store->reconcile_statuses() ], 200 );
+	}
+
+	public function process_reconcile(): void {
+		$this->store->sweep_expired_invitations();
+		$this->store->process_reconciles();
 	}
 
 	public function apply_spoke_rotation( \WP_REST_Request $request ) {
 		$body = $request->get_json_params();
 		if ( ! self::exact_keys( $body, [ 'link_credential' ] ) || ! is_string( $body['link_credential'] ) || ! $this->store->apply_spoke_rotation( strtolower( (string) $request['id'] ), $body['link_credential'], time() ) ) {
+			$link = $this->store->active_spoke_link( strtolower( (string) $request['id'] ) );
+			if ( is_array( $link ) && isset( $body['link_credential'] ) && is_string( $body['link_credential'] ) ) {
+				$this->store->save_reconcile( (string) $link['hub_origin'], strtolower( (string) $request['id'] ), $body['link_credential'], time(), 'unlink_local' );
+			}
 			return self::bad_request();
 		}
 		return $this->response( [ 'link_id' => strtolower( (string) $request['id'] ), 'status' => 'active' ], 200 );
@@ -253,7 +277,11 @@ final class HubSpokeController {
 		if ( ! self::exact_reason( $body ) ) {
 			return self::bad_request();
 		}
-		if ( ! $this->store->unlink_spoke( strtolower( (string) $request['id'] ), time() ) ) {
+		$result = ( new SpokeClient() )->unlink( strtolower( (string) $request['id'] ) );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		if ( ! $result ) {
 			return new \WP_Error( 'wpbridge_spoke_link_not_found', __( 'Spoke link 不存在。', 'wpbridge' ), [ 'status' => 404 ] );
 		}
 		return $this->response( null, 204 );
@@ -313,7 +341,9 @@ final class HubSpokeController {
 			if ( is_wp_error( $file ) ) {
 				return $file;
 			}
-			$response = $this->response( [ '_wpbridge_package_file' => $file, 'slug' => $slug ], 200 );
+			$token = InstallationIdentity::base64url( random_bytes( 32 ) );
+			$this->package_streams[ $token ] = $file;
+			$response = $this->response( [ '_wpbridge_package_stream' => $token, 'slug' => $slug ], 200 );
 			$response->header( 'Content-Type', 'application/zip' );
 			$response->header( 'Content-Disposition', 'attachment; filename="' . $slug . '.zip"' );
 			return $response;
@@ -323,15 +353,18 @@ final class HubSpokeController {
 
 	/** Stream verified package bytes without exposing upstream grant or URL. */
 	public function serve_package( bool $served, $result, \WP_REST_Request $request, $server ): bool {
-		unset( $request, $server );
+		unset( $server );
 		if ( $served || ! $result instanceof \WP_REST_Response ) {
 			return $served;
 		}
-		$data = $result->get_data();
-		$file = is_array( $data ) ? (string) ( $data['_wpbridge_package_file'] ?? '' ) : '';
-		if ( '' === $file || ! is_file( $file ) ) {
+		$route = method_exists( $request, 'get_route' ) ? (string) $request->get_route() : '';
+		$data  = $result->get_data();
+		$token = is_array( $data ) ? (string) ( $data['_wpbridge_package_stream'] ?? '' ) : '';
+		$file  = $this->package_streams[ $token ] ?? '';
+		if ( 1 !== preg_match( '#^/wpbridge/v2/hub-proxy/plugins/[a-z0-9][a-z0-9-]{1,99}/package$#', $route ) || null === $this->authorizer->current_link() || '' === $token || '' === $file || ! is_file( $file ) ) {
 			return false;
 		}
+		unset( $this->package_streams[ $token ] );
 		try {
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- verified temporary package must be streamed byte-for-byte.
 			readfile( $file );
@@ -368,6 +401,15 @@ final class HubSpokeController {
 			return new \WP_Error( 'wpbridge_hub_origin_invalid', __( 'Hub 必须使用 HTTPS 443 origin。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
 		return 'https://' . strtolower( (string) ( $parts['host'] ?? '' ) ) . ( isset( $parts['port'] ) && 443 !== (int) $parts['port'] ? ':' . (int) $parts['port'] : '' );
+	}
+
+	/** @return string|\WP_Error */
+	private static function request_origin( \WP_REST_Request $request ) {
+		$host = strtolower( rtrim( (string) $request->get_header( 'Host' ), '.' ) );
+		if ( 1 !== preg_match( '/^[a-z0-9.-]+(?::443)?$/', $host ) ) {
+			return new \WP_Error( 'wpbridge_hub_origin_invalid', __( '请求 Host 无效。', 'wpbridge' ), [ 'status' => 400 ] );
+		}
+		return 'https://' . preg_replace( '/:443$/', '', $host );
 	}
 
 	/** @return true|\WP_Error */

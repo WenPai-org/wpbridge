@@ -14,6 +14,7 @@ if ( ! defined( 'AUTH_KEY' ) ) {
 define( 'WPBRIDGE_HUB_LINK_ACTIVE_KEY_VERSION', 'test-v1' );
 define( 'WPBRIDGE_HUB_LINK_MASTER_KEYS', [ 'test-v1' => rtrim( strtr( base64_encode( str_repeat( 'K', 32 ) ), '+/', '-_' ), '=' ) ] );
 define( 'WPBRIDGE_HUB_ORIGIN_ALLOWLIST', [ 'https://hub.example' ] );
+define( 'WPBRIDGE_HUB_SPOKE_ENABLED', true );
 
 $GLOBALS['wpbridge_test_options'] = [];
 $GLOBALS['wpbridge_test_uuid']    = 0;
@@ -92,6 +93,14 @@ class WP_Error {
 		return $this->code;
 	}
 }
+class WP_REST_Request {
+	private array $headers;
+	private array $params;
+	public function __construct( array $headers = [], array $params = [] ) { $this->headers = $headers; $this->params = $params; }
+	public function get_query_params(): array { return []; }
+	public function get_header( string $name ): string { return (string) ( $this->headers[ $name ] ?? '' ); }
+	public function get_param( string $name ) { return $this->params[ $name ] ?? null; }
+}
 function is_wp_error( $value ): bool {
 	return $value instanceof WP_Error;
 }
@@ -102,12 +111,14 @@ require_once dirname( __DIR__ ) . '/includes/HubSpoke/CredentialEnvelope.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeStore.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/SpokeProxyClient.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/SpokeClient.php';
+require_once dirname( __DIR__ ) . '/includes/HubSpoke/LinkAuthorizer.php';
 
 use WPBridge\HubSpoke\HubSpokeStore;
 use WPBridge\HubSpoke\InstallationIdentity;
 use WPBridge\HubSpoke\CredentialEnvelope;
 use WPBridge\HubSpoke\SpokeProxyClient;
 use WPBridge\HubSpoke\SpokeClient;
+use WPBridge\HubSpoke\LinkAuthorizer;
 use WPBridge\Security\Encryption;
 
 $failures = 0;
@@ -126,7 +137,7 @@ $assert( Encryption::is_encrypted( $private ) && false === strpos( $private, Ins
 
 $store      = new HubSpokeStore();
 $now        = 1776124800;
-$invitation = $store->create_invitation( [ 'updates:read', 'sources:read' ], [ 'wpbridge', 'wenpai-client' ], $now );
+$invitation = $store->create_invitation( [ 'updates:read', 'sources:read' ], [ 'wpbridge', 'wenpai-client' ], $now, 'https://hub.example' );
 $assert( is_array( $invitation ) && preg_match( '/^WPBI1-[A-Za-z0-9_-]{43}$/', $invitation['invitation_token'] ) === 1, 'Invitation returns a one-time opaque token' );
 $raw_store = serialize( get_option( 'wpbridge_hub_invitations_v1', [] ) );
 $assert( false === strpos( $raw_store, $invitation['invitation_token'] ) && false !== strpos( $raw_store, hash( 'sha256', $invitation['invitation_token'] ) ), 'Hub persists only the invitation token hash' );
@@ -159,7 +170,14 @@ $accepted = $store->accept( $invitation['invitation_id'], $accept_body, $now );
 $assert( is_array( $accepted ) && preg_match( '/^WPBL1-[A-Za-z0-9_-]{43}$/', $accepted['link_credential'] ) === 1, 'Token and Ed25519 possession create an active link' );
 $link_store = serialize( get_option( 'wpbridge_hub_links_v1', [] ) );
 $assert( false === strpos( $link_store, $accepted['link_credential'] ) && false !== strpos( $link_store, hash( 'sha256', $accepted['link_credential'] ) ), 'Hub persists only the link credential hash' );
+$assert( 'https://hub.example' === ( get_option( 'wpbridge_hub_links_v1', [] )[ $accepted['link_id'] ]['hub_origin'] ?? '' ) && 'https://hub.example' === $store->network_origin(), 'Hub link and network state bind the exact frozen Hub origin' );
+$origin_mismatch = $store->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now, 'https://other.example' );
+$assert( is_wp_error( $origin_mismatch ) && 'wpbridge_hub_origin_mismatch' === $origin_mismatch->get_error_code(), 'A second multisite blog cannot replace the frozen network Hub origin' );
 $assert( null !== $store->authorize( $accepted['link_credential'], $now ), 'Current link credential authorizes an active link' );
+$origin_authorizer = new LinkAuthorizer( $store );
+$origin_ok = $origin_authorizer->authorize( new WP_REST_Request( [ 'Authorization' => 'WPBridge-Link ' . $accepted['link_credential'], 'Host' => 'hub.example' ], [ 'slug' => 'wpbridge' ] ), 'updates:read', true );
+$origin_bad = ( new LinkAuthorizer( $store ) )->authorize( new WP_REST_Request( [ 'Authorization' => 'WPBridge-Link ' . $accepted['link_credential'], 'Host' => 'subsite.example' ], [ 'slug' => 'wpbridge' ] ), 'updates:read', true );
+$assert( true === $origin_ok && is_wp_error( $origin_bad ) && 'wpbridge_hub_origin_mismatch' === $origin_bad->get_error_code(), 'Proxy authorization accepts only the frozen network Host and rejects cross-subsite credential replay' );
 $minute = (int) floor( $now / 60 );
 $assert( $store->consume_rate( $accepted['link_id'], $minute, 2 ) && $store->consume_rate( $accepted['link_id'], $minute, 2 ) && ! $store->consume_rate( $accepted['link_id'], $minute, 2 ), 'Persistent lock-serialized rate bucket enforces its exact limit' );
 $other_link = '20000000-0000-4000-8000-000000000002';
@@ -168,7 +186,7 @@ $assert( $store->consume_rate( $other_link, $minute, 2 ) && $store->consume_rate
 $replay = $store->accept( $invitation['invitation_id'], $accept_body, $now );
 $assert( is_wp_error( $replay ), 'Invitation and acceptance proof cannot be replayed' );
 
-$fault_invitation = $store->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now );
+$fault_invitation = $store->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now, 'https://hub.example' );
 $fault_nonce = InstallationIdentity::base64url( random_bytes( 32 ) );
 $fault_canonical = "WPBRIDGE-HUB-LINK-ACCEPT-V1\n"
 	. 'invitation_id:' . $fault_invitation['invitation_id'] . "\n"
@@ -257,7 +275,7 @@ $assert( $before_unlink_links === get_option( 'wpbridge_spoke_links_v1', [] ) &&
 $saved_options = $GLOBALS['wpbridge_test_options'];
 $GLOBALS['wpbridge_test_options'] = [];
 $GLOBALS['wpbridge_fail_update']['wpbridge_link_private_key'] = 1;
-$upgraded_failure = ( new HubSpokeStore() )->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now );
+$upgraded_failure = ( new HubSpokeStore() )->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now, 'https://hub.example' );
 $assert( is_wp_error( $upgraded_failure ) && 'wpbridge_hub_identity_unavailable' === $upgraded_failure->get_error_code(), 'Existing upgraded install fails 503-style before invitation issuance when identity persistence fails' );
 $GLOBALS['wpbridge_fail_update'] = [];
 $GLOBALS['wpbridge_test_options'] = $saved_options;
@@ -266,12 +284,12 @@ $GLOBALS['wpbridge_test_multisite'] = true;
 $GLOBALS['wpbridge_test_site_options'] = [];
 $assert( InstallationIdentity::ensure() && '' !== (string) get_site_option( 'wpbridge_link_private_key', '' ) && '' !== (string) get_site_option( 'wpbridge_link_public_key', '' ), 'Multisite UUID and Ed25519 custody use the same network option scope' );
 $single_site_invitations = get_option( 'wpbridge_hub_invitations_v1', [] );
-$network_invitation = ( new HubSpokeStore() )->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now );
+$network_invitation = ( new HubSpokeStore() )->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now, 'https://hub.example' );
 $assert( is_array( $network_invitation ) && [] !== get_site_option( 'wpbridge_hub_invitations_v1', [] ) && $single_site_invitations === get_option( 'wpbridge_hub_invitations_v1', [] ), 'Multisite link lifecycle state is stored in the same network scope as installation identity' );
 $GLOBALS['wpbridge_test_multisite'] = false;
 $GLOBALS['wpbridge_test_options'] = [];
 $assert( InstallationIdentity::ensure(), 'Single-site identity restored for Spoke compensation fixture' );
-$local_hub_invitation = ( new HubSpokeStore() )->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now );
+$local_hub_invitation = ( new HubSpokeStore() )->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now, 'https://hub.example' );
 $blocked_requests = 0;
 $blocked_client = new SpokeClient( static function () use ( &$blocked_requests ): array { ++$blocked_requests; return []; }, static function () use ( $now ): int { return $now; } );
 $blocked_accept = $blocked_client->accept( 'https://hub.example', '50000000-0000-4000-8000-000000000005', 'WPBI1-' . InstallationIdentity::base64url( str_repeat( 'I', 32 ) ) );
@@ -296,8 +314,13 @@ $compensation = $compensation_requests[2] ?? [];
 $assert( is_wp_error( $compensated ) && 'wpbridge_spoke_storage_failed' === $compensated->get_error_code(), 'Spoke local persistence failure reports failure only after authenticated Hub compensation succeeds' );
 $assert( false !== strpos( (string) ( $compensation['url'] ?? '' ), '/acceptance-compensations' ) && ( $compensation['args']['headers']['Authorization'] ?? '' ) === 'WPBridge-Link ' . $remote_credential && false === strpos( (string) ( $compensation['url'] ?? '' ), $remote_credential ), 'Spoke compensation revokes the exact Hub link with a header-only credential' );
 $assert( ( new HubSpokeStore() )->save_reconcile( 'https://hub.example', $remote_link_id, $remote_credential, $now ) && false === strpos( serialize( get_option( 'wpbridge_spoke_reconcile_v1', [] ) ), $remote_credential ), 'Failed remote compensation can persist an encrypted durable revoke reconciliation record' );
+$reconcile_store = new HubSpokeStore();
+$failed_reconcile = $reconcile_store->process_reconciles( static function (): array { return [ 'response' => [ 'code' => 503 ] ]; }, $now );
+$assert( 1 === $failed_reconcile['failed'] && 1 === count( $reconcile_store->reconcile_statuses() ) && 'remote_revoke_failed' === $reconcile_store->reconcile_statuses()[0]['error'], 'Reconcile processor retains failed remote revoke with retry status' );
+$resolved_reconcile = $reconcile_store->process_reconciles( static function (): array { return [ 'response' => [ 'code' => 204 ] ]; }, $now + 121 );
+$assert( 1 === $resolved_reconcile['resolved'] && [] === $reconcile_store->reconcile_statuses(), 'Reconcile processor removes state only after authenticated remote revoke confirmation' );
 $expired_store = new HubSpokeStore();
-$expired_invitation = $expired_store->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now );
+$expired_invitation = $expired_store->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now, 'https://hub.example' );
 $assert( is_array( $expired_invitation ) && ! $expired_store->has_active_hub_state( $now + 601 ), 'Expired pending invitation no longer blocks Spoke role selection' );
 
 $controller = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeController.php' );
