@@ -494,8 +494,12 @@ final class HubSpokeStore {
 			$credential = CredentialEnvelope::decrypt( (string) $row['credential_ciphertext'], (string) $row['link_id'], (string) $row['hub_origin'] );
 			$response = '' === $credential ? new \WP_Error( 'wpbridge_reconcile_key_unavailable' ) : call_user_func( $transport, (string) $row['hub_origin'] . '/wp-json/wpbridge/v2/hub-links/' . rawurlencode( (string) $row['link_id'] ) . '/acceptance-compensations', [ 'method' => 'POST', 'timeout' => 15, 'redirection' => 0, 'headers' => [ 'Accept' => 'application/json', 'Content-Type' => 'application/json', 'Authorization' => 'WPBridge-Link ' . $credential ], 'body' => wp_json_encode( [ 'reason' => 'spoke_storage_failed' ] ) ] );
 			if ( ! is_wp_error( $response ) && 204 === (int) wp_remote_retrieve_response_code( $response ) ) {
-				if ( 'unlink_local' === ( $row['action'] ?? '' ) ) {
-					$this->unlink_spoke( (string) $row['link_id'], $now );
+				if ( 'unlink_local' === ( $row['action'] ?? '' ) && ! $this->unlink_spoke( (string) $row['link_id'], $now ) ) {
+					$row['action'] = 'local_cleanup';
+					$row['error'] = 'local_cleanup_failed';
+					$row['next_attempt_at'] = $now + 120;
+					++$result['failed'];
+					continue;
 				}
 				unset( $rows[ $id ] );
 				++$result['resolved'];
