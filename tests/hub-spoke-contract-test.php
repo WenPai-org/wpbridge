@@ -271,6 +271,15 @@ $before_unlink_sources = get_option( 'wpbridge_source_registry', [] );
 $GLOBALS['wpbridge_fail_update']['wpbridge_source_registry'] = 1;
 $assert( ! $store->unlink_spoke( $unlink_response['link_id'], $now + 511 ), 'Spoke unlink reports dependent source registry failure' );
 $assert( $before_unlink_links === get_option( 'wpbridge_spoke_links_v1', [] ) && $before_unlink_sources === get_option( 'wpbridge_source_registry', [] ), 'Spoke unlink failure restores credential state and source registry exactly' );
+$assert( $store->save_reconcile( 'https://hub.example', $unlink_response['link_id'], $unlink_response['link_credential'], $now + 512, 'unlink_local' ), 'Remote-revoke reconciliation fixture persists an unlink-local action' );
+$reconcile_transport_calls = 0;
+$reconcile_transport = static function () use ( &$reconcile_transport_calls ): array { ++$reconcile_transport_calls; return [ 'response' => [ 'code' => 204 ] ]; };
+$GLOBALS['wpbridge_fail_update']['wpbridge_source_registry'] = 1;
+$remote_resolved_local_failed = $store->process_reconciles( $reconcile_transport, $now + 512 );
+$pending_cleanup = $store->reconcile_statuses()[0] ?? [];
+$assert( 1 === $remote_resolved_local_failed['failed'] && 'local_cleanup' === ( $pending_cleanup['action'] ?? '' ) && 1 === $reconcile_transport_calls, 'Confirmed remote revoke transitions a failed local unlink to durable local-cleanup state' );
+$local_resolved = $store->process_reconciles( $reconcile_transport, $now + 633 );
+$assert( 1 === $local_resolved['resolved'] && [] === $store->reconcile_statuses() && 1 === $reconcile_transport_calls, 'Second local-cleanup run resolves without calling the revoked Hub credential again' );
 
 $saved_options = $GLOBALS['wpbridge_test_options'];
 $GLOBALS['wpbridge_test_options'] = [];
