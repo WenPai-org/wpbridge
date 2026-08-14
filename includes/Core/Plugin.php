@@ -14,6 +14,8 @@ use WPBridge\Admin\VendorAdmin;
 use WPBridge\Commercial\CommercialManager;
 use WPBridge\Commercial\AutoMatcher;
 use WPBridge\API\RestController;
+use WPBridge\HubSpoke\HubSpokeController;
+use WPBridge\HubSpoke\InstallationIdentity;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -87,6 +89,9 @@ class Plugin {
 	 * @var RestController|null
 	 */
 	private ?RestController $rest_controller = null;
+
+	/** Stage 3A Hub-Spoke controller (routes remain gated by deployment flag). */
+	private ?HubSpokeController $hub_spoke_controller = null;
 
 	/**
 	 * 自动匹配器
@@ -245,6 +250,7 @@ class Plugin {
 		$this->theme_updater      = new ThemeUpdater( $this->settings );
 		$this->commercial_manager = new CommercialManager( $this->settings );
 		$this->rest_controller    = new RestController( $this->settings );
+		$this->hub_spoke_controller = new HubSpokeController( $this->settings );
 
 		// 初始化版本锁定
 		VersionLock::get_instance();
@@ -692,6 +698,7 @@ class Plugin {
 		// 创建默认设置
 		$settings = new Settings();
 		$settings->init_defaults();
+		InstallationIdentity::ensure();
 
 		// 清除更新缓存
 		delete_site_transient( 'update_plugins' );
