@@ -94,6 +94,9 @@ final class HubSpokeController {
 	}
 
 	public function create_link( \WP_REST_Request $request ) {
+		if ( $this->store->has_active_spoke_link() ) {
+			return new \WP_Error( 'wpbridge_spoke_cannot_be_hub', __( 'Active Spoke 不能创建 Hub link。', 'wpbridge' ), [ 'status' => 409 ] );
+		}
 		$body = $request->get_json_params();
 		if ( ! self::exact_keys( $body, [ 'scopes', 'slug_allowlist' ] ) || ! is_array( $body['scopes'] ) || ! is_array( $body['slug_allowlist'] ) ) {
 			return self::bad_request();

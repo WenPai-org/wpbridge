@@ -132,11 +132,16 @@ $spoke_rows  = get_option( 'wpbridge_spoke_links_v1', [] );
 $spoke_row   = $spoke_rows[ $accepted['link_id'] ] ?? [];
 $assert( $spoke_saved && Encryption::is_encrypted( (string) ( $spoke_row['credential_ciphertext'] ?? '' ) ), 'Spoke persists the reusable link credential under AEAD' );
 $assert( false === strpos( serialize( $spoke_rows ), $rotated['link_credential'] ), 'Spoke option does not contain the plaintext credential' );
+$assert( $store->has_active_spoke_link(), 'Installation role recognizes the active Spoke link' );
 
 $controller = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeController.php' );
 $authorizer = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/LinkAuthorizer.php' );
+$pairing    = (string) file_get_contents( dirname( __DIR__ ) . '/includes/Commercial/UpdateAuthorizationClient.php' );
+$spoke      = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/SpokeClient.php' );
 $assert( false !== strpos( $authorizer, 'Authorization' ) && false !== strpos( $authorizer, 'WPBridge-Link' ) && false !== strpos( $authorizer, "query['api_key']" ), 'Proxy authentication is header-only and rejects query api_key' );
 $assert( false !== strpos( $controller, "'sources:read'" ) && false !== strpos( $controller, "'updates:read'" ) && false !== strpos( $controller, "'packages:read'" ), 'Each proxy route maps to one frozen scope' );
 $assert( false !== strpos( $controller, 'safe_metadata' ) && false === strpos( substr( $controller, strpos( $controller, 'private static function safe_metadata' ) ), "'grant'" ), 'Spoke metadata allowlist never contains an upstream grant field' );
+$assert( false !== strpos( $pairing, 'wpbridge_spoke_pairing_forbidden' ), 'Active Spoke cannot consume a license pairing code' );
+$assert( false !== strpos( $spoke, 'has_local_upstream_credentials' ) && false !== strpos( $spoke, "'update_private_key'" ), 'Spoke acceptance fails while upstream or device credentials remain' );
 
 exit( $failures > 0 ? 1 : 0 );

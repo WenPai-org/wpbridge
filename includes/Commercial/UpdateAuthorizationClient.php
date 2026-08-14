@@ -12,6 +12,7 @@ namespace WPBridge\Commercial;
 use WPBridge\Security\Encryption;
 use WPBridge\Security\SafeHttpClient;
 use WPBridge\Security\Validator;
+use WPBridge\HubSpoke\HubSpokeStore;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -40,6 +41,9 @@ final class UpdateAuthorizationClient {
 	 * @return array<string,string>|\WP_Error
 	 */
 	public static function pair( string $license_url, string $pairing_code, string $site_url, ?callable $transport = null, ?callable $keypair_factory = null ) {
+		if ( class_exists( HubSpokeStore::class ) && ( new HubSpokeStore() )->has_active_spoke_link() ) {
+			return new \WP_Error( 'wpbridge_spoke_pairing_forbidden', __( 'Spoke 不能消费 pairing code；请在 Hub 完成配对。', 'wpbridge' ) );
+		}
 		$license_url = rtrim( $license_url, '/' );
 		if ( ! Validator::is_valid_url( $license_url ) || ! Validator::is_valid_url( $site_url ) || ! preg_match( '/^WPB1-[A-Za-z0-9_-]{43}$/', $pairing_code ) ) {
 			return new \WP_Error( 'wpbridge_pairing_invalid', __( '配对信息无效。', 'wpbridge' ) );

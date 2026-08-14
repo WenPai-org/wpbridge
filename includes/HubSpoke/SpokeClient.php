@@ -30,6 +30,9 @@ final class SpokeClient {
 
 	/** @return array<string,mixed>|\WP_Error */
 	public function accept( string $hub_url, string $invitation_id, string $invitation_token ) {
+		if ( self::has_local_upstream_credentials() ) {
+			return new \WP_Error( 'wpbridge_spoke_credentials_present', __( 'Spoke 仍保存上游或设备凭据，清除后才能接受 Hub link。', 'wpbridge' ) );
+		}
 		$origin = self::allowed_origin( $hub_url );
 		if ( is_wp_error( $origin ) || 1 !== preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $invitation_id ) || ! HubSpokeStore::valid_invitation_token( $invitation_token ) ) {
 			return is_wp_error( $origin ) ? $origin : new \WP_Error( 'wpbridge_spoke_accept_invalid', __( 'Hub 邀请参数无效。', 'wpbridge' ) );
@@ -136,5 +139,24 @@ final class SpokeClient {
 		sort( $keys, SORT_STRING );
 		sort( $expected, SORT_STRING );
 		return $keys === $expected;
+	}
+
+	/** A Spoke must not retain source, marketplace, pairing or device credentials. */
+	private static function has_local_upstream_credentials(): bool {
+		foreach ( (array) get_option( 'wpbridge_sources', [] ) as $source ) {
+			if ( ! is_array( $source ) ) {
+				continue;
+			}
+			if ( ! empty( $source['auth_token'] ) ) {
+				return true;
+			}
+			$metadata = is_array( $source['metadata'] ?? null ) ? $source['metadata'] : [];
+			foreach ( [ 'update_private_key', 'update_device_id', 'license_key', 'api_key', 'access_token' ] as $key ) {
+				if ( ! empty( $metadata[ $key ] ) ) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 }

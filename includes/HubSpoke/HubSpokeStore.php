@@ -228,6 +228,16 @@ final class HubSpokeStore {
 		return $this->save( self::SPOKE_LINKS, $rows );
 	}
 
+	/** Whether this installation is already an active Spoke. */
+	public function has_active_spoke_link(): bool {
+		foreach ( (array) get_option( self::SPOKE_LINKS, [] ) as $row ) {
+			if ( is_array( $row ) && 'active' === ( $row['status'] ?? '' ) && ! empty( $row['credential_ciphertext'] ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** @return array<string,array<string,mixed>> */
 	private function invitations(): array {
 		return (array) get_option( self::INVITATIONS, [] );
