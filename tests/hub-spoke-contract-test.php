@@ -16,6 +16,7 @@ define( 'WPBRIDGE_HUB_LINK_MASTER_KEYS', [ 'test-v1' => rtrim( strtr( base64_enc
 
 $GLOBALS['wpbridge_test_options'] = [];
 $GLOBALS['wpbridge_test_uuid']    = 0;
+$GLOBALS['wpbridge_fail_update']  = [];
 $GLOBALS['wpdb'] = new class() {
 	public function prepare( string $sql, ...$args ): string {
 		return vsprintf( str_replace( [ '%s', '%d' ], [ "'%s'", '%d' ], $sql ), $args );
@@ -38,6 +39,10 @@ function get_option( string $key, $default = false ) {
 }
 function update_option( string $key, $value, bool $autoload = true ): bool {
 	unset( $autoload );
+	if ( ! empty( $GLOBALS['wpbridge_fail_update'][ $key] ) ) {
+		--$GLOBALS['wpbridge_fail_update'][ $key];
+		return false;
+	}
 	$changed = ! array_key_exists( $key, $GLOBALS['wpbridge_test_options'] ) || $GLOBALS['wpbridge_test_options'][ $key ] !== $value;
 	$GLOBALS['wpbridge_test_options'][ $key ] = $value;
 	return $changed;
@@ -141,9 +146,36 @@ $assert( false === strpos( $link_store, $accepted['link_credential'] ) && false 
 $assert( null !== $store->authorize( $accepted['link_credential'], $now ), 'Current link credential authorizes an active link' );
 $minute = (int) floor( $now / 60 );
 $assert( $store->consume_rate( $accepted['link_id'], $minute, 2 ) && $store->consume_rate( $accepted['link_id'], $minute, 2 ) && ! $store->consume_rate( $accepted['link_id'], $minute, 2 ), 'Persistent lock-serialized rate bucket enforces its exact limit' );
+$other_link = '20000000-0000-4000-8000-000000000002';
+$assert( $store->consume_rate( $other_link, $minute, 2 ) && $store->consume_rate( $other_link, $minute, 2 ) && ! $store->consume_rate( $other_link, $minute, 2 ) && ! $store->consume_rate( $accepted['link_id'], $minute, 2 ), 'Shared persistent rate lock preserves independent buckets for multiple links' );
 
 $replay = $store->accept( $invitation['invitation_id'], $accept_body, $now );
 $assert( is_wp_error( $replay ), 'Invitation and acceptance proof cannot be replayed' );
+
+$fault_invitation = $store->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now );
+$fault_nonce = InstallationIdentity::base64url( random_bytes( 32 ) );
+$fault_canonical = "WPBRIDGE-HUB-LINK-ACCEPT-V1\n"
+	. 'invitation_id:' . $fault_invitation['invitation_id'] . "\n"
+	. 'invitation_token_sha256:' . hash( 'sha256', $fault_invitation['invitation_token'] ) . "\n"
+	. 'hub_installation_uuid:' . $uuid . "\n"
+	. 'spoke_installation_uuid:' . $spoke_uuid . "\n"
+	. 'spoke_public_key_sha256:' . hash( 'sha256', $spoke_public ) . "\n"
+	. 'nonce:' . $fault_nonce . "\n"
+	. 'timestamp:' . $timestamp . "\n";
+$fault_accept_body = [
+	'invitation_token' => $fault_invitation['invitation_token'],
+	'spoke_installation_uuid' => $spoke_uuid,
+	'spoke_public_key' => InstallationIdentity::base64url( $spoke_public ),
+	'nonce' => $fault_nonce,
+	'timestamp' => $timestamp,
+	'signature' => InstallationIdentity::base64url( sodium_crypto_sign_detached( $fault_canonical, $spoke_secret ) ),
+];
+$before_fault_hub_links = get_option( 'wpbridge_hub_links_v1', [] );
+$before_fault_invitations = get_option( 'wpbridge_hub_invitations_v1', [] );
+$GLOBALS['wpbridge_fail_update']['wpbridge_hub_invitations_v1'] = 1;
+$fault_accept = $store->accept( $fault_invitation['invitation_id'], $fault_accept_body, $now );
+$assert( is_wp_error( $fault_accept ) && 'wpbridge_hub_store_failed' === $fault_accept->get_error_code(), 'Hub accept never returns a credential after invitation persistence failure' );
+$assert( $before_fault_hub_links === get_option( 'wpbridge_hub_links_v1', [] ) && $before_fault_invitations === get_option( 'wpbridge_hub_invitations_v1', [] ), 'Hub accept failure reliably restores link and invitation options' );
 
 $rotated = $store->rotate( $accepted['link_id'], $now + 1 );
 $assert( is_array( $rotated ) && null !== $store->authorize( $accepted['link_credential'], $now + 299 ), 'Rotation keeps the prior credential for at most five minutes' );
@@ -183,6 +215,25 @@ $assert( $store->apply_spoke_rotation( $accepted['link_id'], $replacement, $now 
 $assert( $store->unlink_spoke( $accepted['link_id'], $now + 401 ) && null === $store->active_spoke_link( $accepted['link_id'] ), 'Spoke unlink wipes reusable credential access immediately' );
 $disabled_sources = array_filter( (array) get_option( 'wpbridge_source_registry', [] ), static function ( $source ): bool { return is_array( $source ) && 'hub_spoke' === ( $source['type'] ?? '' ) && empty( $source['enabled'] ); } );
 $assert( 2 === count( $disabled_sources ), 'Spoke unlink disables every provisioned Hub runtime source' );
+
+$before_fault_sources = get_option( 'wpbridge_source_registry', [] );
+$before_fault_defaults = get_option( 'wpbridge_defaults', [] );
+$before_fault_links = get_option( 'wpbridge_spoke_links_v1', [] );
+$fault_response = $rotated;
+$fault_response['link_id'] = '30000000-0000-4000-8000-000000000003';
+$fault_response['hub_public_key_fingerprint'] = str_repeat( 'a', 64 );
+$GLOBALS['wpbridge_fail_update']['wpbridge_defaults'] = 1;
+$assert( ! $store->save_spoke_link( 'https://hub.example', $fault_response, $now + 500 ), 'Spoke provisioning reports failure when a dependent option write fails' );
+$assert( $before_fault_sources === get_option( 'wpbridge_source_registry', [] ) && $before_fault_defaults === get_option( 'wpbridge_defaults', [] ) && $before_fault_links === get_option( 'wpbridge_spoke_links_v1', [] ), 'Spoke provisioning failure restores links, source registry and defaults exactly' );
+$unlink_response = $rotated;
+$unlink_response['link_id'] = '40000000-0000-4000-8000-000000000004';
+$unlink_response['hub_public_key_fingerprint'] = str_repeat( 'b', 64 );
+$assert( $store->save_spoke_link( 'https://hub.example', $unlink_response, $now + 510 ), 'Fault fixture creates a second active Spoke link' );
+$before_unlink_links = get_option( 'wpbridge_spoke_links_v1', [] );
+$before_unlink_sources = get_option( 'wpbridge_source_registry', [] );
+$GLOBALS['wpbridge_fail_update']['wpbridge_source_registry'] = 1;
+$assert( ! $store->unlink_spoke( $unlink_response['link_id'], $now + 511 ), 'Spoke unlink reports dependent source registry failure' );
+$assert( $before_unlink_links === get_option( 'wpbridge_spoke_links_v1', [] ) && $before_unlink_sources === get_option( 'wpbridge_source_registry', [] ), 'Spoke unlink failure restores credential state and source registry exactly' );
 
 $controller = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeController.php' );
 $authorizer = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/LinkAuthorizer.php' );

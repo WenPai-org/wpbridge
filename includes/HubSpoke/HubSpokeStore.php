@@ -38,6 +38,7 @@ final class HubSpokeStore {
 		$id    = strtolower( wp_generate_uuid4() );
 		$token = 'WPBI1-' . InstallationIdentity::base64url( random_bytes( 32 ) );
 		$rows  = $this->invitations();
+		$previous_rows = $rows;
 		$rows[ $id ] = [
 			'invitation_id'         => $id,
 			'token_sha256'          => hash( 'sha256', $token ),
@@ -49,8 +50,10 @@ final class HubSpokeStore {
 			'created_at'            => $now,
 			'nonces'                => [],
 		];
-		$this->save( self::INVITATIONS, $rows );
-		$this->audit( 'invitation.created', $id, $now );
+		if ( ! $this->save( self::INVITATIONS, $rows ) || ! $this->audit( 'invitation.created', $id, $now ) ) {
+			$this->save( self::INVITATIONS, $previous_rows );
+			return new \WP_Error( 'wpbridge_hub_store_failed', __( 'Hub invitation 无法持久保存。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
 		return [
 			'invitation_id'         => $id,
 			'invitation_token'      => $token,
@@ -111,6 +114,8 @@ final class HubSpokeStore {
 		$link_id    = strtolower( wp_generate_uuid4() );
 		$credential = 'WPBL1-' . InstallationIdentity::base64url( random_bytes( 32 ) );
 		$links      = $this->links();
+		$previous_links = $links;
+		$previous_invitations = $rows;
 		$links[ $link_id ] = [
 			'link_id'                    => $link_id,
 			'hub_installation_uuid'      => (string) $row['hub_installation_uuid'],
@@ -130,9 +135,15 @@ final class HubSpokeStore {
 		$row['nonces'][ hash( 'sha256', $nonce ) ] = $now;
 		$row['consumed_at']                        = $now;
 		$rows[ $id ]                               = $row;
-		$this->save( self::LINKS, $links );
-		$this->save( self::INVITATIONS, $rows );
-		$this->audit( 'link.accepted', $link_id, $now );
+		if ( ! $this->save( self::LINKS, $links ) ) {
+			return new \WP_Error( 'wpbridge_hub_store_failed', __( 'Hub link 无法持久保存。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
+		if ( ! $this->save( self::INVITATIONS, $rows ) || ! $this->audit( 'link.accepted', $link_id, $now ) ) {
+			$links_rolled_back = $this->save( self::LINKS, $previous_links );
+			$invitations_rolled_back = $this->save( self::INVITATIONS, $previous_invitations );
+			$rolled_back = $links_rolled_back && $invitations_rolled_back;
+			return new \WP_Error( $rolled_back ? 'wpbridge_hub_store_failed' : 'wpbridge_hub_store_inconsistent', __( 'Hub link 持久化失败，未签发凭据。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
 		return [
 			'link_id'         => $link_id,
 			'link_credential' => $credential,
@@ -172,6 +183,7 @@ final class HubSpokeStore {
 		}
 		try {
 		$links = $this->links();
+		$previous_links = $links;
 		$row   = $links[ $id ] ?? null;
 		if ( ! is_array( $row ) || 'active' !== $row['status'] ) {
 			return new \WP_Error( 'wpbridge_link_not_found', __( 'Hub link 不存在。', 'wpbridge' ), [ 'status' => 404 ] );
@@ -182,8 +194,13 @@ final class HubSpokeStore {
 		$row['credential_sha256']          = hash( 'sha256', $credential );
 		$row['rotated_at']                 = $now;
 		$links[ $id ]                      = $row;
-		$this->save( self::LINKS, $links );
-		$this->audit( 'link.rotated', $id, $now );
+		if ( ! $this->save( self::LINKS, $links ) ) {
+			return new \WP_Error( 'wpbridge_hub_store_failed', __( 'Hub link rotation 无法持久保存。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
+		if ( ! $this->audit( 'link.rotated', $id, $now ) ) {
+			$this->save( self::LINKS, $previous_links );
+			return new \WP_Error( 'wpbridge_hub_store_failed', __( 'Hub link rotation 审计失败，未签发凭据。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
 		return [
 			'link_id'             => $id,
 			'link_credential'     => $credential,
@@ -203,6 +220,7 @@ final class HubSpokeStore {
 		}
 		try {
 		$links = $this->links();
+		$previous_links = $links;
 		if ( ! isset( $links[ $id ] ) || 'active' !== $links[ $id ]['status'] ) {
 			return false;
 		}
@@ -211,8 +229,13 @@ final class HubSpokeStore {
 		$links[ $id ]['previous_credential_sha256'] = '';
 		$links[ $id ]['previous_valid_until']       = 0;
 		$links[ $id ]['revoked_at']                 = $now;
-		$this->save( self::LINKS, $links );
-		$this->audit( 'link.revoked', $id, $now );
+		if ( ! $this->save( self::LINKS, $links ) ) {
+			return false;
+		}
+		if ( ! $this->audit( 'link.revoked', $id, $now ) ) {
+			$this->save( self::LINKS, $previous_links );
+			return false;
+		}
 		return true;
 		} finally {
 			$this->release_lock( 'links' );
@@ -238,7 +261,7 @@ final class HubSpokeStore {
 
 	/** Persistent, lock-serialized per-link minute bucket. */
 	public function consume_rate( string $link_id, int $minute, int $limit ): bool {
-		$lock = $this->acquire_lock( 'rate:' . $link_id );
+		$lock = $this->acquire_lock( 'rate-global' );
 		if ( is_wp_error( $lock ) ) {
 			return false;
 		}
@@ -257,7 +280,7 @@ final class HubSpokeStore {
 			$rows[ $key ] = [ 'minute' => $minute, 'count' => $count + 1 ];
 			return $this->save( self::RATE, $rows );
 		} finally {
-			$this->release_lock( 'rate:' . $link_id );
+			$this->release_lock( 'rate-global' );
 		}
 	}
 
@@ -294,7 +317,9 @@ final class HubSpokeStore {
 			return false;
 		}
 		if ( ! $this->provision_spoke_sources( (string) $response['link_id'], $hub_origin, (array) $response['slug_allowlist'] ) ) {
-			$this->save( self::SPOKE_LINKS, $previous_rows );
+			if ( ! $this->save( self::SPOKE_LINKS, $previous_rows ) ) {
+				$this->mark_spoke_inconsistent( (string) $response['link_id'], $now );
+			}
 			return false;
 		}
 		return true;
@@ -357,13 +382,27 @@ final class HubSpokeStore {
 		}
 		try {
 			$rows = (array) get_option( self::SPOKE_LINKS, [] );
+			$previous_rows = $rows;
+			$previous_sources = (array) get_option( 'wpbridge_source_registry', [] );
 			if ( ! isset( $rows[ $link_id ] ) ) {
 				return false;
 			}
 			$rows[ $link_id ]['credential_ciphertext'] = '';
 			$rows[ $link_id ]['status'] = 'revoked';
 			$rows[ $link_id ]['revoked_at'] = $now;
-			return $this->save( self::SPOKE_LINKS, $rows ) && $this->disable_spoke_sources( $link_id );
+			if ( ! $this->save( self::SPOKE_LINKS, $rows ) ) {
+				return false;
+			}
+			if ( ! $this->disable_spoke_sources( $link_id ) ) {
+				$links_rolled_back = $this->save( self::SPOKE_LINKS, $previous_rows );
+				$sources_rolled_back = $this->save( 'wpbridge_source_registry', $previous_sources );
+				$rolled_back = $links_rolled_back && $sources_rolled_back;
+				if ( ! $rolled_back ) {
+					$this->mark_spoke_inconsistent( $link_id, $now );
+				}
+				return false;
+			}
+			return true;
 		} finally {
 			$this->release_lock( 'spoke-links' );
 		}
@@ -398,6 +437,8 @@ final class HubSpokeStore {
 
 	private function provision_spoke_sources( string $link_id, string $origin, array $slugs ): bool {
 		$sources = (array) get_option( 'wpbridge_source_registry', [] );
+		$previous_sources = $sources;
+		$previous_defaults = (array) get_option( 'wpbridge_defaults', [] );
 		$source_keys = [];
 		foreach ( $slugs as $slug ) {
 			$id = 'hub-spoke-' . substr( str_replace( '-', '', $link_id ), 0, 12 ) . '-' . $slug;
@@ -416,13 +457,21 @@ final class HubSpokeStore {
 			}
 		}
 		$saved = update_option( 'wpbridge_source_registry', $sources, false ) || $sources === get_option( 'wpbridge_source_registry', [] );
-		$defaults = (array) get_option( 'wpbridge_defaults', [] );
+		$defaults = $previous_defaults;
 		$plugin = is_array( $defaults['plugin'] ?? null ) ? $defaults['plugin'] : [];
 		$order = array_values( array_unique( array_merge( $source_keys, (array) ( $plugin['source_order'] ?? [ 'wporg' ] ) ) ) );
 		$plugin['source_order'] = $order;
 		$plugin['fallback_to_wporg'] = true;
 		$defaults['plugin'] = $plugin;
-		return $saved && ( update_option( 'wpbridge_defaults', $defaults, false ) || $defaults === get_option( 'wpbridge_defaults', [] ) );
+		if ( ! $saved ) {
+			return false;
+		}
+		if ( ! $this->save( 'wpbridge_defaults', $defaults ) ) {
+			$this->save( 'wpbridge_source_registry', $previous_sources );
+			$this->save( 'wpbridge_defaults', $previous_defaults );
+			return false;
+		}
+		return true;
 	}
 
 	private function disable_spoke_sources( string $link_id ): bool {
@@ -457,10 +506,20 @@ final class HubSpokeStore {
 		}
 	}
 
-	private function audit( string $action, string $resource, int $now ): void {
+	private function audit( string $action, string $resource, int $now ): bool {
 		$rows   = (array) get_option( self::AUDIT, [] );
 		$rows[] = [ 'action' => $action, 'resource_sha256' => hash( 'sha256', $resource ), 'occurred_at' => $now, 'user_id' => get_current_user_id() ];
-		update_option( self::AUDIT, array_slice( $rows, -500 ), false );
+		return $this->save( self::AUDIT, array_slice( $rows, -500 ) );
+	}
+
+	private function mark_spoke_inconsistent( string $link_id, int $now ): void {
+		$rows = (array) get_option( self::SPOKE_LINKS, [] );
+		if ( isset( $rows[ $link_id ] ) ) {
+			$rows[ $link_id ]['status'] = 'inconsistent';
+			$rows[ $link_id ]['credential_ciphertext'] = '';
+			$rows[ $link_id ]['failed_at'] = $now;
+			$this->save( self::SPOKE_LINKS, $rows );
+		}
 	}
 
 	/** @return array<string,array<int,string>>|\WP_Error */
