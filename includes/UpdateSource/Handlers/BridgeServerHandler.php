@@ -228,6 +228,29 @@ class BridgeServerHandler extends AbstractHandler implements ProtectedPackageHan
 		return $this->client->download_package( $slug, $grant, $integrity );
 	}
 
+	/** Build the exact record consumed by the protected package verifier. */
+	public function protected_integrity( string $slug, array $info ): array {
+		$policy = $this->artifact_trust_policy();
+		return self::protected_integrity_record( $slug, $info, (array) $policy['_wpbridge_artifact_keys'] );
+	}
+
+	/** Exact controller-to-BridgeClient integrity contract. */
+	public static function protected_integrity_record( string $slug, array $info, array $artifact_public_keys ): array {
+		return [
+			'sha256' => $info['sha256'] ?? $info['checksum_sha256'] ?? '',
+			'slug' => $slug,
+			'version' => (string) ( $info['version'] ?? '' ),
+			'signature_scheme' => $info['signature_scheme'] ?? '',
+			'signature_kid' => $info['signature_kid'] ?? '',
+			'signature' => $info['signature'] ?? '',
+			'signature_required' => true,
+			'artifact_size' => $info['artifact_size'] ?? 0,
+			'artifact_file' => $info['artifact_file'] ?? '',
+			'artifact_signed_at' => $info['artifact_signed_at'] ?? '',
+			'artifact_public_keys' => $artifact_public_keys,
+		];
+	}
+
 	/** Locally configured artifact trust policy. Bridge metadata cannot add keys. */
 	private function artifact_trust_policy(): array {
 		$keyring = $this->source->metadata['artifact_public_keys'] ?? [];

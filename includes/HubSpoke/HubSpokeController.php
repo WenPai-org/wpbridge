@@ -47,6 +47,7 @@ final class HubSpokeController {
 		);
 		register_rest_route( self::NAMESPACE, '/hub-links/(?P<id>[0-9a-f-]{36})/challenge', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'challenge' ], 'permission_callback' => '__return_true' ] );
 		register_rest_route( self::NAMESPACE, '/hub-links/(?P<id>[0-9a-f-]{36})/acceptances', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'acceptance' ], 'permission_callback' => '__return_true' ] );
+		register_rest_route( self::NAMESPACE, '/hub-links/(?P<id>[0-9a-f-]{36})/acceptance-compensations', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'acceptance_compensation' ], 'permission_callback' => [ $this, 'acceptance_compensation_permission' ] ] );
 		register_rest_route( self::NAMESPACE, '/hub-links/(?P<id>[0-9a-f-]{36})/rotations', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'rotate_link' ], 'permission_callback' => [ $this, 'admin_permission' ] ] );
 		register_rest_route( self::NAMESPACE, '/hub-links/(?P<id>[0-9a-f-]{36})', [ 'methods' => \WP_REST_Server::DELETABLE, 'callback' => [ $this, 'revoke_link' ], 'permission_callback' => [ $this, 'admin_permission' ] ] );
 		register_rest_route( self::NAMESPACE, '/spoke-links/accept', [ 'methods' => \WP_REST_Server::CREATABLE, 'callback' => [ $this, 'accept_local' ], 'permission_callback' => [ $this, 'admin_permission' ] ] );
@@ -88,6 +89,19 @@ final class HubSpokeController {
 		return $this->authorizer->authorize( $request, 'packages:read', true );
 	}
 
+	/** The just-issued credential may only revoke its own link after local persistence fails. */
+	public function acceptance_compensation_permission( \WP_REST_Request $request ) {
+		$query = $request->get_query_params();
+		if ( isset( $query['api_key'] ) || isset( $query['link_credential'] ) || isset( $query['authorization'] ) ) {
+			return new \WP_Error( 'wpbridge_query_credential_forbidden', __( '凭据不得通过 query 传递。', 'wpbridge' ), [ 'status' => 400 ] );
+		}
+		if ( 1 !== preg_match( '/^WPBridge-Link (WPBL1-[A-Za-z0-9_-]{43})$/', (string) $request->get_header( 'Authorization' ), $match ) ) {
+			return new \WP_Error( 'wpbridge_link_credential_missing', __( '缺少 Hub link credential。', 'wpbridge' ), [ 'status' => 401 ] );
+		}
+		$link = $this->store->authorize( $match[1], time() );
+		return is_array( $link ) && hash_equals( strtolower( (string) $request['id'] ), (string) $link['link_id'] ) ? true : new \WP_Error( 'wpbridge_link_credential_invalid', __( 'Hub link credential 无效。', 'wpbridge' ), [ 'status' => 401 ] );
+	}
+
 	public function issue_step_up( \WP_REST_Request $request ) {
 		if ( ! LinkAuthorizer::enabled() ) {
 			return new \WP_Error( 'wpbridge_hub_spoke_disabled', __( 'Hub-Spoke 未启用。', 'wpbridge' ), [ 'status' => 503 ] );
@@ -97,6 +111,10 @@ final class HubSpokeController {
 	}
 
 	public function create_link( \WP_REST_Request $request ) {
+		$identity = self::ensure_hub_identity();
+		if ( is_wp_error( $identity ) ) {
+			return $identity;
+		}
 		if ( $this->store->has_active_spoke_link() ) {
 			return new \WP_Error( 'wpbridge_spoke_cannot_be_hub', __( 'Active Spoke 不能创建 Hub link。', 'wpbridge' ), [ 'status' => 409 ] );
 		}
@@ -116,14 +134,22 @@ final class HubSpokeController {
 		return $this->response( $result, 201 );
 	}
 
-	public function list_links( \WP_REST_Request $request ): \WP_REST_Response {
+	public function list_links( \WP_REST_Request $request ) {
 		unset( $request );
+		$identity = self::ensure_hub_identity();
+		if ( is_wp_error( $identity ) ) {
+			return $identity;
+		}
 		return $this->response( $this->store->public_links(), 200 );
 	}
 
 	public function challenge( \WP_REST_Request $request ) {
 		if ( ! LinkAuthorizer::enabled() ) {
 			return new \WP_Error( 'wpbridge_hub_spoke_disabled', __( 'Hub-Spoke 未启用。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
+		$identity = self::ensure_hub_identity();
+		if ( is_wp_error( $identity ) ) {
+			return $identity;
 		}
 		$body = $request->get_json_params();
 		if ( ! self::exact_keys( $body, [ 'invitation_token' ] ) || ! is_string( $body['invitation_token'] ) ) {
@@ -137,6 +163,10 @@ final class HubSpokeController {
 		if ( ! LinkAuthorizer::enabled() ) {
 			return new \WP_Error( 'wpbridge_hub_spoke_disabled', __( 'Hub-Spoke 未启用。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
+		$identity = self::ensure_hub_identity();
+		if ( is_wp_error( $identity ) ) {
+			return $identity;
+		}
 		$body = $request->get_json_params();
 		if ( ! self::exact_keys( $body, [ 'invitation_token', 'spoke_installation_uuid', 'spoke_public_key', 'nonce', 'timestamp', 'signature' ] ) ) {
 			return self::bad_request();
@@ -146,6 +176,10 @@ final class HubSpokeController {
 	}
 
 	public function rotate_link( \WP_REST_Request $request ) {
+		$identity = self::ensure_hub_identity();
+		if ( is_wp_error( $identity ) ) {
+			return $identity;
+		}
 		$body = $request->get_json_params();
 		if ( ! self::exact_reason( $body ) ) {
 			return self::bad_request();
@@ -155,12 +189,27 @@ final class HubSpokeController {
 	}
 
 	public function revoke_link( \WP_REST_Request $request ) {
+		$identity = self::ensure_hub_identity();
+		if ( is_wp_error( $identity ) ) {
+			return $identity;
+		}
 		$body = $request->get_json_params();
 		if ( ! self::exact_reason( $body ) ) {
 			return self::bad_request();
 		}
 		if ( ! $this->store->revoke( strtolower( (string) $request['id'] ), time() ) ) {
 			return new \WP_Error( 'wpbridge_link_not_found', __( 'Hub link 不存在。', 'wpbridge' ), [ 'status' => 404 ] );
+		}
+		return $this->response( null, 204 );
+	}
+
+	public function acceptance_compensation( \WP_REST_Request $request ) {
+		$body = $request->get_json_params();
+		if ( ! self::exact_keys( $body, [ 'reason' ] ) || 'spoke_storage_failed' !== ( $body['reason'] ?? '' ) ) {
+			return self::bad_request();
+		}
+		if ( ! $this->store->revoke( strtolower( (string) $request['id'] ), time() ) ) {
+			return new \WP_Error( 'wpbridge_link_compensation_failed', __( 'Hub link 撤销补偿失败。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
 		return $this->response( null, 204 );
 	}
@@ -247,17 +296,7 @@ final class HubSpokeController {
 			if ( ! is_array( $info ) ) {
 				continue;
 			}
-			$integrity = [
-				'sha256'            => $info['sha256'] ?? $info['checksum_sha256'] ?? '',
-				'signature_scheme'   => $info['signature_scheme'] ?? '',
-				'signature_kid'      => $info['signature_kid'] ?? '',
-				'signature'          => $info['signature'] ?? '',
-				'signature_required' => true,
-				'artifact_size'      => $info['artifact_size'] ?? 0,
-				'artifact_file'      => $info['artifact_file'] ?? '',
-				'artifact_signed_at' => $info['artifact_signed_at'] ?? '',
-				'_wpbridge_artifact_keys' => $source->metadata['artifact_public_keys'] ?? [],
-			];
+			$integrity = $handler->protected_integrity( $slug, $info );
 			$file = $handler->download_package( $slug, $integrity );
 			if ( is_wp_error( $file ) ) {
 				return $file;
@@ -317,6 +356,18 @@ final class HubSpokeController {
 			return new \WP_Error( 'wpbridge_hub_origin_invalid', __( 'Hub 必须使用 HTTPS 443 origin。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
 		return 'https://' . strtolower( (string) ( $parts['host'] ?? '' ) ) . ( isset( $parts['port'] ) && 443 !== (int) $parts['port'] ? ':' . (int) $parts['port'] : '' );
+	}
+
+	/** @return true|\WP_Error */
+	private static function ensure_hub_identity() {
+		if ( ! InstallationIdentity::ensure() ) {
+			return new \WP_Error( 'wpbridge_hub_identity_unavailable', __( 'Hub installation identity 无法持久保存。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
+		$key = InstallationIdentity::base64url_decode( InstallationIdentity::public_key() );
+		if ( '' === InstallationIdentity::uuid() || ! is_string( $key ) || ! defined( 'SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES' ) || SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES !== strlen( $key ) ) {
+			return new \WP_Error( 'wpbridge_hub_identity_unavailable', __( 'Hub installation identity 无法持久保存。', 'wpbridge' ), [ 'status' => 503 ] );
+		}
+		return true;
 	}
 
 	private static function exact_keys( $value, array $expected ): bool {

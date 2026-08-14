@@ -26,7 +26,10 @@ final class HubSpokeStore {
 
 	/** @return array<string,mixed>|\WP_Error */
 	public function create_invitation( array $scopes, array $slugs, int $now ) {
-		$lock = $this->acquire_lock( 'invitations' );
+		if ( ! self::identity_ready() ) {
+			return self::identity_error();
+		}
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
 		if ( is_wp_error( $lock ) ) {
 			return $lock;
 		}
@@ -63,12 +66,15 @@ final class HubSpokeStore {
 			'expires_at'            => gmdate( 'c', $now + 600 ),
 		];
 		} finally {
-			$this->release_lock( 'invitations' );
+			$this->release_lock( 'hub-lifecycle' );
 		}
 	}
 
 	/** @return array<string,mixed>|\WP_Error */
 	public function challenge( string $id, string $token, int $now ) {
+		if ( ! self::identity_ready() ) {
+			return self::identity_error();
+		}
 		$rows = $this->invitations();
 		$row  = $rows[ $id ] ?? null;
 		if ( ! is_array( $row ) || ! self::valid_invitation_token( $token ) || ! hash_equals( (string) $row['token_sha256'], hash( 'sha256', $token ) ) || 'pending' !== $row['status'] || $now >= (int) $row['expires_at'] ) {
@@ -86,7 +92,10 @@ final class HubSpokeStore {
 
 	/** @return array<string,mixed>|\WP_Error */
 	public function accept( string $id, array $request, int $now ) {
-		$lock = $this->acquire_lock( 'invitations' );
+		if ( ! self::identity_ready() ) {
+			return self::identity_error();
+		}
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
 		if ( is_wp_error( $lock ) ) {
 			return $lock;
 		}
@@ -152,7 +161,7 @@ final class HubSpokeStore {
 			'expires_at'      => null,
 		];
 		} finally {
-			$this->release_lock( 'invitations' );
+			$this->release_lock( 'hub-lifecycle' );
 		}
 	}
 
@@ -177,7 +186,10 @@ final class HubSpokeStore {
 
 	/** @return array<string,mixed>|\WP_Error */
 	public function rotate( string $id, int $now ) {
-		$lock = $this->acquire_lock( 'links' );
+		if ( ! self::identity_ready() ) {
+			return self::identity_error();
+		}
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
 		if ( is_wp_error( $lock ) ) {
 			return $lock;
 		}
@@ -209,12 +221,15 @@ final class HubSpokeStore {
 			'slug_allowlist'      => $row['slug_allowlist'],
 		];
 		} finally {
-			$this->release_lock( 'links' );
+			$this->release_lock( 'hub-lifecycle' );
 		}
 	}
 
 	public function revoke( string $id, int $now ): bool {
-		$lock = $this->acquire_lock( 'links' );
+		if ( ! self::identity_ready() ) {
+			return false;
+		}
+		$lock = $this->acquire_lock( 'hub-lifecycle' );
 		if ( is_wp_error( $lock ) ) {
 			return false;
 		}
@@ -238,7 +253,7 @@ final class HubSpokeStore {
 		}
 		return true;
 		} finally {
-			$this->release_lock( 'links' );
+			$this->release_lock( 'hub-lifecycle' );
 		}
 	}
 
@@ -266,7 +281,7 @@ final class HubSpokeStore {
 			return false;
 		}
 		try {
-			$rows = (array) get_option( self::RATE, [] );
+			$rows = (array) $this->state_option( self::RATE );
 			foreach ( $rows as $key => $row ) {
 				if ( ! is_array( $row ) || (int) ( $row['minute'] ?? 0 ) < $minute - 2 ) {
 					unset( $rows[ $key ] );
@@ -299,7 +314,7 @@ final class HubSpokeStore {
 		if ( '' === $ciphertext ) {
 			return false;
 		}
-		$rows = (array) get_option( self::SPOKE_LINKS, [] );
+		$rows = (array) $this->state_option( self::SPOKE_LINKS );
 		$previous_rows = $rows;
 		$rows[ (string) $response['link_id'] ] = [
 			'link_id'               => (string) $response['link_id'],
@@ -330,8 +345,23 @@ final class HubSpokeStore {
 
 	/** Whether this installation is already an active Spoke. */
 	public function has_active_spoke_link(): bool {
-		foreach ( (array) get_option( self::SPOKE_LINKS, [] ) as $row ) {
+		foreach ( (array) $this->state_option( self::SPOKE_LINKS ) as $row ) {
 			if ( is_array( $row ) && 'active' === ( $row['status'] ?? '' ) && ! empty( $row['credential_ciphertext'] ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Whether this network already owns pending or active Hub lifecycle state. */
+	public function has_active_hub_state(): bool {
+		foreach ( $this->invitations() as $row ) {
+			if ( is_array( $row ) && 'pending' === ( $row['status'] ?? '' ) ) {
+				return true;
+			}
+		}
+		foreach ( $this->links() as $row ) {
+			if ( is_array( $row ) && 'active' === ( $row['status'] ?? '' ) ) {
 				return true;
 			}
 		}
@@ -340,7 +370,7 @@ final class HubSpokeStore {
 
 	/** @return array<string,mixed>|null */
 	public function active_spoke_link( string $link_id = '' ): ?array {
-		foreach ( (array) get_option( self::SPOKE_LINKS, [] ) as $id => $row ) {
+		foreach ( (array) $this->state_option( self::SPOKE_LINKS ) as $id => $row ) {
 			if ( is_array( $row ) && 'active' === ( $row['status'] ?? '' ) && ( '' === $link_id || hash_equals( $link_id, (string) $id ) ) ) {
 				$row['credential'] = CredentialEnvelope::decrypt( (string) $row['credential_ciphertext'], (string) $row['link_id'], (string) $row['hub_origin'] );
 				return '' === $row['credential'] ? null : $row;
@@ -356,7 +386,7 @@ final class HubSpokeStore {
 			return false;
 		}
 		try {
-			$rows = (array) get_option( self::SPOKE_LINKS, [] );
+			$rows = (array) $this->state_option( self::SPOKE_LINKS );
 			$row  = $rows[ $link_id ] ?? null;
 			if ( ! is_array( $row ) || 'active' !== $row['status'] ) {
 				return false;
@@ -381,7 +411,7 @@ final class HubSpokeStore {
 			return false;
 		}
 		try {
-			$rows = (array) get_option( self::SPOKE_LINKS, [] );
+			$rows = (array) $this->state_option( self::SPOKE_LINKS );
 			$previous_rows = $rows;
 			$previous_sources = (array) get_option( 'wpbridge_source_registry', [] );
 			if ( ! isset( $rows[ $link_id ] ) ) {
@@ -411,7 +441,7 @@ final class HubSpokeStore {
 	/** @return array<int,array<string,mixed>> */
 	public function spoke_statuses(): array {
 		$output = [];
-		foreach ( (array) get_option( self::SPOKE_LINKS, [] ) as $row ) {
+		foreach ( (array) $this->state_option( self::SPOKE_LINKS ) as $row ) {
 			if ( ! is_array( $row ) ) {
 				continue;
 			}
@@ -423,16 +453,24 @@ final class HubSpokeStore {
 
 	/** @return array<string,array<string,mixed>> */
 	private function invitations(): array {
-		return (array) get_option( self::INVITATIONS, [] );
+		return (array) $this->state_option( self::INVITATIONS );
 	}
 
 	/** @return array<string,array<string,mixed>> */
 	private function links(): array {
-		return (array) get_option( self::LINKS, [] );
+		return (array) $this->state_option( self::LINKS );
 	}
 
 	private function save( string $option, array $value ): bool {
+		if ( in_array( $option, [ self::INVITATIONS, self::LINKS, self::SPOKE_LINKS, self::AUDIT, self::RATE ], true ) ) {
+			return is_multisite() ? update_site_option( $option, $value ) || $value === get_site_option( $option, [] ) : update_option( $option, $value, false ) || $value === get_option( $option, [] );
+		}
 		return update_option( $option, $value, false ) || $value === get_option( $option, [] );
+	}
+
+	/** Network-scoped installation state; single-site keeps the ordinary option table. */
+	private function state_option( string $option ): array {
+		return (array) ( is_multisite() ? get_site_option( $option, [] ) : get_option( $option, [] ) );
 	}
 
 	private function provision_spoke_sources( string $link_id, string $origin, array $slugs ): bool {
@@ -507,13 +545,13 @@ final class HubSpokeStore {
 	}
 
 	private function audit( string $action, string $resource, int $now ): bool {
-		$rows   = (array) get_option( self::AUDIT, [] );
+		$rows   = (array) $this->state_option( self::AUDIT );
 		$rows[] = [ 'action' => $action, 'resource_sha256' => hash( 'sha256', $resource ), 'occurred_at' => $now, 'user_id' => get_current_user_id() ];
 		return $this->save( self::AUDIT, array_slice( $rows, -500 ) );
 	}
 
 	private function mark_spoke_inconsistent( string $link_id, int $now ): void {
-		$rows = (array) get_option( self::SPOKE_LINKS, [] );
+		$rows = (array) $this->state_option( self::SPOKE_LINKS );
 		if ( isset( $rows[ $link_id ] ) ) {
 			$rows[ $link_id ]['status'] = 'inconsistent';
 			$rows[ $link_id ]['credential_ciphertext'] = '';
@@ -574,5 +612,17 @@ final class HubSpokeStore {
 
 	public static function valid_link_credential( string $value ): bool {
 		return 1 === preg_match( '/^WPBL1-[A-Za-z0-9_-]{43}$/', $value );
+	}
+
+	private static function identity_ready(): bool {
+		if ( ! InstallationIdentity::ensure() || '' === InstallationIdentity::uuid() ) {
+			return false;
+		}
+		$key = InstallationIdentity::base64url_decode( InstallationIdentity::public_key() );
+		return is_string( $key ) && defined( 'SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES' ) && SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES === strlen( $key );
+	}
+
+	private static function identity_error(): \WP_Error {
+		return new \WP_Error( 'wpbridge_hub_identity_unavailable', __( 'Hub installation identity 无法持久保存。', 'wpbridge' ), [ 'status' => 503 ] );
 	}
 }

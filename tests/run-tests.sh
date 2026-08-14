@@ -21,6 +21,7 @@ run "Security regressions" php tests/security-regression-test.php
 run "Updater regressions" php tests/updater-regression-test.php
 run "Update authorization" php tests/update-authorization-test.php
 run "Hub-Spoke contract" php tests/hub-spoke-contract-test.php
+run "Hub protected package E2E" php tests/hub-protected-package-e2e-test.php
 run "Artifact signatures" php tests/artifact-signature-test.php
 run "Repository contracts" php tests/static-contract-test.php
 run "Admin JavaScript syntax" node --check assets/js/admin.js

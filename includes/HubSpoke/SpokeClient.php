@@ -30,6 +30,10 @@ final class SpokeClient {
 
 	/** @return array<string,mixed>|\WP_Error */
 	public function accept( string $hub_url, string $invitation_id, string $invitation_token ) {
+		$store = new HubSpokeStore();
+		if ( $store->has_active_hub_state() ) {
+			return new \WP_Error( 'wpbridge_hub_cannot_be_spoke', __( '存在 pending invitation 或 active Hub link 时不能接受 Spoke link。', 'wpbridge' ) );
+		}
 		if ( self::has_local_upstream_credentials() ) {
 			return new \WP_Error( 'wpbridge_spoke_credentials_present', __( 'Spoke 仍保存上游或设备凭据，清除后才能接受 Hub link。', 'wpbridge' ) );
 		}
@@ -82,15 +86,33 @@ final class SpokeClient {
 		}
 		$policy = HubSpokeStore::normalize_policy( (array) $response['scopes'], (array) $response['slug_allowlist'] );
 		if ( is_wp_error( $policy ) || $policy['scopes'] !== $challenge['scopes'] || $policy['slug_allowlist'] !== $challenge['slug_allowlist'] ) {
+			$this->compensate_acceptance( $origin, (string) $response['link_id'], (string) $response['link_credential'] );
 			return new \WP_Error( 'wpbridge_hub_policy_mismatch', __( 'Hub link 权限与邀请不一致。', 'wpbridge' ) );
 		}
 		$response['hub_public_key_fingerprint'] = $challenge['hub_public_key_fingerprint'];
-		$store = new HubSpokeStore();
 		if ( ! $store->save_spoke_link( $origin, $response, (int) call_user_func( $this->clock ) ) ) {
-			return new \WP_Error( 'wpbridge_spoke_storage_failed', __( 'Spoke credential 无法安全保存。', 'wpbridge' ) );
+			$compensated = $this->compensate_acceptance( $origin, (string) $response['link_id'], (string) $response['link_credential'] );
+			return new \WP_Error( $compensated ? 'wpbridge_spoke_storage_failed' : 'wpbridge_spoke_reconcile_required', __( 'Spoke credential 无法安全保存，Hub link 已撤销或需要管理员核对。', 'wpbridge' ) );
 		}
 		unset( $response['link_credential'] );
 		return $response;
+	}
+
+	private function compensate_acceptance( string $origin, string $link_id, string $credential ): bool {
+		$json = wp_json_encode( [ 'reason' => 'spoke_storage_failed' ] );
+		if ( ! is_string( $json ) ) {
+			return false;
+		}
+		$response = call_user_func(
+			$this->transport,
+			$origin . '/wp-json/wpbridge/v2/hub-links/' . rawurlencode( $link_id ) . '/acceptance-compensations',
+			[
+				'method' => 'POST', 'timeout' => 15, 'redirection' => 0,
+				'headers' => [ 'Accept' => 'application/json', 'Content-Type' => 'application/json', 'Authorization' => 'WPBridge-Link ' . $credential ],
+				'body' => $json,
+			]
+		);
+		return ! is_wp_error( $response ) && 204 === (int) wp_remote_retrieve_response_code( $response );
 	}
 
 	/** @return array<string,mixed>|\WP_Error */

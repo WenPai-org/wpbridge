@@ -13,16 +13,20 @@ if ( ! defined( 'AUTH_KEY' ) ) {
 }
 define( 'WPBRIDGE_HUB_LINK_ACTIVE_KEY_VERSION', 'test-v1' );
 define( 'WPBRIDGE_HUB_LINK_MASTER_KEYS', [ 'test-v1' => rtrim( strtr( base64_encode( str_repeat( 'K', 32 ) ), '+/', '-_' ), '=' ) ] );
+define( 'WPBRIDGE_HUB_ORIGIN_ALLOWLIST', [ 'https://hub.example' ] );
 
 $GLOBALS['wpbridge_test_options'] = [];
 $GLOBALS['wpbridge_test_uuid']    = 0;
 $GLOBALS['wpbridge_fail_update']  = [];
+$GLOBALS['wpbridge_test_multisite'] = false;
+$GLOBALS['wpbridge_test_site_options'] = [];
+$GLOBALS['wpbridge_lock_sql'] = [];
 $GLOBALS['wpdb'] = new class() {
 	public function prepare( string $sql, ...$args ): string {
 		return vsprintf( str_replace( [ '%s', '%d' ], [ "'%s'", '%d' ], $sql ), $args );
 	}
 	public function get_var( string $sql ): string {
-		unset( $sql );
+		$GLOBALS['wpbridge_lock_sql'][] = $sql;
 		return '1';
 	}
 };
@@ -32,7 +36,14 @@ function __( string $message, string $domain = '' ): string {
 	return $message;
 }
 function is_multisite(): bool {
-	return false;
+	return $GLOBALS['wpbridge_test_multisite'];
+}
+function get_site_option( string $key, $default = false ) { return $GLOBALS['wpbridge_test_site_options'][ $key ] ?? $default; }
+function update_site_option( string $key, $value ): bool {
+	if ( ! empty( $GLOBALS['wpbridge_fail_update'][ $key ] ) ) { --$GLOBALS['wpbridge_fail_update'][ $key ]; return false; }
+	$changed = ! array_key_exists( $key, $GLOBALS['wpbridge_test_site_options'] ) || $GLOBALS['wpbridge_test_site_options'][ $key ] !== $value;
+	$GLOBALS['wpbridge_test_site_options'][ $key ] = $value;
+	return $changed;
 }
 function get_option( string $key, $default = false ) {
 	return $GLOBALS['wpbridge_test_options'][ $key ] ?? $default;
@@ -66,6 +77,7 @@ function wp_remote_retrieve_response_code( array $response ): int {
 function wp_remote_retrieve_body( array $response ): string {
 	return (string) ( $response['body'] ?? '' );
 }
+function wp_parse_url( string $url ) { return parse_url( $url ); }
 
 class WP_Error {
 	private string $code;
@@ -89,11 +101,13 @@ require_once dirname( __DIR__ ) . '/includes/HubSpoke/InstallationIdentity.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/CredentialEnvelope.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeStore.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/SpokeProxyClient.php';
+require_once dirname( __DIR__ ) . '/includes/HubSpoke/SpokeClient.php';
 
 use WPBridge\HubSpoke\HubSpokeStore;
 use WPBridge\HubSpoke\InstallationIdentity;
 use WPBridge\HubSpoke\CredentialEnvelope;
 use WPBridge\HubSpoke\SpokeProxyClient;
+use WPBridge\HubSpoke\SpokeClient;
 use WPBridge\Security\Encryption;
 
 $failures = 0;
@@ -116,6 +130,8 @@ $invitation = $store->create_invitation( [ 'updates:read', 'sources:read' ], [ '
 $assert( is_array( $invitation ) && preg_match( '/^WPBI1-[A-Za-z0-9_-]{43}$/', $invitation['invitation_token'] ) === 1, 'Invitation returns a one-time opaque token' );
 $raw_store = serialize( get_option( 'wpbridge_hub_invitations_v1', [] ) );
 $assert( false === strpos( $raw_store, $invitation['invitation_token'] ) && false !== strpos( $raw_store, hash( 'sha256', $invitation['invitation_token'] ) ), 'Hub persists only the invitation token hash' );
+$lock_names = array_values( array_filter( $GLOBALS['wpbridge_lock_sql'], static function ( string $sql ): bool { return false !== strpos( $sql, 'GET_LOCK' ); } ) );
+$assert( 1 === count( array_unique( $lock_names ) ), 'Hub invitation lifecycle starts under the unified installation lifecycle lock' );
 
 $spoke_keypair = sodium_crypto_sign_keypair();
 $spoke_public  = sodium_crypto_sign_publickey( $spoke_keypair );
@@ -181,6 +197,9 @@ $rotated = $store->rotate( $accepted['link_id'], $now + 1 );
 $assert( is_array( $rotated ) && null !== $store->authorize( $accepted['link_credential'], $now + 299 ), 'Rotation keeps the prior credential for at most five minutes' );
 $assert( null === $store->authorize( $accepted['link_credential'], $now + 302 ), 'Rotated credential is rejected after the overlap window' );
 $assert( $store->revoke( $accepted['link_id'], $now + 303 ) && null === $store->authorize( $rotated['link_credential'], $now + 303 ), 'Revocation immediately rejects the active credential' );
+$lifecycle_lock = substr( hash( 'sha256', 'hub-lifecycle:' . $uuid ), 0, 48 );
+$lifecycle_acquires = array_values( array_filter( $GLOBALS['wpbridge_lock_sql'], static function ( string $sql ) use ( $lifecycle_lock ): bool { return false !== strpos( $sql, 'GET_LOCK' ) && false !== strpos( $sql, $lifecycle_lock ); } ) );
+$assert( count( $lifecycle_acquires ) >= 7 && 1 === count( array_unique( $lifecycle_acquires ) ), 'Invitation accept, rotation and revoke share one Hub lifecycle lock without cross-workflow option races' );
 
 $spoke_saved = $store->save_spoke_link( 'https://hub.example', $rotated, $now + 2 );
 $spoke_rows  = get_option( 'wpbridge_spoke_links_v1', [] );
@@ -234,6 +253,48 @@ $before_unlink_sources = get_option( 'wpbridge_source_registry', [] );
 $GLOBALS['wpbridge_fail_update']['wpbridge_source_registry'] = 1;
 $assert( ! $store->unlink_spoke( $unlink_response['link_id'], $now + 511 ), 'Spoke unlink reports dependent source registry failure' );
 $assert( $before_unlink_links === get_option( 'wpbridge_spoke_links_v1', [] ) && $before_unlink_sources === get_option( 'wpbridge_source_registry', [] ), 'Spoke unlink failure restores credential state and source registry exactly' );
+
+$saved_options = $GLOBALS['wpbridge_test_options'];
+$GLOBALS['wpbridge_test_options'] = [];
+$GLOBALS['wpbridge_fail_update']['wpbridge_link_private_key'] = 1;
+$upgraded_failure = ( new HubSpokeStore() )->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now );
+$assert( is_wp_error( $upgraded_failure ) && 'wpbridge_hub_identity_unavailable' === $upgraded_failure->get_error_code(), 'Existing upgraded install fails 503-style before invitation issuance when identity persistence fails' );
+$GLOBALS['wpbridge_fail_update'] = [];
+$GLOBALS['wpbridge_test_options'] = $saved_options;
+
+$GLOBALS['wpbridge_test_multisite'] = true;
+$GLOBALS['wpbridge_test_site_options'] = [];
+$assert( InstallationIdentity::ensure() && '' !== (string) get_site_option( 'wpbridge_link_private_key', '' ) && '' !== (string) get_site_option( 'wpbridge_link_public_key', '' ), 'Multisite UUID and Ed25519 custody use the same network option scope' );
+$single_site_invitations = get_option( 'wpbridge_hub_invitations_v1', [] );
+$network_invitation = ( new HubSpokeStore() )->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now );
+$assert( is_array( $network_invitation ) && [] !== get_site_option( 'wpbridge_hub_invitations_v1', [] ) && $single_site_invitations === get_option( 'wpbridge_hub_invitations_v1', [] ), 'Multisite link lifecycle state is stored in the same network scope as installation identity' );
+$GLOBALS['wpbridge_test_multisite'] = false;
+$GLOBALS['wpbridge_test_options'] = [];
+$assert( InstallationIdentity::ensure(), 'Single-site identity restored for Spoke compensation fixture' );
+$local_hub_invitation = ( new HubSpokeStore() )->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now );
+$blocked_requests = 0;
+$blocked_client = new SpokeClient( static function () use ( &$blocked_requests ): array { ++$blocked_requests; return []; }, static function () use ( $now ): int { return $now; } );
+$blocked_accept = $blocked_client->accept( 'https://hub.example', '50000000-0000-4000-8000-000000000005', 'WPBI1-' . InstallationIdentity::base64url( str_repeat( 'I', 32 ) ) );
+$assert( is_wp_error( $blocked_accept ) && 'wpbridge_hub_cannot_be_spoke' === $blocked_accept->get_error_code() && 0 === $blocked_requests, 'Spoke acceptance rejects pending Hub invitations before any remote request' );
+$GLOBALS['wpbridge_test_options']['wpbridge_hub_invitations_v1'] = [];
+$compensation_requests = [];
+$remote_link_id = '60000000-0000-4000-8000-000000000006';
+$remote_credential = 'WPBL1-' . InstallationIdentity::base64url( str_repeat( 'L', 32 ) );
+$transport = static function ( string $url, array $args ) use ( &$compensation_requests, $remote_link_id, $remote_credential ): array {
+	$compensation_requests[] = [ 'url' => $url, 'args' => $args ];
+	if ( false !== strpos( $url, '/challenge' ) ) {
+		return [ 'response' => [ 'code' => 200 ], 'body' => wp_json_encode( [ 'invitation_id' => '50000000-0000-4000-8000-000000000005', 'hub_installation_uuid' => '70000000-0000-4000-8000-000000000007', 'hub_public_key_fingerprint' => str_repeat( 'a', 64 ), 'scopes' => [ 'updates:read' ], 'slug_allowlist' => [ 'wpbridge' ], 'expires_at' => '2026-08-14T00:10:00Z' ] ) ];
+	}
+	if ( false !== strpos( $url, '/acceptances' ) ) {
+		return [ 'response' => [ 'code' => 201 ], 'body' => wp_json_encode( [ 'link_id' => $remote_link_id, 'link_credential' => $remote_credential, 'scopes' => [ 'updates:read' ], 'slug_allowlist' => [ 'wpbridge' ], 'expires_at' => null ] ) ];
+	}
+	return [ 'response' => [ 'code' => 204 ], 'body' => '' ];
+};
+$GLOBALS['wpbridge_fail_update']['wpbridge_spoke_links_v1'] = 1;
+$compensated = ( new SpokeClient( $transport, static function () use ( $now ): int { return $now; } ) )->accept( 'https://hub.example', '50000000-0000-4000-8000-000000000005', 'WPBI1-' . InstallationIdentity::base64url( str_repeat( 'I', 32 ) ) );
+$compensation = $compensation_requests[2] ?? [];
+$assert( is_wp_error( $compensated ) && 'wpbridge_spoke_storage_failed' === $compensated->get_error_code(), 'Spoke local persistence failure reports failure only after authenticated Hub compensation succeeds' );
+$assert( false !== strpos( (string) ( $compensation['url'] ?? '' ), '/acceptance-compensations' ) && ( $compensation['args']['headers']['Authorization'] ?? '' ) === 'WPBridge-Link ' . $remote_credential && false === strpos( (string) ( $compensation['url'] ?? '' ), $remote_credential ), 'Spoke compensation revokes the exact Hub link with a header-only credential' );
 
 $controller = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeController.php' );
 $authorizer = (string) file_get_contents( dirname( __DIR__ ) . '/includes/HubSpoke/LinkAuthorizer.php' );

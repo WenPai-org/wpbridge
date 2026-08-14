@@ -26,7 +26,7 @@ final class InstallationIdentity {
 		if ( '' === self::uuid() && ! self::write_network_option( self::UUID_OPTION, wp_generate_uuid4() ) ) {
 			return false;
 		}
-		if ( '' !== (string) get_option( self::PUBLIC_KEY_OPTION, '' ) && '' !== (string) get_option( self::PRIVATE_KEY_OPTION, '' ) ) {
+		if ( '' !== (string) self::read_network_option( self::PUBLIC_KEY_OPTION ) && '' !== (string) self::read_network_option( self::PRIVATE_KEY_OPTION ) ) {
 			return true;
 		}
 		if ( ! function_exists( 'sodium_crypto_sign_keypair' ) || ! function_exists( 'sodium_memzero' ) ) {
@@ -46,9 +46,10 @@ final class InstallationIdentity {
 		if ( '' === $ciphertext ) {
 			return false;
 		}
-		update_option( self::PUBLIC_KEY_OPTION, self::base64url( $public ), false );
-		update_option( self::PRIVATE_KEY_OPTION, $ciphertext, false );
-		return true;
+		if ( ! self::write_network_option( self::PUBLIC_KEY_OPTION, self::base64url( $public ) ) || ! self::write_network_option( self::PRIVATE_KEY_OPTION, $ciphertext ) ) {
+			return false;
+		}
+		return '' !== self::uuid() && '' !== self::public_key() && '' !== (string) self::read_network_option( self::PRIVATE_KEY_OPTION );
 	}
 
 	/** Return the immutable network installation UUID. */
@@ -59,7 +60,7 @@ final class InstallationIdentity {
 
 	/** Return the base64url public key. */
 	public static function public_key(): string {
-		return (string) get_option( self::PUBLIC_KEY_OPTION, '' );
+		return (string) self::read_network_option( self::PUBLIC_KEY_OPTION );
 	}
 
 	/** Sign a canonical string without exposing the private key. */
@@ -67,7 +68,7 @@ final class InstallationIdentity {
 		if ( ! self::ensure() || ! function_exists( 'sodium_crypto_sign_detached' ) || ! function_exists( 'sodium_memzero' ) ) {
 			return new \WP_Error( 'wpbridge_link_key_unavailable', __( '安装身份密钥不可用。', 'wpbridge' ) );
 		}
-		$encoded = Encryption::decrypt( (string) get_option( self::PRIVATE_KEY_OPTION, '' ) );
+		$encoded = Encryption::decrypt( (string) self::read_network_option( self::PRIVATE_KEY_OPTION ) );
 		$secret  = self::base64url_decode( $encoded );
 		if ( ! is_string( $secret ) || ! defined( 'SODIUM_CRYPTO_SIGN_SECRETKEYBYTES' ) || SODIUM_CRYPTO_SIGN_SECRETKEYBYTES !== strlen( $secret ) ) {
 			return new \WP_Error( 'wpbridge_link_key_unavailable', __( '安装身份密钥不可用。', 'wpbridge' ) );

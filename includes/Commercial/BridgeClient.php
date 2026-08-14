@@ -48,6 +48,9 @@ class BridgeClient {
 	 */
 	private int $timeout;
 
+	/** @var callable */
+	private $package_transport;
+
 	/** @var array|null */
 	private ?array $capabilities = null;
 
@@ -58,7 +61,7 @@ class BridgeClient {
 	 * @param string $api_key    API Key
 	 * @param int    $timeout    请求超时（秒）
 	 */
-	public function __construct( string $server_url, string $api_key, int $timeout = 30 ) {
+	public function __construct( string $server_url, string $api_key, int $timeout = 30, ?callable $package_transport = null ) {
 		$server_url = rtrim( $server_url, '/' );
 
 		// H3/H4: 强制 HTTPS
@@ -80,6 +83,7 @@ class BridgeClient {
 		$this->server_url = $server_url;
 		$this->api_key    = $api_key;
 		$this->timeout    = $timeout;
+		$this->package_transport = $package_transport ?? [ SafeHttpClient::class, 'request' ];
 	}
 
 	/**
@@ -135,7 +139,8 @@ class BridgeClient {
 			return new \WP_Error( 'wpbridge_package_temp_failed', __( '无法创建更新包临时文件。', 'wpbridge' ) );
 		}
 		$endpoint = $this->endpoint( 'download', '/api/v1/download/{slug}', $slug );
-		$response = SafeHttpClient::request(
+		$response = call_user_func(
+			$this->package_transport,
 			$this->server_url . $endpoint,
 			[
 				'method'      => 'GET',
