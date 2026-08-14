@@ -30,7 +30,7 @@ function wpbridge_uninstall_site(): void {
 }
 
 if ( is_multisite() ) {
-	$network_options = [ 'wpbridge_installation_uuid', 'wpbridge_link_public_key', 'wpbridge_link_private_key', 'wpbridge_hub_invitations_v1', 'wpbridge_hub_links_v1', 'wpbridge_spoke_links_v1', 'wpbridge_hub_audit_v1', 'wpbridge_hub_rate_v1', 'wpbridge_spoke_reconcile_v1', 'wpbridge_spoke_uncertain_accept_v1', 'wpbridge_hub_spoke_role_v1', 'wpbridge_hub_network_origin_v1', 'wpbridge_source_registry', 'wpbridge_defaults' ];
+	$network_options = [ 'wpbridge_installation_uuid', 'wpbridge_link_public_key', 'wpbridge_link_private_key', 'wpbridge_hub_invitations_v1', 'wpbridge_hub_links_v1', 'wpbridge_spoke_links_v1', 'wpbridge_hub_audit_v1', 'wpbridge_hub_rate_v1', 'wpbridge_spoke_reconcile_v1', 'wpbridge_spoke_uncertain_accept_v1', 'wpbridge_hub_spoke_role_v1', 'wpbridge_hub_network_origin_v1' ];
 	foreach ( $network_options as $network_option ) {
 		delete_site_option( $network_option );
 	}

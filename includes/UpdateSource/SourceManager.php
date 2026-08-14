@@ -180,7 +180,7 @@ class SourceManager {
 	 * @return bool
 	 */
 	public function update( SourceModel $source ): bool {
-		if ( ! CredentialBoundary::credential_write_allowed( $source->to_array() ) ) {
+		if ( ! CredentialBoundary::credential_write_allowed( $source->to_array(), (array) $this->settings->get_source( $source->id ) ) ) {
 			return false;
 		}
 		// 验证

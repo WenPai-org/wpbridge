@@ -80,7 +80,7 @@ final class HubSpokeController {
 
 	/** Authority-reducing emergency cleanup remains available while feature flag is off. */
 	public function cleanup_permission( \WP_REST_Request $request ) {
-		return $this->step_up->verify( $request );
+		return $this->step_up->verify( $request, true );
 	}
 
 	/** @return true|\WP_Error */
@@ -120,9 +120,6 @@ final class HubSpokeController {
 	}
 
 	public function issue_step_up( \WP_REST_Request $request ) {
-		if ( ! LinkAuthorizer::enabled() ) {
-			return new \WP_Error( 'wpbridge_hub_spoke_disabled', __( 'Hub-Spoke 未启用。', 'wpbridge' ), [ 'status' => 503 ] );
-		}
 		$result = $this->step_up->issue( $request );
 		return is_wp_error( $result ) ? $result : $this->response( $result, 201 );
 	}
@@ -281,7 +278,9 @@ final class HubSpokeController {
 		if ( ! self::exact_keys( $body, [] ) || isset( $query['link_credential'] ) || false !== stripos( $cookie, 'WPBL1-' ) || ! $valid_header || ! $this->store->apply_spoke_rotation( strtolower( (string) $request['id'] ), $match[1], time() ) ) {
 			$link = $this->store->active_spoke_link( strtolower( (string) $request['id'] ) );
 			if ( is_array( $link ) && $valid_header ) {
-				$this->store->save_reconcile( (string) $link['hub_origin'], strtolower( (string) $request['id'] ), $match[1], time(), 'unlink_local' );
+				if ( ! $this->store->save_reconcile( (string) $link['hub_origin'], strtolower( (string) $request['id'] ), $match[1], time(), 'unlink_local' ) ) {
+					return new \WP_Error( 'wpbridge_spoke_reconcile_storage_failed', __( '无法持久记录 rotation compensation。', 'wpbridge' ), [ 'status' => 503 ] );
+				}
 			}
 			return self::bad_request();
 		}

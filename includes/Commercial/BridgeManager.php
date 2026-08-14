@@ -130,7 +130,9 @@ class BridgeManager {
 
 		// 保存配置（URL 明文存储，API Key 加密存储）
 		$this->settings->set( 'bridge_server_url', $server_url );
-		Encryption::store_secure( 'bridge_server_api_key', $api_key );
+		if ( ! Encryption::store_secure( 'bridge_server_api_key', $api_key ) ) {
+			return [ 'success' => false, 'message' => __( 'Active Spoke 不能保存上游凭据。', 'wpbridge' ) ];
+		}
 
 		$this->bridge_client = $client;
 
@@ -531,9 +533,14 @@ class BridgeManager {
 
 		// 敏感字段加密存储
 		$sensitive_fields = [ 'license_key', 'api_key', 'consumer_key', 'consumer_secret' ];
+		$stored_fields = [];
 		foreach ( $sensitive_fields as $field ) {
 			if ( ! empty( $config[ $field ] ) ) {
-				Encryption::store_secure( "vendor_{$vendor_id}_{$field}", $config[ $field ] );
+				if ( ! Encryption::store_secure( "vendor_{$vendor_id}_{$field}", $config[ $field ] ) ) {
+					foreach ( $stored_fields as $stored_field ) { Encryption::delete_secure( "vendor_{$vendor_id}_{$stored_field}" ); }
+					return [ 'success' => false, 'message' => __( 'Active Spoke 不能保存供应商凭据。', 'wpbridge' ) ];
+				}
+				$stored_fields[] = $field;
 				$config[ $field ] = '***encrypted***';
 			}
 		}

@@ -49,7 +49,7 @@ class DefaultsManager {
 	 */
 	public function get_all(): array {
 		if ( null === $this->cached_defaults ) {
-			$this->cached_defaults = is_multisite() ? get_site_option( self::OPTION_NAME, [] ) : get_option( self::OPTION_NAME, [] );
+			$this->cached_defaults = get_option( self::OPTION_NAME, [] );
 			$this->ensure_defaults();
 		}
 		return $this->cached_defaults;
@@ -82,7 +82,7 @@ class DefaultsManager {
 		$defaults[ $scope ]['updated_at'] = current_time( 'mysql' );
 
 		$this->cached_defaults = $defaults;
-		return is_multisite() ? update_site_option( self::OPTION_NAME, $defaults ) : update_option( self::OPTION_NAME, $defaults, false );
+		return update_option( self::OPTION_NAME, $defaults, false );
 	}
 
 	/**
@@ -202,7 +202,7 @@ class DefaultsManager {
 		}
 
 		if ( $needs_update ) {
-			is_multisite() ? update_site_option( self::OPTION_NAME, $this->cached_defaults ) : update_option( self::OPTION_NAME, $this->cached_defaults, false );
+			update_option( self::OPTION_NAME, $this->cached_defaults, false );
 		}
 	}
 
@@ -253,13 +253,13 @@ class DefaultsManager {
 	public function reset( ?string $scope = null ): bool {
 		if ( null === $scope ) {
 			$this->cached_defaults = null;
-			return is_multisite() ? delete_site_option( self::OPTION_NAME ) : delete_option( self::OPTION_NAME );
+			return delete_option( self::OPTION_NAME );
 		}
 
 		$defaults              = $this->get_all();
 		$defaults[ $scope ]    = $this->get_scope_defaults( $scope );
 		$this->cached_defaults = $defaults;
-		return is_multisite() ? update_site_option( self::OPTION_NAME, $defaults ) : update_option( self::OPTION_NAME, $defaults, false );
+		return update_option( self::OPTION_NAME, $defaults, false );
 	}
 
 	/**

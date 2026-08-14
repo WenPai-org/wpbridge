@@ -30,12 +30,20 @@ final class StepUpVerifier {
 			return new \WP_Error( 'wpbridge_step_up_failed', __( '重新认证失败。', 'wpbridge' ), [ 'status' => 401 ] );
 		}
 		$proof = InstallationIdentity::base64url( random_bytes( 32 ) );
-		set_transient( $this->proof_key( $proof ), [ 'user_id' => (int) $user->ID, 'session_sha256' => $this->session_hash() ], 300 );
+		set_transient(
+			$this->proof_key( $proof ),
+			[
+				'user_id'       => (int) $user->ID,
+				'session_sha256' => $this->session_hash(),
+				'cleanup_only'   => ! LinkAuthorizer::enabled(),
+			],
+			300
+		);
 		return [ 'step_up_proof' => $proof, 'expires_in' => 300 ];
 	}
 
 	/** @return true|\WP_Error */
-	public function verify( \WP_REST_Request $request ) {
+	public function verify( \WP_REST_Request $request, bool $cleanup = false ) {
 		$base = $this->check_admin_request( $request, true );
 		if ( is_wp_error( $base ) ) {
 			return $base;
@@ -44,6 +52,9 @@ final class StepUpVerifier {
 		$record = 1 === preg_match( '/^[A-Za-z0-9_-]{43}$/', $proof ) ? get_transient( $this->proof_key( $proof ) ) : false;
 		if ( ! is_array( $record ) || get_current_user_id() !== (int) ( $record['user_id'] ?? 0 ) || ! hash_equals( $this->session_hash(), (string) ( $record['session_sha256'] ?? '' ) ) ) {
 			return new \WP_Error( 'wpbridge_step_up_required', __( '此操作需要最近五分钟内重新认证。', 'wpbridge' ), [ 'status' => 401 ] );
+		}
+		if ( ! $cleanup && ! empty( $record['cleanup_only'] ) ) {
+			return new \WP_Error( 'wpbridge_cleanup_proof_scope_invalid', __( '此凭证仅可用于降低权限的清理操作。', 'wpbridge' ), [ 'status' => 403 ] );
 		}
 		return true;
 	}

@@ -99,7 +99,9 @@ final class SpokeClient {
 		if ( ! self::exact_keys( $response, [ 'link_id', 'link_credential', 'scopes', 'slug_allowlist', 'expires_at' ] ) || ! is_null( $response['expires_at'] ) ) {
 			$compensated = $compensable && $this->compensate_acceptance( $origin, $response['link_id'], $response['link_credential'] );
 			if ( $compensable && ! $compensated ) {
-				$store->save_reconcile( $origin, $response['link_id'], $response['link_credential'], (int) call_user_func( $this->clock ) );
+				if ( ! $store->save_reconcile( $origin, $response['link_id'], $response['link_credential'], (int) call_user_func( $this->clock ) ) ) {
+					return new \WP_Error( 'wpbridge_spoke_reconcile_storage_failed', __( '无法持久记录 acceptance compensation。', 'wpbridge' ), [ 'status' => 503 ] );
+				}
 			}
 			if ( $compensated ) {
 				$store->clear_uncertain_accept( $invitation_id );
@@ -110,7 +112,9 @@ final class SpokeClient {
 		$policy = HubSpokeStore::normalize_policy( (array) $response['scopes'], (array) $response['slug_allowlist'] );
 		if ( is_wp_error( $policy ) || $policy['scopes'] !== $challenge['scopes'] || $policy['slug_allowlist'] !== $challenge['slug_allowlist'] ) {
 			if ( ! $this->compensate_acceptance( $origin, (string) $response['link_id'], (string) $response['link_credential'] ) ) {
-				$store->save_reconcile( $origin, (string) $response['link_id'], (string) $response['link_credential'], (int) call_user_func( $this->clock ) );
+				if ( ! $store->save_reconcile( $origin, (string) $response['link_id'], (string) $response['link_credential'], (int) call_user_func( $this->clock ) ) ) {
+					return new \WP_Error( 'wpbridge_spoke_reconcile_storage_failed', __( '无法持久记录 acceptance compensation。', 'wpbridge' ), [ 'status' => 503 ] );
+				}
 			} else {
 				$store->clear_uncertain_accept( $invitation_id );
 				$store->release_spoke_reservation();
@@ -121,7 +125,9 @@ final class SpokeClient {
 		if ( ! $store->save_spoke_link( $origin, $response, (int) call_user_func( $this->clock ) ) ) {
 			$compensated = $this->compensate_acceptance( $origin, (string) $response['link_id'], (string) $response['link_credential'] );
 			if ( ! $compensated ) {
-				$store->save_reconcile( $origin, (string) $response['link_id'], (string) $response['link_credential'], (int) call_user_func( $this->clock ) );
+				if ( ! $store->save_reconcile( $origin, (string) $response['link_id'], (string) $response['link_credential'], (int) call_user_func( $this->clock ) ) ) {
+					return new \WP_Error( 'wpbridge_spoke_reconcile_storage_failed', __( '无法持久记录 acceptance compensation。', 'wpbridge' ), [ 'status' => 503 ] );
+				}
 			} else {
 				$store->clear_uncertain_accept( $invitation_id );
 				$store->release_spoke_reservation();
@@ -162,12 +168,16 @@ final class SpokeClient {
 		$json = wp_json_encode( [ 'reason' => 'spoke_unlink' ] );
 		$response = call_user_func( $this->transport, (string) $link['hub_origin'] . '/wp-json/wpbridge/v2/hub-links/' . rawurlencode( $link_id ) . '/acceptance-compensations', [ 'method' => 'POST', 'timeout' => 15, 'redirection' => 0, 'headers' => [ 'Accept' => 'application/json', 'Content-Type' => 'application/json', 'Authorization' => 'WPBridge-Link ' . $link['credential'] ], 'body' => $json ] );
 		if ( is_wp_error( $response ) || 204 !== (int) wp_remote_retrieve_response_code( $response ) ) {
-			$store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], (int) call_user_func( $this->clock ), 'unlink_local', $admin_reason );
+			if ( ! $store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], (int) call_user_func( $this->clock ), 'unlink_local', $admin_reason ) ) {
+				return new \WP_Error( 'wpbridge_spoke_reconcile_storage_failed', __( '无法持久记录 Hub revoke 重试。', 'wpbridge' ), [ 'status' => 503 ] );
+			}
 			return new \WP_Error( 'wpbridge_spoke_remote_revoke_pending', __( 'Hub revoke 尚未确认，本地凭据保持并等待重试。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
 		$now = (int) call_user_func( $this->clock );
 		if ( ! $store->finalize_remote_revoke( $link_id, $now, $admin_reason ) ) {
-			$store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], $now, 'local_cleanup', $admin_reason );
+			if ( ! $store->save_reconcile( (string) $link['hub_origin'], $link_id, (string) $link['credential'], $now, 'local_cleanup', $admin_reason ) ) {
+				return new \WP_Error( 'wpbridge_spoke_reconcile_storage_failed', __( 'Hub 已撤销，但无法持久记录本地清理重试。', 'wpbridge' ), [ 'status' => 503 ] );
+			}
 			return new \WP_Error( 'wpbridge_spoke_local_cleanup_pending', __( 'Hub 已撤销，Spoke 本地清理等待重试。', 'wpbridge' ), [ 'status' => 503 ] );
 		}
 		return true;

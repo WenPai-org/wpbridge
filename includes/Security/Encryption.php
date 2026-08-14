@@ -299,6 +299,9 @@ class Encryption {
 	 * @return bool
 	 */
 	public static function store_secure( string $key, string $value ): bool {
+		if ( class_exists( \WPBridge\HubSpoke\CredentialBoundary::class ) && ! \WPBridge\HubSpoke\CredentialBoundary::secure_write_allowed( $value, self::get_secure( $key, '' ) ) ) {
+			return false;
+		}
 		$encrypted = self::encrypt( $value );
 		return update_option( 'wpbridge_secure_' . $key, $encrypted );
 	}

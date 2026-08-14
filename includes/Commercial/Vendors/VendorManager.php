@@ -15,6 +15,7 @@ namespace WPBridge\Commercial\Vendors;
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
 use WPBridge\Security\Encryption;
+use WPBridge\HubSpoke\CredentialBoundary;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -295,6 +296,7 @@ class VendorManager {
 	 */
 	public function add_vendor_config( string $vendor_id, array $config ): bool {
 		$vendors = $this->settings->get( 'vendors', [] );
+		if ( ! CredentialBoundary::credential_write_allowed( $config, (array) ( $vendors[ $vendor_id ] ?? [] ) ) ) { return false; }
 		// 加密敏感字段后存储
 		$vendors[ $vendor_id ] = self::encrypt_config( $config );
 

@@ -17,9 +17,6 @@ final class CredentialBoundary {
 		if ( ! is_multisite() ) {
 			return self::current_site_has_credentials();
 		}
-		if ( self::contains_nonempty_credentials( (array) get_site_option( 'wpbridge_source_registry', [] ) ) ) {
-			return true;
-		}
 		foreach ( get_sites( [ 'fields' => 'ids', 'number' => 0 ] ) as $site_id ) {
 			switch_to_blog( (int) $site_id );
 			$found = self::current_site_has_credentials();
@@ -36,8 +33,18 @@ final class CredentialBoundary {
 	}
 
 	/** A deletion/empty replacement reduces authority and remains permitted. */
-	public static function credential_write_allowed( array $value ): bool {
-		return ! self::contains_nonempty_credentials( $value ) || self::mutation_allowed();
+	public static function credential_write_allowed( array $value, array $previous = [] ): bool {
+		if ( self::mutation_allowed() ) {
+			return true;
+		}
+		$new_credentials = self::credential_map( $value );
+		$old_credentials = self::credential_map( $previous );
+		foreach ( $new_credentials as $path => $credential ) {
+			if ( '' !== $credential && ( ! isset( $old_credentials[ $path ] ) || ! hash_equals( $old_credentials[ $path ], $credential ) ) ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	public static function contains_nonempty_credentials( array $value ): bool {
@@ -50,6 +57,11 @@ final class CredentialBoundary {
 			}
 		}
 		return false;
+	}
+
+	/** Guard the generic encrypted-option API; an empty value remains authority-reducing. */
+	public static function secure_write_allowed( string $value, string $previous = '' ): bool {
+		return '' === $value || self::mutation_allowed() || ( '' !== $previous && hash_equals( $previous, $value ) );
 	}
 
 	private static function current_site_has_credentials(): bool {
@@ -70,5 +82,22 @@ final class CredentialBoundary {
 			}
 		}
 		return false;
+	}
+
+	/** @return array<string,string> */
+	private static function credential_map( array $value, string $prefix = '' ): array {
+		$output = [];
+		foreach ( $value as $key => $item ) {
+			$path = $prefix . '/' . (string) $key;
+			if ( in_array( strtolower( (string) $key ), self::SENSITIVE_KEYS, true ) ) {
+				if ( is_array( $item ) ) {
+					if ( [] !== $item ) { $output[ $path ] = hash( 'sha256', serialize( $item ) ); }
+				} elseif ( ! empty( $item ) && '***REDACTED***' !== $item && '********' !== $item ) {
+					$output[ $path ] = hash( 'sha256', (string) $item );
+				}
+			}
+			if ( is_array( $item ) ) { $output += self::credential_map( $item, $path ); }
+		}
+		return $output;
 	}
 }

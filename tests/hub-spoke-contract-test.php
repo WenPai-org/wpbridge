@@ -146,7 +146,8 @@ $assert( is_array( $invitation ) && preg_match( '/^WPBI1-[A-Za-z0-9_-]{43}$/', $
 $raw_store = serialize( get_option( 'wpbridge_hub_invitations_v1', [] ) );
 $assert( false === strpos( $raw_store, $invitation['invitation_token'] ) && false !== strpos( $raw_store, hash( 'sha256', $invitation['invitation_token'] ) ), 'Hub persists only the invitation token hash' );
 $lock_names = array_values( array_filter( $GLOBALS['wpbridge_lock_sql'], static function ( string $sql ): bool { return false !== strpos( $sql, 'GET_LOCK' ); } ) );
-$assert( 1 === count( array_unique( $lock_names ) ), 'Hub invitation lifecycle starts under the unified installation lifecycle lock' );
+$invitation_lifecycle_lock = substr( hash( 'sha256', 'hub-lifecycle:' . $uuid ), 0, 48 );
+$assert( count( array_filter( $lock_names, static function ( string $sql ) use ( $invitation_lifecycle_lock ): bool { return false !== strpos( $sql, $invitation_lifecycle_lock ); } ) ) >= 1, 'Hub invitation lifecycle starts under the unified installation lifecycle lock' );
 
 $spoke_keypair = sodium_crypto_sign_keypair();
 $spoke_public  = sodium_crypto_sign_publickey( $spoke_keypair );
@@ -281,15 +282,19 @@ $before_unlink_sources = get_option( 'wpbridge_source_registry', [] );
 $GLOBALS['wpbridge_fail_update']['wpbridge_source_registry'] = 1;
 $assert( ! $store->unlink_spoke( $unlink_response['link_id'], $now + 511 ), 'Spoke unlink reports dependent source registry failure' );
 $assert( $before_unlink_links === get_option( 'wpbridge_spoke_links_v1', [] ) && $before_unlink_sources === get_option( 'wpbridge_source_registry', [] ), 'Spoke unlink failure restores credential state and source registry exactly' );
+$GLOBALS['wpbridge_fail_update']['wpbridge_spoke_reconcile_v1'] = 1;
+$enqueue_failure = ( new SpokeClient( static function (): array { return [ 'response' => [ 'code' => 503 ] ]; }, static function () use ( $now ): int { return $now + 512; } ) )->unlink( $unlink_response['link_id'], 'admin unlink' );
+$assert( is_wp_error( $enqueue_failure ) && 'wpbridge_spoke_reconcile_storage_failed' === $enqueue_failure->get_error_code(), 'Failed durable enqueue returns an explicit 503 error instead of claiming pending reconciliation' );
 $assert( $store->save_reconcile( 'https://hub.example', $unlink_response['link_id'], $unlink_response['link_credential'], $now + 512, 'unlink_local' ), 'Remote-revoke reconciliation fixture persists an unlink-local action' );
 $reconcile_transport_calls = 0;
 $reconcile_reason = '';
 $reconcile_transport = static function ( string $url, array $args ) use ( &$reconcile_transport_calls, &$reconcile_reason ): array { unset( $url ); ++$reconcile_transport_calls; $reconcile_reason = (string) ( json_decode( (string) $args['body'], true )['reason'] ?? '' ); return [ 'response' => [ 'code' => 204 ] ]; };
+$audit_before_failed_cleanup = count( (array) get_option( 'wpbridge_hub_audit_v1', [] ) );
 $GLOBALS['wpbridge_fail_update']['wpbridge_hub_spoke_role_v1'] = 1;
 $remote_resolved_local_failed = $store->process_reconciles( $reconcile_transport, $now + 512 );
 $pending_cleanup = $store->reconcile_statuses()[0] ?? [];
 $wiped_after_remote = get_option( 'wpbridge_spoke_links_v1', [] )[ $unlink_response['link_id'] ] ?? [];
-$assert( 1 === $remote_resolved_local_failed['failed'] && 'local_cleanup' === ( $pending_cleanup['action'] ?? '' ) && 'spoke_unlink' === $reconcile_reason && 1 === $reconcile_transport_calls && 'revoked' === ( $wiped_after_remote['status'] ?? '' ) && '' === ( $wiped_after_remote['credential_ciphertext'] ?? 'missing' ) && ! isset( $pending_cleanup['credential_ciphertext'] ), 'Confirmed remote revoke uses persisted reason and wipes credential before durable source-only cleanup' );
+$assert( 1 === $remote_resolved_local_failed['failed'] && 'local_cleanup' === ( $pending_cleanup['action'] ?? '' ) && 'spoke_unlink' === $reconcile_reason && 1 === $reconcile_transport_calls && 'revoked' === ( $wiped_after_remote['status'] ?? '' ) && '' === ( $wiped_after_remote['credential_ciphertext'] ?? 'missing' ) && ! isset( $pending_cleanup['credential_ciphertext'] ) && $audit_before_failed_cleanup === count( (array) get_option( 'wpbridge_hub_audit_v1', [] ) ), 'Confirmed remote revoke uses persisted reason, wipes credential, and emits no false cleanup-success audit' );
 $local_resolved = $store->process_reconciles( $reconcile_transport, $now + 633 );
 $assert( 1 === $local_resolved['resolved'] && [] === $store->reconcile_statuses() && 1 === $reconcile_transport_calls, 'Second local-cleanup run resolves without calling the revoked Hub credential again' );
 
@@ -340,6 +345,26 @@ $failed_reconcile = $reconcile_store->process_reconciles( static function (): ar
 $assert( 1 === $failed_reconcile['failed'] && 1 === count( $reconcile_store->reconcile_statuses() ) && 'remote_revoke_failed' === $reconcile_store->reconcile_statuses()[0]['error'] && 'pending' === $reconcile_store->reconcile_statuses()[0]['reconcile_state'], 'Reconcile processor retains failed remote revoke with bounded retry state' );
 $resolved_reconcile = $reconcile_store->process_reconciles( static function (): array { return [ 'response' => [ 'code' => 204 ] ]; }, $now + 121 );
 $assert( 1 === $resolved_reconcile['resolved'] && [] === $reconcile_store->reconcile_statuses(), 'Reconcile processor removes state only after authenticated remote revoke confirmation' );
+$interleave_first = '61000000-0000-4000-8000-000000000061';
+$interleave_next  = '62000000-0000-4000-8000-000000000062';
+$interleave_credential = 'WPBL1-' . InstallationIdentity::base64url( str_repeat( 'Q', 32 ) );
+$reconcile_store->save_reconcile( 'https://hub.example', $interleave_first, $remote_credential, $now + 122 );
+$GLOBALS['wpbridge_test_options']['wpbridge_hub_spoke_role_v1'] = [];
+$GLOBALS['wpbridge_test_options']['wpbridge_hub_invitations_v1'] = [];
+$assert( is_wp_error( $reconcile_store->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now + 122, 'https://hub.example' ) ) && ! $reconcile_store->reserve_spoke_role( $now + 122 ), 'Any durable reconcile row blocks Hub invitation and Spoke role transitions' );
+$appended_during_io = false;
+$same_row_enqueue = false;
+$interleave_result = $reconcile_store->process_reconciles(
+	static function () use ( $reconcile_store, $interleave_first, $interleave_next, $interleave_credential, $remote_credential, $now, &$appended_during_io, &$same_row_enqueue ): array {
+		$same_row_enqueue = $reconcile_store->save_reconcile( 'https://hub.example', $interleave_first, $remote_credential, $now + 122 );
+		$appended_during_io = $reconcile_store->save_reconcile( 'https://hub.example', $interleave_next, $interleave_credential, $now + 122 );
+		return [ 'response' => [ 'code' => 204 ] ];
+	},
+	$now + 122
+);
+$remaining_ids = array_column( $reconcile_store->reconcile_statuses(), 'link_id' );
+$assert( $appended_during_io && $same_row_enqueue && 1 === $interleave_result['resolved'] && in_array( $interleave_next, $remaining_ids, true ) && ! in_array( $interleave_first, $remaining_ids, true ), 'Reconcile releases its network lock during HTTP and preserves a concurrent new row without resurrecting the claimed row' );
+$reconcile_store->process_reconciles( static function (): array { return [ 'response' => [ 'code' => 204 ] ]; }, $now + 123 );
 $expired_store = new HubSpokeStore();
 $expired_invitation = $expired_store->create_invitation( [ 'updates:read' ], [ 'wpbridge' ], $now, 'https://hub.example' );
 $assert( is_array( $expired_invitation ) && ! $expired_store->has_active_hub_state( $now + 601 ), 'Expired pending invitation no longer blocks Spoke role selection' );

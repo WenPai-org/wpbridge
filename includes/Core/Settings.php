@@ -7,6 +7,8 @@
 
 namespace WPBridge\Core;
 
+use WPBridge\HubSpoke\CredentialBoundary;
+
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -137,6 +139,7 @@ class Settings {
 	 */
 	public function set( string $key, $value ): bool {
 		$settings         = $this->get_all();
+		if ( ! CredentialBoundary::credential_write_allowed( [ $key => $value ], [ $key => $settings[ $key ] ?? null ] ) ) { return false; }
 		$settings[ $key ] = $value;
 
 		$this->cached_settings = $settings;
@@ -151,6 +154,7 @@ class Settings {
 	 */
 	public function update( array $settings ): bool {
 		$current = $this->get_all();
+		if ( ! CredentialBoundary::credential_write_allowed( $settings, $current ) ) { return false; }
 		$merged  = wp_parse_args( $settings, $current );
 
 		$this->cached_settings = $merged;
@@ -207,6 +211,7 @@ class Settings {
 	 * @return bool
 	 */
 	public function add_source( array $source ): bool {
+		if ( ! CredentialBoundary::credential_write_allowed( $source ) ) { return false; }
 		$sources = $this->get_sources();
 
 		// 生成唯一 ID
@@ -249,6 +254,7 @@ class Settings {
 
 		foreach ( $sources as $index => $source ) {
 			if ( $source['id'] === $id ) {
+				if ( ! CredentialBoundary::credential_write_allowed( $data, $source ) ) { return false; }
 				$sources[ $index ]    = wp_parse_args( $data, $source );
 				$this->cached_sources = $sources;
 				return update_option( self::OPTION_SOURCES, $sources );
