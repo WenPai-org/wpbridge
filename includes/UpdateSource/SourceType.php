@@ -76,6 +76,7 @@ class SourceType {
 	 * WPBridge Server（商业插件桥接服务）
 	 */
 	const BRIDGE_SERVER = 'bridge_server';
+	const HUB_SPOKE = 'hub_spoke';
 
 	/**
 	 * 供应商（通过 VendorManager 桥接）
@@ -103,6 +104,7 @@ class SourceType {
 		self::FAIR,
 		self::PUC,
 		self::BRIDGE_SERVER,
+		self::HUB_SPOKE,
 	];
 
 	/**
@@ -120,6 +122,7 @@ class SourceType {
 		self::FAIR,
 		self::PUC,
 		self::BRIDGE_SERVER,
+		self::HUB_SPOKE,
 		self::VENDOR,
 	];
 
@@ -141,6 +144,7 @@ class SourceType {
 			self::FAIR          => __( 'FAIR', 'wpbridge' ),
 			self::PUC           => __( 'PUC Server', 'wpbridge' ),
 			self::BRIDGE_SERVER => __( 'Bridge Server', 'wpbridge' ),
+			self::HUB_SPOKE     => __( 'WPBridge Hub', 'wpbridge' ),
 			self::VENDOR        => __( '供应商', 'wpbridge' ),
 		];
 	}
@@ -205,6 +209,7 @@ class SourceType {
 			self::FAIR          => 'WPBridge\\UpdateSource\\Handlers\\FairHandler',
 			self::PUC           => 'WPBridge\\UpdateSource\\Handlers\\PUCHandler',
 			self::BRIDGE_SERVER => 'WPBridge\\UpdateSource\\Handlers\\BridgeServerHandler',
+			self::HUB_SPOKE     => 'WPBridge\\UpdateSource\\Handlers\\HubSpokeHandler',
 			self::VENDOR        => 'WPBridge\\UpdateSource\\Handlers\\VendorHandler',
 		];
 

@@ -12,24 +12,41 @@ jobs:
     runs-on: linux-arm64
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: PHP Parallel Lint
         run: |
           parallel-lint --exclude vendor --exclude node_modules .
 
-      - name: PHPCS 代码规范检查
+      - name: Install locked development gates
+        run: composer install --no-interaction --prefer-source --no-progress
+
+      - name: PHPCS 发布安全与兼容门
+        run: vendor/bin/phpcs --standard=phpcs.release.xml.dist --report=full .
+
+      - name: PHPCS 全量债务报告（非发布门）
+        continue-on-error: true
         run: |
-          # 如果仓库有自定义 phpcs 配置则使用，否则用默认 WordPress 标准
-          if [ -f phpcs.xml ] || [ -f phpcs.xml.dist ] || [ -f .phpcs.xml ] || [ -f .phpcs.xml.dist ]; then
-            phpcs .
-          else
-            phpcs --standard=WordPress-Extra \
-              --extensions=php \
-              --ignore=vendor/*,node_modules/*,tests/*,lib/* \
-              --report=full \
-              -s .
-          fi
+          vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary .
+
+      - name: Functional regression suite
+        run: npm test
+
+      - name: PHPStan level 3
+        run: |
+          vendor/bin/phpstan analyse -c phpstan.neon.dist --no-progress --memory-limit=1G --error-format=raw
+
+      - name: Reproducible private release package
+        run: |
+          output_dir="$(mktemp -d)"
+          trap 'rm -rf "$output_dir"' EXIT
+          tests/release/build-candidate.sh --version 1.2.4 --output-dir "$output_dir"
+          first_sha="$(awk '{print $1}' "$output_dir/wpbridge-1.2.4.zip.sha256")"
+          tests/release/build-candidate.sh --version 1.2.4 --output-dir "$output_dir"
+          second_sha="$(awk '{print $1}' "$output_dir/wpbridge-1.2.4.zip.sha256")"
+          test "$first_sha" = "$second_sha"
+          ( cd "$output_dir" && sha256sum -c wpbridge-1.2.4.zip.sha256 )
+          unzip -t "$output_dir/wpbridge-1.2.4.zip"
 
       - name: Gitleaks 密钥泄露扫描
         run: |

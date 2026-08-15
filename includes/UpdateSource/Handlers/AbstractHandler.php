@@ -10,6 +10,7 @@ namespace WPBridge\UpdateSource\Handlers;
 use WPBridge\UpdateSource\SourceModel;
 use WPBridge\Core\Logger;
 use WPBridge\Security\Encryption;
+use WPBridge\Security\SafeHttpClient;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -93,9 +94,10 @@ abstract class AbstractHandler implements HandlerInterface {
 	public function test_connection(): HealthStatus {
 		$start = microtime( true );
 
-		$response = wp_remote_get(
+		$response = $this->http_request(
 			$this->get_check_url(),
 			[
+				'method'  => 'GET',
 				'timeout' => $this->timeout,
 				'headers' => $this->get_headers(),
 			]
@@ -134,7 +136,8 @@ abstract class AbstractHandler implements HandlerInterface {
 		];
 
 		$args     = wp_parse_args( $args, $defaults );
-		$response = wp_remote_get( $url, $args );
+		$args['method'] = 'GET';
+		$response       = $this->http_request( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
 			Logger::error(
@@ -175,6 +178,17 @@ abstract class AbstractHandler implements HandlerInterface {
 		}
 
 		return $data;
+	}
+
+	/**
+	 * Send a request through the DNS-pinned client.
+	 *
+	 * @param string $url  URL.
+	 * @param array  $args Request arguments.
+	 * @return array|\WP_Error
+	 */
+	protected function http_request( string $url, array $args = [] ) {
+		return SafeHttpClient::request( $url, $args );
 	}
 
 	/**

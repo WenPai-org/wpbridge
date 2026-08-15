@@ -18,6 +18,107 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Validator {
 
 	/**
+	 * Resolve a URL to public addresses at request time.
+	 *
+	 * @param string $url URL.
+	 * @return array|\WP_Error
+	 */
+	public static function resolve_public_url( string $url ) {
+		if ( ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
+			return new \WP_Error( 'wpbridge_invalid_url', __( '远程 URL 无效。', 'wpbridge' ) );
+		}
+
+		$parts = wp_parse_url( $url );
+		if ( ! is_array( $parts ) || empty( $parts['scheme'] ) || empty( $parts['host'] ) ) {
+			return new \WP_Error( 'wpbridge_invalid_url', __( '远程 URL 缺少主机名。', 'wpbridge' ) );
+		}
+
+		$scheme = strtolower( (string) $parts['scheme'] );
+		if ( ! in_array( $scheme, [ 'http', 'https' ], true ) || isset( $parts['user'] ) || isset( $parts['pass'] ) ) {
+			return new \WP_Error( 'wpbridge_invalid_url', __( '远程 URL 协议或凭据无效。', 'wpbridge' ) );
+		}
+
+		$port = (int) ( $parts['port'] ?? ( 'https' === $scheme ? 443 : 80 ) );
+		if ( $port < 1 || $port > 65535 ) {
+			return new \WP_Error( 'wpbridge_invalid_url', __( '远程 URL 端口无效。', 'wpbridge' ) );
+		}
+
+		$host = strtolower( rtrim( (string) $parts['host'], '.' ) );
+		$ips  = self::resolve_host( $host );
+		if ( empty( $ips ) ) {
+			return new \WP_Error( 'wpbridge_dns_failed', __( '远程主机 DNS 解析失败。', 'wpbridge' ) );
+		}
+
+		foreach ( $ips as $ip ) {
+			if ( ! self::is_public_ip( $ip ) ) {
+				return new \WP_Error( 'wpbridge_private_address', __( '远程主机解析到了私有或保留地址。', 'wpbridge' ) );
+			}
+		}
+
+		return [
+			'host' => $host,
+			'port' => $port,
+			'ips'  => array_values( array_unique( $ips ) ),
+		];
+	}
+
+	/**
+	 * Resolve all A and AAAA records. Test fixtures may replace the result.
+	 *
+	 * @param string $host Host name or IP literal.
+	 * @return string[]
+	 */
+	private static function resolve_host( string $host ): array {
+		$pre_resolved = apply_filters( 'wpbridge_pre_resolve_host', null, $host );
+		if ( is_array( $pre_resolved ) ) {
+			$resolved = $pre_resolved;
+		} elseif ( filter_var( $host, FILTER_VALIDATE_IP ) ) {
+			$resolved = [ $host ];
+		} else {
+			$resolved = [];
+			if ( function_exists( 'dns_get_record' ) ) {
+				$records = dns_get_record( $host, DNS_A | DNS_AAAA );
+				if ( is_array( $records ) ) {
+					foreach ( $records as $record ) {
+						$ip = $record['ip'] ?? $record['ipv6'] ?? '';
+						if ( is_string( $ip ) && '' !== $ip ) {
+							$resolved[] = $ip;
+						}
+					}
+				}
+			}
+			if ( empty( $resolved ) ) {
+				$ipv4     = gethostbynamel( $host );
+				$resolved = is_array( $ipv4 ) ? $ipv4 : [];
+			}
+		}
+
+		$resolved = apply_filters( 'wpbridge_resolve_host', $resolved, $host );
+		if ( ! is_array( $resolved ) ) {
+			return [];
+		}
+
+		return array_values(
+			array_filter(
+				$resolved,
+				static function ( $ip ): bool {
+					return is_string( $ip ) && false !== filter_var( $ip, FILTER_VALIDATE_IP );
+				}
+			)
+		);
+	}
+
+	/**
+	 * Check that an address is globally routable.
+	 *
+	 * @param string $ip IP address.
+	 * @return bool
+	 */
+	private static function is_public_ip( string $ip ): bool {
+		return false !== filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE );
+	}
+
+	/**
 	 * 校验 URL
 	 *
 	 * @param string $url URL
@@ -34,23 +135,18 @@ class Validator {
 		}
 
 		// 只允许 http 和 https
-		$scheme = parse_url( $url, PHP_URL_SCHEME );
+		$scheme = wp_parse_url( $url, PHP_URL_SCHEME );
 		if ( ! in_array( $scheme, [ 'http', 'https' ], true ) ) {
 			return false;
 		}
 
 		// 检查是否有主机名
-		$host = parse_url( $url, PHP_URL_HOST );
+		$host = wp_parse_url( $url, PHP_URL_HOST );
 		if ( empty( $host ) ) {
 			return false;
 		}
 
-		// 禁止本地地址（安全考虑）
-		if ( self::is_local_address( $host ) ) {
-			return false;
-		}
-
-		return true;
+		return ! is_wp_error( self::resolve_public_url( $url ) );
 	}
 
 	/**
@@ -165,7 +261,7 @@ class Validator {
 
 		foreach ( $required as $field ) {
 			if ( ! isset( $data[ $field ] ) ) {
-				$errors[] = sprintf( __( '缺少必需字段: %s', 'wpbridge' ), $field );
+				$errors[] = sprintf( /* translators: %s: required field name */ __( '缺少必需字段: %s', 'wpbridge' ), $field );
 			}
 		}
 

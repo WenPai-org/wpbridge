@@ -180,6 +180,12 @@ class SourceModel {
 		} elseif ( ! Validator::is_valid_url( $this->api_url ) ) {
 			$errors['api_url'] = __( '无效的 URL 格式或不允许的地址', 'wpbridge' );
 		}
+		if ( SourceType::HUB_SPOKE === $this->type ) {
+			$parts = wp_parse_url( $this->api_url );
+			if ( '' !== $this->auth_token || 1 !== preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', (string) ( $this->metadata['spoke_link_id'] ?? '' ) ) || ! is_array( $parts ) || 'https' !== strtolower( (string) ( $parts['scheme'] ?? '' ) ) || empty( $parts['host'] ) || isset( $parts['user'] ) || isset( $parts['pass'] ) || ( ! empty( $parts['path'] ) && '/' !== $parts['path'] ) || isset( $parts['query'] ) || isset( $parts['fragment'] ) || 443 !== (int) ( $parts['port'] ?? 443 ) ) {
+				$errors['hub_spoke'] = __( 'Hub-Spoke source 只能引用 active link，不能保存源凭据。', 'wpbridge' );
+			}
+		}
 
 		// 验证项目类型
 		if ( ! in_array( $this->item_type, [ 'plugin', 'theme' ], true ) ) {

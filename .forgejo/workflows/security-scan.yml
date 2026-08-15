@@ -24,7 +24,7 @@ jobs:
     runs-on: linux-arm64
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Hadolint Dockerfile 检查
         run: |
@@ -54,7 +54,7 @@ jobs:
             echo "未找到 composer.lock，跳过"
             exit 0
           fi
-          composer audit --format=table || {
+          composer audit --locked --format=table || {
             echo "::error::Composer 依赖存在已知安全漏洞"
             exit 1
           }
@@ -68,7 +68,7 @@ jobs:
           fi
           # npm audit 只报告 high 和 critical
           if [ -f package-lock.json ]; then
-            npm audit --audit-level=high || {
+            npm_config_registry=https://registry.npmjs.org npm audit --audit-level=high || {
               echo "::error::npm 依赖存在高危安全漏洞"
               exit 1
             }

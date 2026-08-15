@@ -125,7 +125,13 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 								<div class="wpbridge-vendor-preset-meta">
 									<span class="wpbridge-vendor-meta-item">
 										<span class="dashicons dashicons-admin-plugins"></span>
-										<?php printf( esc_html__( '%d 个插件', 'wpbridge' ), $plugin_count ); ?>
+										<?php
+										printf(
+											/* translators: %d: plugin count */
+											esc_html__( '%d 个插件', 'wpbridge' ),
+											absint( $plugin_count )
+										);
+										?>
 									</span>
 									<?php if ( $last_sync ) : ?>
 										<span class="wpbridge-vendor-meta-item">
@@ -187,7 +193,15 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 								<?php if ( $daily_dl >= PHP_INT_MAX ) : ?>
 									<span class="wpbridge-vendor-perk"><?php esc_html_e( '无限下载', 'wpbridge' ); ?></span>
 								<?php else : ?>
-									<span class="wpbridge-vendor-perk"><?php printf( esc_html__( '%d 次/天', 'wpbridge' ), $daily_dl ); ?></span>
+									<span class="wpbridge-vendor-perk">
+										<?php
+										printf(
+											/* translators: %d: daily download limit */
+											esc_html__( '%d 次/天', 'wpbridge' ),
+											absint( $daily_dl )
+										);
+										?>
+									</span>
 								<?php endif; ?>
 								<?php if ( in_array( 'bridge_api', $features, true ) ) : ?>
 									<span class="wpbridge-vendor-perk">API</span>
@@ -209,7 +223,10 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 						<div class="wpbridge-vendor-footer-right">
 							<?php if ( $checked_at > 0 ) : ?>
 								<span class="wpbridge-subscription-checked">
-									<?php printf( esc_html__( '%s前验证', 'wpbridge' ), esc_html( human_time_diff( $checked_at ) ) ); ?>
+									<?php
+									/* translators: %s: human-readable time difference */
+									printf( esc_html__( '%s前验证', 'wpbridge' ), esc_html( human_time_diff( $checked_at ) ) );
+									?>
 								</span>
 							<?php endif; ?>
 							<button type="button" class="wpbridge-refresh-subscription" title="<?php esc_attr_e( '刷新', 'wpbridge' ); ?>">
@@ -256,7 +273,13 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 								<div class="wpbridge-vendor-preset-meta">
 									<span class="wpbridge-vendor-meta-item">
 										<span class="dashicons dashicons-admin-plugins"></span>
-										<?php printf( esc_html__( '%d 个插件', 'wpbridge' ), $plugin_count ); ?>
+										<?php
+										printf(
+											/* translators: %d: plugin count */
+											esc_html__( '%d 个插件', 'wpbridge' ),
+											absint( $plugin_count )
+										);
+										?>
 									</span>
 									<?php if ( $last_sync ) : ?>
 										<span class="wpbridge-vendor-meta-item">
@@ -475,7 +498,7 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 								<span class="wpbridge-plugin-list-author"><?php echo esc_html( $author ); ?></span>
 							<?php endif; ?>
 							<?php if ( $tested ) : ?>
-								<span class="wpbridge-plugin-list-compat"><?php printf( esc_html__( '已测 WP %s', 'wpbridge' ), esc_html( $tested ) ); ?></span>
+								<span class="wpbridge-plugin-list-compat"><?php /* translators: %s: tested WordPress version */ printf( esc_html__( '已测 WP %s', 'wpbridge' ), esc_html( $tested ) ); ?></span>
 							<?php endif; ?>
 							<?php if ( $requires_php ) : ?>
 								<span class="wpbridge-plugin-list-compat">PHP <?php echo esc_html( $requires_php ); ?>+</span>
@@ -488,7 +511,7 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 			<?php if ( count( $all_plugins ) > 20 ) : ?>
 				<div class="wpbridge-plugin-list-more">
 					<button type="button" class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm wpbridge-show-more-plugins">
-						<?php printf( esc_html__( '显示全部 %d 个插件', 'wpbridge' ), count( $all_plugins ) ); ?>
+						<?php /* translators: %d: total plugin count */ printf( esc_html__( '显示全部 %d 个插件', 'wpbridge' ), count( $all_plugins ) ); ?>
 					</button>
 				</div>
 			<?php endif; ?>

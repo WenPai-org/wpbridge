@@ -9,6 +9,7 @@ namespace WPBridge\UpdateSource;
 
 use WPBridge\Core\Settings;
 use WPBridge\Core\Logger;
+use WPBridge\HubSpoke\CredentialBoundary;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -141,6 +142,9 @@ class SourceManager {
 	 * @return bool
 	 */
 	public function add( SourceModel $source ): bool {
+		if ( ! CredentialBoundary::credential_write_allowed( $source->to_array() ) ) {
+			return false;
+		}
 		// 验证
 		$errors = $source->validate();
 		if ( ! empty( $errors ) ) {
@@ -176,6 +180,9 @@ class SourceManager {
 	 * @return bool
 	 */
 	public function update( SourceModel $source ): bool {
+		if ( ! CredentialBoundary::credential_write_allowed( $source->to_array(), (array) $this->settings->get_source( $source->id ) ) ) {
+			return false;
+		}
 		// 验证
 		$errors = $source->validate();
 		if ( ! empty( $errors ) ) {

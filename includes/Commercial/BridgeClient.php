@@ -13,7 +13,9 @@ declare(strict_types=1);
 namespace WPBridge\Commercial;
 
 use WPBridge\Core\Logger;
+use WPBridge\Security\SafeHttpClient;
 use WPBridge\Security\Validator;
+use WPBridge\Security\PackageIntegrityVerifier;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -46,6 +48,14 @@ class BridgeClient {
 	 */
 	private int $timeout;
 
+	/** @var callable */
+	private $package_transport;
+	/** @var callable */
+	private $api_transport;
+
+	/** @var array|null */
+	private ?array $capabilities = null;
+
 	/**
 	 * 构造函数
 	 *
@@ -53,7 +63,7 @@ class BridgeClient {
 	 * @param string $api_key    API Key
 	 * @param int    $timeout    请求超时（秒）
 	 */
-	public function __construct( string $server_url, string $api_key, int $timeout = 30 ) {
+	public function __construct( string $server_url, string $api_key, int $timeout = 30, ?callable $package_transport = null, ?callable $api_transport = null ) {
 		$server_url = rtrim( $server_url, '/' );
 
 		// H3/H4: 强制 HTTPS
@@ -75,6 +85,8 @@ class BridgeClient {
 		$this->server_url = $server_url;
 		$this->api_key    = $api_key;
 		$this->timeout    = $timeout;
+		$this->package_transport = $package_transport ?? [ SafeHttpClient::class, 'request' ];
+		$this->api_transport = $api_transport ?? [ SafeHttpClient::class, 'request' ];
 	}
 
 	/**
@@ -83,8 +95,9 @@ class BridgeClient {
 	 * @param string $slug 插件 slug
 	 * @return array|null
 	 */
-	public function get_plugin_info( string $slug ): ?array {
-		$response = $this->request( 'GET', "/api/v1/plugin/{$slug}" );
+	public function get_plugin_info( string $slug, string $grant = '' ): ?array {
+		$endpoint = $this->endpoint( 'plugin_info', '/api/v1/plugin/{slug}', $slug );
+		$response = $this->request( 'GET', $endpoint, [], true, true, $grant );
 
 		if ( is_wp_error( $response ) ) {
 			Logger::error(
@@ -111,7 +124,97 @@ class BridgeClient {
 			return null;
 		}
 		// 下载端点会返回重定向或直接代理
-		return $this->server_url . "/api/v1/download/{$slug}";
+		return $this->server_url . $this->endpoint( 'download', '/api/v1/download/{slug}', $slug );
+	}
+
+	/**
+	 * Download a package with a short-lived grant and verify its advertised digest.
+	 *
+	 * @return string|\WP_Error Temporary file path on success.
+	 */
+	public function download_package( string $slug, string $grant, array $integrity ) {
+		$sha256 = strtolower( trim( (string) ( $integrity['sha256'] ?? '' ) ) );
+		if ( '' === $grant || ! preg_match( '/^[a-f0-9]{64}$/', $sha256 ) || empty( $this->server_url ) ) {
+			return new \WP_Error( 'wpbridge_protected_package_unverified', __( '受保护更新缺少可验证的包摘要。', 'wpbridge' ) );
+		}
+		$file = wp_tempnam( $slug . '.zip' );
+		if ( ! is_string( $file ) || '' === $file ) {
+			return new \WP_Error( 'wpbridge_package_temp_failed', __( '无法创建更新包临时文件。', 'wpbridge' ) );
+		}
+		$endpoint = $this->endpoint( 'download', '/api/v1/download/{slug}', $slug );
+		$response = call_user_func(
+			$this->package_transport,
+			$this->server_url . $endpoint,
+			[
+				'method'      => 'GET',
+				'timeout'     => 300,
+				'redirection' => 0,
+				'stream'      => true,
+				'filename'    => $file,
+				'headers'     => [ 'Accept' => 'application/zip', 'Authorization' => 'Bearer ' . $grant ],
+			]
+		);
+		if ( is_wp_error( $response ) ) {
+			wp_delete_file( $file );
+			return $response;
+		}
+		$status = (int) wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $status ) {
+			wp_delete_file( $file );
+			return new \WP_Error( 'wpbridge_package_download_failed', __( '受保护更新包下载失败。', 'wpbridge' ), [ 'status' => $status ] );
+		}
+		$verified = PackageIntegrityVerifier::verify_downloaded_file( $file, $integrity );
+		if ( is_wp_error( $verified ) ) {
+			wp_delete_file( $file );
+			return $verified;
+		}
+		return $file;
+	}
+
+	/**
+	 * Discover and normalize the server contract. Legacy servers keep their old routes.
+	 *
+	 * @return array
+	 */
+	public function get_capabilities(): array {
+		if ( null !== $this->capabilities ) {
+			return $this->capabilities;
+		}
+
+		$fallback = [
+			'service'     => 'wpbridge-server',
+			'api_version' => 'v1',
+			'legacy'      => true,
+			'auth'        => [ 'required' => true, 'header' => 'X-API-Key' ],
+			'endpoints'   => [
+				'health'      => '/health',
+				'plugin_info' => '/api/v1/plugin/{slug}',
+				'download'    => '/api/v1/download/{slug}',
+			],
+			'features'    => [ 'batch_update' => false, 'signed_download' => false, 'sha256' => false ],
+		];
+
+		$response = $this->request( 'GET', '/api/v1/capabilities', [], true, false );
+		if ( is_wp_error( $response ) || empty( $response['endpoints'] ) || ! is_array( $response['endpoints'] ) ) {
+			$this->capabilities = $fallback;
+			return $this->capabilities;
+		}
+
+		$this->capabilities = array_replace_recursive( $fallback, $response );
+		$this->capabilities['legacy'] = false;
+		return $this->capabilities;
+	}
+
+	/** @return array */
+	public function get_diagnostics(): array {
+		$capabilities = $this->get_capabilities();
+		return [
+			'service'     => sanitize_text_field( (string) ( $capabilities['service'] ?? '' ) ),
+			'api_version' => sanitize_text_field( (string) ( $capabilities['api_version'] ?? '' ) ),
+			'legacy'      => ! empty( $capabilities['legacy'] ),
+			'auth_header' => sanitize_text_field( (string) ( $capabilities['auth']['header'] ?? 'X-API-Key' ) ),
+			'features'    => array_map( 'boolval', (array) ( $capabilities['features'] ?? [] ) ),
+		];
 	}
 
 	/**
@@ -132,7 +235,7 @@ class BridgeClient {
 			return [];
 		}
 
-		return $response ?? [];
+		return $response;
 	}
 
 	/**
@@ -219,7 +322,7 @@ class BridgeClient {
 			return [];
 		}
 
-		return $response ?? [];
+		return $response;
 	}
 
 	/**
@@ -310,7 +413,7 @@ class BridgeClient {
 	 * @return bool
 	 */
 	public function health_check(): bool {
-		$response = $this->request( 'GET', '/health' );
+		$response = $this->request( 'GET', $this->endpoint( 'health', '/health' ), [], true );
 
 		if ( is_wp_error( $response ) ) {
 			return false;
@@ -328,7 +431,7 @@ class BridgeClient {
 	 * @param bool   $auth     是否需要认证
 	 * @return array|\WP_Error
 	 */
-	private function request( string $method, string $endpoint, array $data = [], bool $auth = false ) {
+	private function request( string $method, string $endpoint, array $data = [], bool $auth = false, bool $retry = true, string $bearer = '' ) {
 		$url = $this->server_url . $endpoint;
 
 		$args = [
@@ -345,13 +448,16 @@ class BridgeClient {
 		if ( $auth && ! empty( $this->api_key ) ) {
 			$args['headers']['X-API-Key'] = $this->api_key;
 		}
+		if ( '' !== $bearer ) {
+			$args['headers']['Authorization'] = 'Bearer ' . $bearer;
+		}
 
 		// 添加请求体
 		if ( ! empty( $data ) && in_array( $method, [ 'POST', 'PUT', 'PATCH' ], true ) ) {
 			$args['body'] = wp_json_encode( $data );
 		}
 
-		$response = wp_remote_request( $url, $args );
+		$response = call_user_func( $this->api_transport, $url, $args );
 
 		if ( is_wp_error( $response ) ) {
 			return $response;
@@ -368,14 +474,34 @@ class BridgeClient {
 		// 处理错误状态码
 		if ( $status_code >= 400 ) {
 			$error_data = json_decode( $body, true );
-			$message    = $error_data['message'] ?? $error_data['error'] ?? "HTTP {$status_code}";
-			return new \WP_Error( 'bridge_server_error', $message, [ 'status' => $status_code ] );
+			$error       = is_array( $error_data ) ? ( $error_data['error'] ?? $error_data ) : [];
+			$top_message = is_array( $error_data ) ? ( $error_data['message'] ?? '' ) : '';
+			$message     = is_array( $error ) ? ( $error['message'] ?? $top_message ) : (string) $error;
+			$code        = is_array( $error ) ? ( $error['code'] ?? 'bridge_server_error' ) : 'bridge_server_error';
+			$retry_after = (int) wp_remote_retrieve_header( $response, 'retry-after' );
+
+			if ( $retry && 'GET' === $method && ( 429 === $status_code || $status_code >= 500 ) ) {
+				$delay_ms = min( 1000, max( 100, $retry_after * 1000 ) );
+				usleep( $delay_ms * 1000 );
+				return $this->request( $method, $endpoint, $data, $auth, false, $bearer );
+			}
+
+			return new \WP_Error(
+				sanitize_key( (string) $code ) ?: 'bridge_server_error',
+				$message ?: "HTTP {$status_code}",
+				[
+					'status'      => $status_code,
+					'retry_after' => $retry_after,
+					'retryable'   => 429 === $status_code || $status_code >= 500,
+					'request_id'  => is_array( $error ) ? sanitize_text_field( (string) ( $error['request_id'] ?? '' ) ) : '',
+				]
+			);
 		}
 
 		// 解析 JSON 响应
 		$decoded = json_decode( $body, true );
 
-		if ( json_last_error() !== JSON_ERROR_NONE ) {
+		if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $decoded ) ) {
 			return new \WP_Error( 'json_decode_error', 'Invalid JSON response' );
 		}
 
@@ -397,6 +523,16 @@ class BridgeClient {
 	 * @return bool
 	 */
 	public function is_configured(): bool {
-		return ! empty( $this->server_url ) && ! empty( $this->api_key );
+		return ! empty( $this->server_url );
+	}
+
+	/** Resolve a capability endpoint without allowing an absolute URL. */
+	private function endpoint( string $name, string $fallback, string $slug = '' ): string {
+		$capabilities = $this->get_capabilities();
+		$endpoint     = (string) ( $capabilities['endpoints'][ $name ] ?? $fallback );
+		if ( '' === $endpoint || '/' !== $endpoint[0] || 0 === strpos( $endpoint, '//' ) ) {
+			$endpoint = $fallback;
+		}
+		return str_replace( '{slug}', rawurlencode( sanitize_title( $slug ) ), $endpoint );
 	}
 }

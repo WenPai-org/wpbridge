@@ -44,7 +44,7 @@ test_api() {
     echo "│  📡 URL: $url"
 
     # 发送请求
-    response=$(curl -s -w "\n%{http_code}" --connect-timeout 10 --max-time 30 "$url" 2>/dev/null)
+    response=$(curl -sL -w "\n%{http_code}" --connect-timeout 10 --max-time 30 "$url" 2>/dev/null)
     http_code=$(echo "$response" | tail -n1)
     body=$(echo "$response" | sed '$d')
 
@@ -57,8 +57,8 @@ test_api() {
                 echo -e "│  ${GREEN}✅ 响应包含: $expected_field${NC}"
                 ((PASS++))
             else
-                echo -e "│  ${YELLOW}⚠️  响应不包含: $expected_field${NC}"
-                ((PASS++))
+                echo -e "│  ${RED}❌ 响应不包含: $expected_field${NC}"
+                ((FAIL++))
             fi
         else
             ((PASS++))
@@ -146,10 +146,12 @@ test_api "ArkPress API" \
     "true" \
     "需要配置真实 ArkPress 服务"
 
-# 12. 本地 Bridge Server
-test_api "Bridge Server (本地)" \
-    "http://localhost:8080/health" \
-    "status"
+# 12. Bridge Server（仅在显式提供测试地址时执行）
+if [ -n "${WPBRIDGE_TEST_BRIDGE_URL:-}" ]; then
+    test_api "Bridge Server" "$WPBRIDGE_TEST_BRIDGE_URL" "status"
+else
+    test_api "Bridge Server" "http://localhost:8080/health" "status" "true" "未提供 WPBRIDGE_TEST_BRIDGE_URL"
+fi
 
 # 13. JSON/PUC 格式测试
 test_api "JSON/PUC API" \
@@ -207,3 +209,9 @@ if [ $SKIP -gt 0 ]; then
 fi
 
 echo ""
+
+if [ "$FAIL" -gt 0 ]; then
+    exit 1
+fi
+
+exit 0

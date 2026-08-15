@@ -7,6 +7,8 @@
 
 namespace WPBridge\Core;
 
+use WPBridge\HubSpoke\CredentialBoundary;
+
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -137,10 +139,13 @@ class Settings {
 	 */
 	public function set( string $key, $value ): bool {
 		$settings         = $this->get_all();
-		$settings[ $key ] = $value;
-
-		$this->cached_settings = $settings;
-		return update_option( self::OPTION_SETTINGS, $settings );
+		$previous = [ $key => $settings[ $key ] ?? null ];
+		return CredentialBoundary::guarded_write( [ $key => $value ], $previous, function () use ( $settings, $key, $value ): bool {
+			$updated = $settings;
+			$updated[ $key ] = $value;
+			$this->cached_settings = $updated;
+			return update_option( self::OPTION_SETTINGS, $updated );
+		} );
 	}
 
 	/**
@@ -152,9 +157,10 @@ class Settings {
 	public function update( array $settings ): bool {
 		$current = $this->get_all();
 		$merged  = wp_parse_args( $settings, $current );
-
-		$this->cached_settings = $merged;
-		return update_option( self::OPTION_SETTINGS, $merged );
+		return CredentialBoundary::guarded_write( $settings, $current, function () use ( $merged ): bool {
+			$this->cached_settings = $merged;
+			return update_option( self::OPTION_SETTINGS, $merged );
+		} );
 	}
 
 	/**
@@ -233,8 +239,10 @@ class Settings {
 
 		$sources[] = $source;
 
-		$this->cached_sources = $sources;
-		return update_option( self::OPTION_SOURCES, $sources );
+		return CredentialBoundary::guarded_write( $source, [], function () use ( $sources ): bool {
+			$this->cached_sources = $sources;
+			return update_option( self::OPTION_SOURCES, $sources );
+		} );
 	}
 
 	/**
@@ -250,8 +258,10 @@ class Settings {
 		foreach ( $sources as $index => $source ) {
 			if ( $source['id'] === $id ) {
 				$sources[ $index ]    = wp_parse_args( $data, $source );
-				$this->cached_sources = $sources;
-				return update_option( self::OPTION_SOURCES, $sources );
+				return CredentialBoundary::guarded_write( $data, $source, function () use ( $sources ): bool {
+					$this->cached_sources = $sources;
+					return update_option( self::OPTION_SOURCES, $sources );
+				} );
 			}
 		}
 
@@ -276,9 +286,10 @@ class Settings {
 
 				unset( $sources[ $index ] );
 				$sources = array_values( $sources ); // 重新索引
-
-				$this->cached_sources = $sources;
-				return update_option( self::OPTION_SOURCES, $sources );
+				return CredentialBoundary::guarded_write( [], $source, function () use ( $sources ): bool {
+					$this->cached_sources = $sources;
+					return update_option( self::OPTION_SOURCES, $sources );
+				} );
 			}
 		}
 
@@ -293,7 +304,18 @@ class Settings {
 	 * @return bool
 	 */
 	public function toggle_source( string $id, bool $enabled ): bool {
-		return $this->update_source( $id, [ 'enabled' => $enabled ] );
+		$sources = $this->get_sources();
+		foreach ( $sources as $index => $source ) {
+			if ( ( $source['id'] ?? '' ) === $id ) {
+				$updated = array_merge( $source, [ 'enabled' => $enabled ] );
+				$sources[ $index ] = $updated;
+				return CredentialBoundary::guarded_write( $updated, $enabled ? [] : $source, function () use ( $sources ): bool {
+					$this->cached_sources = $sources;
+					return update_option( self::OPTION_SOURCES, $sources );
+				} );
+			}
+		}
+		return false;
 	}
 
 	/**

@@ -2,6 +2,10 @@ includes:
     - %rootDir%/../../szepeviktor/phpstan-wordpress/extension.neon
 
 parameters:
+    bootstrapFiles:
+        - tests/phpstan/phpstan-bootstrap.php
+    scanFiles:
+        - tests/phpstan/phpstan-wp-cli-stubs.php
     level: 3
     paths:
         - includes

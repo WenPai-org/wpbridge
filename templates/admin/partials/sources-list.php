@@ -82,8 +82,8 @@ $render_test_status = function ( string $source_id, bool $enabled ) use ( $healt
 				printf(
 					/* translators: 1: total count, 2: enabled count */
 					esc_html__( '共 %1$d 个更新源，%2$d 个已启用', 'wpbridge' ),
-					$total_count,
-					$enabled_count
+					absint( $total_count ),
+					absint( $enabled_count )
 				);
 				?>
 			</span>

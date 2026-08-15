@@ -99,12 +99,14 @@ class BackupManager {
 			// 创建 .htaccess 防止直接访问
 			$htaccess = $dir . '/.htaccess';
 			if ( ! file_exists( $htaccess ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writes a fixed marker into the plugin-owned backup directory created immediately above.
 				file_put_contents( $htaccess, "Deny from all\n" );
 			}
 
 			// 创建 index.php
 			$index = $dir . '/index.php';
 			if ( ! file_exists( $index ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writes a fixed marker into the plugin-owned backup directory created immediately above.
 				file_put_contents( $index, "<?php\n// Silence is golden.\n" );
 			}
 		}
@@ -141,9 +143,9 @@ class BackupManager {
 	/**
 	 * 更新前创建备份
 	 *
-	 * @param bool|WP_Error $response 响应
+	 * @param bool|\WP_Error $response 响应
 	 * @param array         $hook_extra 额外参数
-	 * @return bool|WP_Error
+	 * @return bool|\WP_Error
 	 */
 	public function pre_install_backup( $response, $hook_extra ) {
 		// 检查是否启用了备份
@@ -349,7 +351,7 @@ class BackupManager {
 			// 删除文件
 			$file_path = $this->get_backup_dir() . '/' . $old_backup['filename'];
 			if ( file_exists( $file_path ) ) {
-				unlink( $file_path );
+				wp_delete_file( $file_path );
 			}
 		}
 
@@ -363,7 +365,7 @@ class BackupManager {
 	 *
 	 * @param string $item_key  项目键
 	 * @param string $backup_id 备份 ID
-	 * @return bool|WP_Error
+	 * @return bool|\WP_Error
 	 */
 	public function rollback( string $item_key, string $backup_id ) {
 		$item_backups = $this->get_item_backups( $item_key );
@@ -387,24 +389,20 @@ class BackupManager {
 			return new \WP_Error( 'backup_file_missing', __( '备份文件不存在', 'wpbridge' ) );
 		}
 
-		// 确定目标路径
+		// 确定目标路径。备份只能替换其原始插件或主题，不能解压到共同父目录。
 		if ( strpos( $item_key, 'plugin:' ) === 0 ) {
 			$plugin_file = substr( $item_key, 7 );
-			$target_dir  = WP_PLUGIN_DIR . '/' . dirname( $plugin_file );
-
-			if ( dirname( $plugin_file ) === '.' ) {
-				// 单文件插件
-				$target_dir = WP_PLUGIN_DIR;
-			}
+			$target_path = '.' === dirname( $plugin_file )
+				? WP_PLUGIN_DIR . '/' . $plugin_file
+				: WP_PLUGIN_DIR . '/' . dirname( $plugin_file );
 		} elseif ( strpos( $item_key, 'theme:' ) === 0 ) {
 			$theme_slug = substr( $item_key, 6 );
-			$target_dir = get_theme_root() . '/' . $theme_slug;
+			$target_path = get_theme_root() . '/' . $theme_slug;
 		} else {
 			return new \WP_Error( 'invalid_item', __( '无效的项目', 'wpbridge' ) );
 		}
 
-		// 解压备份
-		$result = $this->extract_zip( $backup_path, dirname( $target_dir ) );
+		$result = $this->atomic_restore( $backup_path, $target_path );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -416,13 +414,90 @@ class BackupManager {
 	}
 
 	/**
+	 * Extract into a same-filesystem staging directory, then atomically swap it in.
+	 *
+	 * @param string $zip_path    Backup archive.
+	 * @param string $target_path Plugin file/directory or theme directory.
+	 * @return bool|\WP_Error
+	 */
+	private function atomic_restore( string $zip_path, string $target_path ) {
+		$parent = dirname( $target_path );
+		if ( ! is_dir( $parent ) ) {
+			return new \WP_Error( 'invalid_target', __( '回滚目标目录不存在。', 'wpbridge' ) );
+		}
+
+		$suffix       = str_replace( '-', '', wp_generate_uuid4() );
+		$staging_dir  = $parent . '/.wpbridge-restore-' . $suffix;
+		$previous     = $parent . '/.wpbridge-previous-' . $suffix;
+		$expected     = $staging_dir . '/' . basename( $target_path );
+		$target_moved = false;
+
+		if ( ! wp_mkdir_p( $staging_dir ) ) {
+			return new \WP_Error( 'restore_staging_failed', __( '无法创建回滚暂存目录。', 'wpbridge' ) );
+		}
+
+		$result = $this->extract_zip( $zip_path, $staging_dir, basename( $target_path ) );
+		if ( is_wp_error( $result ) ) {
+			$this->delete_path( $staging_dir );
+			return $result;
+		}
+
+		if ( ! file_exists( $expected ) ) {
+			$this->delete_path( $staging_dir );
+			return new \WP_Error( 'invalid_backup_archive', __( '备份文件缺少预期的插件或主题目录。', 'wpbridge' ) );
+		}
+
+		if ( file_exists( $target_path ) ) {
+			if ( ! $this->atomic_rename( $target_path, $previous ) ) {
+				$this->delete_path( $staging_dir );
+				return new \WP_Error( 'restore_swap_failed', __( '无法暂存当前版本，回滚未执行。', 'wpbridge' ) );
+			}
+			$target_moved = true;
+		}
+
+		if ( ! $this->atomic_rename( $expected, $target_path ) ) {
+			$restored = ! $target_moved || $this->atomic_rename( $previous, $target_path );
+			$this->delete_path( $staging_dir );
+			if ( ! $restored ) {
+				return new \WP_Error( 'restore_recovery_failed', __( '回滚替换失败，且无法恢复原版本。', 'wpbridge' ) );
+			}
+			return new \WP_Error( 'restore_swap_failed', __( '回滚替换失败，原版本已恢复。', 'wpbridge' ) );
+		}
+
+		$this->delete_path( $staging_dir );
+		if ( $target_moved ) {
+			$this->delete_path( $previous );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Rename within one filesystem. The filter exists to inject deterministic failures in tests.
+	 *
+	 * @param string $from Source.
+	 * @param string $to   Destination.
+	 * @return bool
+	 */
+	private function atomic_rename( string $from, string $to ): bool {
+		$override = apply_filters( 'wpbridge_atomic_rename', null, $from, $to );
+		if ( is_bool( $override ) ) {
+			return $override;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- Same-filesystem rename is the atomic primitive required here.
+		return @rename( $from, $to );
+	}
+
+	/**
 	 * 解压 ZIP 文件
 	 *
 	 * @param string $zip_path   ZIP 路径
-	 * @param string $target_dir 目标目录
-	 * @return bool|WP_Error
+	 * @param string $target_dir   暂存目录.
+	 * @param string $expected_top 唯一允许的顶层文件或目录名.
+	 * @return bool|\WP_Error
 	 */
-	private function extract_zip( string $zip_path, string $target_dir ) {
+	private function extract_zip( string $zip_path, string $target_dir, string $expected_top ) {
 		if ( ! class_exists( 'ZipArchive' ) ) {
 			return new \WP_Error( 'no_zip', __( 'ZipArchive 不可用', 'wpbridge' ) );
 		}
@@ -433,44 +508,65 @@ class BackupManager {
 			return new \WP_Error( 'zip_open_failed', __( '无法打开备份文件', 'wpbridge' ) );
 		}
 
-		// Zip Slip 防护：检查所有条目是否在目标目录内
-		$real_target = realpath( $target_dir );
-		if ( false === $real_target ) {
-			$zip->close();
-			return new \WP_Error( 'invalid_target', __( '目标目录不存在', 'wpbridge' ) );
-		}
-		$real_target = rtrim( $real_target, '/' ) . '/';
-
 		for ( $i = 0; $i < $zip->numFiles; $i++ ) {
-			$entry = $zip->getNameIndex( $i );
-			// 规范化路径并检查是否包含路径遍历
-			$full_path = realpath( $target_dir ) . '/' . $entry;
-			$resolved  = realpath( dirname( $target_dir . '/' . $entry ) );
+			$entry      = (string) $zip->getNameIndex( $i );
+			$normalized = str_replace( '\\', '/', $entry );
+			$segments   = explode( '/', trim( $normalized, '/' ) );
+			$unsafe     = '' === $entry
+				|| 0 === strpos( $normalized, '/' )
+				|| (bool) preg_match( '/^[A-Za-z]:/', $normalized )
+				|| in_array( '..', $segments, true )
+				|| ( $segments[0] ?? '' ) !== $expected_top;
 
-			// 如果目录尚不存在，用字符串检查
-			if ( false === $resolved ) {
-				// 检查原始条目名是否包含 .. 遍历
-				$normalized = str_replace( '\\', '/', $entry );
-				if ( strpos( $normalized, '../' ) !== false || strpos( $normalized, '..' . DIRECTORY_SEPARATOR ) !== false ) {
-					$zip->close();
-					return new \WP_Error(
-						'invalid_backup_archive',
-						sprintf( __( '备份文件包含非法路径: %s', 'wpbridge' ), $entry )
-					);
-				}
-			} elseif ( strpos( $resolved . '/', $real_target ) !== 0 ) {
+			$attributes = 0;
+			$opsys       = 0;
+			if ( $zip->getExternalAttributesIndex( $i, $opsys, $attributes ) && 3 === $opsys ) {
+				$unsafe = $unsafe || ( ( ( $attributes >> 16 ) & 0170000 ) === 0120000 );
+			}
+
+			if ( $unsafe ) {
 				$zip->close();
 				return new \WP_Error(
 					'invalid_backup_archive',
-					sprintf( __( '备份文件包含非法路径: %s', 'wpbridge' ), $entry )
+					sprintf( /* translators: %s: unsafe archive entry path */ __( '备份文件包含非法路径: %s', 'wpbridge' ), $entry )
 				);
 			}
 		}
 
-		$zip->extractTo( $target_dir );
+		$extracted = $zip->extractTo( $target_dir );
 		$zip->close();
 
-		return true;
+		return $extracted ? true : new \WP_Error( 'zip_extract_failed', __( '无法解压备份文件。', 'wpbridge' ) );
+	}
+
+	/**
+	 * Remove a file or directory created by this restore transaction.
+	 *
+	 * @param string $path Path.
+	 */
+	private function delete_path( string $path ): void {
+		if ( is_link( $path ) || is_file( $path ) ) {
+			wp_delete_file( $path );
+			return;
+		}
+		if ( ! is_dir( $path ) ) {
+			return;
+		}
+
+		$iterator = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator( $path, \FilesystemIterator::SKIP_DOTS ),
+			\RecursiveIteratorIterator::CHILD_FIRST
+		);
+		foreach ( $iterator as $item ) {
+			if ( $item->isDir() && ! $item->isLink() ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- Cleanup is limited to transaction-owned directories.
+				@rmdir( $item->getPathname() );
+			} else {
+				wp_delete_file( $item->getPathname() );
+			}
+		}
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- Cleanup is limited to a transaction-owned directory.
+		@rmdir( $path );
 	}
 
 	/**
@@ -492,7 +588,7 @@ class BackupManager {
 				// 删除文件
 				$file_path = $this->get_backup_dir() . '/' . $backup['filename'];
 				if ( file_exists( $file_path ) ) {
-					unlink( $file_path );
+					wp_delete_file( $file_path );
 				}
 
 				// 删除记录

@@ -14,6 +14,8 @@ use WPBridge\Admin\VendorAdmin;
 use WPBridge\Commercial\CommercialManager;
 use WPBridge\Commercial\AutoMatcher;
 use WPBridge\API\RestController;
+use WPBridge\HubSpoke\HubSpokeController;
+use WPBridge\HubSpoke\InstallationIdentity;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -88,6 +90,9 @@ class Plugin {
 	 */
 	private ?RestController $rest_controller = null;
 
+	/** Stage 3A Hub-Spoke controller (routes remain gated by deployment flag). */
+	private ?HubSpokeController $hub_spoke_controller = null;
+
 	/**
 	 * 自动匹配器
 	 *
@@ -128,68 +133,74 @@ class Plugin {
 	 * 一次性迁移旧版本数据
 	 */
 	private function maybe_migrate_legacy(): void {
-		$migrated = get_option( 'wpbridge_migration_version', '' );
+		$migrated = get_option( 'wpbridge_migration_version', '0.0.0' );
 
-		// v1.2.0: weixiaoduo-store → weixiaoduo-mall
+		// v0.6.0 引入新数据模型。旧选项仍保留，避免迁移失败导致用户数据丢失。
+		if ( version_compare( $migrated, '0.6.0', '<' ) && false !== get_option( 'wpbridge_sources' ) ) {
+			Logger::info( '检测到旧版本更新源数据，保留旧数据并启用兼容读取' );
+		}
+
+		// v1.2.0: weixiaoduo-store → weixiaoduo-mall。
 		if ( version_compare( $migrated, '1.2.0', '<' ) ) {
 			$this->migrate_vendor_id( 'weixiaoduo-store', 'weixiaoduo-mall' );
-			update_option( 'wpbridge_migration_version', WPBRIDGE_VERSION );
-			return;
 		}
 
-		if ( version_compare( $migrated, '0.6.0', '>=' ) ) {
-			return;
-		}
-
-		// 旧方案 A 的选项已不存在则无需迁移
-		$old_sources = get_option( 'wpbridge_sources' );
-		if ( false === $old_sources ) {
-			update_option( 'wpbridge_migration_version', WPBRIDGE_VERSION );
-			return;
-		}
-
-		// 标记迁移完成（旧数据保留，不影响新架构）
-		Logger::info( '旧版本数据检测完成，标记迁移版本', [ 'version' => WPBRIDGE_VERSION ] );
 		update_option( 'wpbridge_migration_version', WPBRIDGE_VERSION );
 	}
 
 	/**
-	 * 迁移供应商 ID：替换 source_registry 和 defaults 中的 vendor_ 前缀 key
+	 * 迁移供应商 ID，并同步所有保存 source key 的选项。
 	 */
 	private function migrate_vendor_id( string $old_id, string $new_id ): void {
 		$old_key = 'vendor_' . $old_id;
 		$new_key = 'vendor_' . $new_id;
 
-		// 迁移 source_registry
 		$sources = get_option( SourceRegistry::OPTION_NAME, [] );
-		if ( isset( $sources[ $old_key ] ) ) {
-			$sources[ $new_key ] = $sources[ $old_key ];
-			unset( $sources[ $old_key ] );
-			update_option( SourceRegistry::OPTION_NAME, $sources, false );
+		foreach ( $sources as &$source ) {
+			if ( ( $source['source_key'] ?? '' ) === $old_key ) {
+				$source['source_key'] = $new_key;
+			}
+			if ( ( $source['vendor_id'] ?? '' ) === $old_id ) {
+				$source['vendor_id'] = $new_id;
+			}
 		}
+		unset( $source );
+		update_option( SourceRegistry::OPTION_NAME, $sources, false );
 
-		// 迁移 defaults（项目绑定的 source_ids）
 		$defaults = get_option( DefaultsManager::OPTION_NAME, [] );
-		$changed  = false;
 		foreach ( $defaults as &$item ) {
 			if ( isset( $item['source_ids'][ $old_key ] ) ) {
 				$item['source_ids'][ $new_key ] = $item['source_ids'][ $old_key ];
 				unset( $item['source_ids'][ $old_key ] );
-				$changed = true;
+			}
+			if ( ! empty( $item['source_order'] ) ) {
+				$item['source_order'] = array_map(
+					static function ( $source_key ) use ( $old_key, $new_key ) {
+						return $old_key === $source_key ? $new_key : $source_key;
+					},
+					$item['source_order']
+				);
 			}
 		}
 		unset( $item );
-		if ( $changed ) {
-			update_option( DefaultsManager::OPTION_NAME, $defaults, false );
+		update_option( DefaultsManager::OPTION_NAME, $defaults, false );
+
+		$item_sources = get_option( ItemSourceManager::OPTION_NAME, [] );
+		foreach ( $item_sources as &$config ) {
+			if ( isset( $config['source_ids'][ $old_key ] ) ) {
+				$config['source_ids'][ $new_key ] = $config['source_ids'][ $old_key ];
+				unset( $config['source_ids'][ $old_key ] );
+			}
+		}
+		unset( $config );
+		update_option( ItemSourceManager::OPTION_NAME, $item_sources, false );
+
+		$old_slug_map = get_option( 'wpbridge_slug_map_' . $old_id, false );
+		if ( false !== $old_slug_map && false === get_option( 'wpbridge_slug_map_' . $new_id, false ) ) {
+			update_option( 'wpbridge_slug_map_' . $new_id, $old_slug_map, false );
 		}
 
-		Logger::info(
-			'供应商 ID 迁移完成',
-			[
-				'from' => $old_id,
-				'to'   => $new_id,
-			]
-		);
+		Logger::info( '供应商 ID 迁移完成', [ 'from' => $old_id, 'to' => $new_id ] );
 	}
 
 	/**
@@ -239,6 +250,7 @@ class Plugin {
 		$this->theme_updater      = new ThemeUpdater( $this->settings );
 		$this->commercial_manager = new CommercialManager( $this->settings );
 		$this->rest_controller    = new RestController( $this->settings );
+		$this->hub_spoke_controller = new HubSpokeController( $this->settings );
 
 		// 初始化版本锁定
 		VersionLock::get_instance();
@@ -470,7 +482,7 @@ class Plugin {
 			return;
 		}
 
-		$include_secrets = isset( $_POST['include_secrets'] ) && 'true' === $_POST['include_secrets'];
+		$include_secrets = isset( $_POST['include_secrets'] ) && 'true' === sanitize_text_field( wp_unslash( $_POST['include_secrets'] ) );
 
 		$config_manager = new ConfigManager();
 		$config         = $config_manager->export( $include_secrets );
@@ -494,19 +506,25 @@ class Plugin {
 			return;
 		}
 
-		if ( empty( $_POST['config'] ) ) {
+		if ( ! isset( $_POST['config'] ) || ! is_string( $_POST['config'] ) ) {
 			wp_send_json_error( array( 'message' => __( '配置数据为空', 'wpbridge' ) ) );
 			return;
 		}
 
-		$config = json_decode( wp_unslash( $_POST['config'] ), true );
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON must remain structurally intact; decoded keys and values are sanitized below.
+		$raw_config = wp_unslash( $_POST['config'] );
+		if ( '' === $raw_config ) {
+			wp_send_json_error( array( 'message' => __( '配置数据为空', 'wpbridge' ) ) );
+			return;
+		}
+		$config = json_decode( $raw_config, true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
 			wp_send_json_error( array( 'message' => __( 'JSON 格式无效', 'wpbridge' ) ) );
 			return;
 		}
 
-		$merge = isset( $_POST['merge'] ) && 'true' === $_POST['merge'];
+		$merge = isset( $_POST['merge'] ) && 'true' === sanitize_text_field( wp_unslash( $_POST['merge'] ) );
 
 		$config_manager = new ConfigManager();
 		$result         = $config_manager->import( $config, $merge );
@@ -518,6 +536,7 @@ class Plugin {
 			wp_send_json_success(
 				array(
 					'message'  => sprintf(
+						/* translators: %d: number of imported configuration entries */
 						__( '成功导入 %d 项配置', 'wpbridge' ),
 						count( $result['imported'] )
 					),
@@ -679,6 +698,7 @@ class Plugin {
 		// 创建默认设置
 		$settings = new Settings();
 		$settings->init_defaults();
+		InstallationIdentity::ensure();
 
 		// 清除更新缓存
 		delete_site_transient( 'update_plugins' );
@@ -722,7 +742,7 @@ class Plugin {
 		// 清除对象缓存组（不使用 flush 避免影响其他插件）
 		if ( wp_using_ext_object_cache() ) {
 			if ( function_exists( 'wp_cache_flush_group' ) ) {
-				wp_cache_flush_group( 'wpbridge' );
+				call_user_func( 'wp_cache_flush_group', 'wpbridge' );
 			} else {
 				wp_cache_delete( 'wpbridge', 'wpbridge' );
 			}

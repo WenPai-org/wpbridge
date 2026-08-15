@@ -12,6 +12,7 @@ use WPBridge\Core\Logger;
 use WPBridge\UpdateSource\SourceManager;
 use WPBridge\UpdateSource\SourceModel;
 use WPBridge\Cache\CacheManager;
+use WPBridge\Security\SafeHttpClient;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -128,56 +129,46 @@ class BackgroundUpdater {
 	}
 
 	/**
-	 * 并行检查多个更新源
+	 * 检查多个更新源。为保证每个重定向 hop 都重新解析并固定 DNS，按源顺序请求。
 	 *
 	 * @param SourceModel[] $sources 源列表
 	 * @return array<string, array|null>
 	 */
 	private function check_multiple_sources( array $sources ): array {
-		$requests = [];
-
-		foreach ( $sources as $source ) {
-			$requests[ $source->id ] = [
-				'url'     => $source->get_check_url(),
-				'type'    => \WpOrg\Requests\Requests::GET,
-				'headers' => $source->get_headers(),
-			];
-		}
-
 		$timeout = $this->settings->get_request_timeout();
-
-		$responses = \WpOrg\Requests\Requests::request_multiple(
-			$requests,
-			[
-				'timeout'          => $timeout,
-				'connect_timeout'  => 5,
-				'follow_redirects' => true,
-				'redirects'        => 3,
-			]
-		);
-
 		$results = [];
 
-		foreach ( $responses as $source_id => $response ) {
-			if ( $response instanceof \WpOrg\Requests\Exception ) {
+		foreach ( $sources as $source ) {
+			$response = SafeHttpClient::request(
+				$source->get_check_url(),
+				[
+					'method'      => 'GET',
+					'headers'     => $source->get_headers(),
+					'timeout'     => $timeout,
+					'redirection' => 3,
+				]
+			);
+
+			if ( is_wp_error( $response ) ) {
 				Logger::warning(
 					'请求失败',
 					[
-						'source' => $source_id,
-						'error'  => $response->getMessage(),
+						'source' => $source->id,
+						'error'  => $response->get_error_message(),
 					]
 				);
-				$results[ $source_id ] = null;
+				$results[ $source->id ] = null;
 				continue;
 			}
 
-			if ( ! $response->success ) {
-				$results[ $source_id ] = null;
+			$code = (int) wp_remote_retrieve_response_code( $response );
+			if ( $code < 200 || $code >= 300 ) {
+				$results[ $source->id ] = null;
 				continue;
 			}
 
-			$data                  = json_decode( $response->body, true );
-			$results[ $source_id ] = ( json_last_error() === JSON_ERROR_NONE ) ? $data : null;
+			$data                   = json_decode( wp_remote_retrieve_body( $response ), true );
+			$results[ $source->id ] = ( json_last_error() === JSON_ERROR_NONE ) ? $data : null;
 		}
 
 		return $results;

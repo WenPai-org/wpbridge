@@ -131,7 +131,8 @@ $api_endpoint = rest_url( 'bridge/v1/' );
 								if ( ! empty( $created_at ) ) {
 									$timestamp = is_numeric( $created_at ) ? $created_at : strtotime( $created_at );
 									printf(
-										esc_html__( '创建于 %s', 'wpbridge' ),
+										/* translators: %s: API key creation date */
+									esc_html__( '创建于 %s', 'wpbridge' ),
 										esc_html( date_i18n( get_option( 'date_format' ), $timestamp ) )
 									);
 								}
@@ -139,7 +140,8 @@ $api_endpoint = rest_url( 'bridge/v1/' );
 								if ( ! empty( $last_used ) ) {
 									$last_timestamp = is_numeric( $last_used ) ? $last_used : strtotime( $last_used );
 									printf(
-										' &middot; ' . esc_html__( '最后使用 %s', 'wpbridge' ),
+										/* translators: %s: human-readable time since the API key was last used */
+									' &middot; ' . esc_html__( '最后使用 %s', 'wpbridge' ),
 										esc_html( human_time_diff( $last_timestamp, time() ) . __( '前', 'wpbridge' ) )
 									);
 								}

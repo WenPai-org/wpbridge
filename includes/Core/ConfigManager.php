@@ -7,6 +7,8 @@
 
 namespace WPBridge\Core;
 
+use WPBridge\HubSpoke\CredentialBoundary;
+
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -100,7 +102,6 @@ class ConfigManager {
 			$result['errors']  = $validation['errors'];
 			return $result;
 		}
-
 		// 导入选项
 		foreach ( $config['options'] as $option_name => $value ) {
 			// 只导入允许的选项
@@ -114,14 +115,21 @@ class ConfigManager {
 					$value = $this->merge_option( $option_name, $value );
 				}
 
-				if ( update_option( $option_name, $value ) ) {
+				$previous = get_option( $option_name, [] );
+				$written = CredentialBoundary::guarded_write(
+					[ $option_name => $value ],
+					[ $option_name => $previous ],
+					static function () use ( $option_name, $value ): bool { return update_option( $option_name, $value ) || $value === get_option( $option_name, [] ); }
+				);
+				if ( $written ) {
 					$result['imported'][] = $option_name;
 				} else {
-					// 值相同时 update_option 返回 false
-					$result['imported'][] = $option_name;
+					$result['success'] = false;
+					$result['errors'][] = __( 'Active Spoke 不能导入上游凭据。', 'wpbridge' );
 				}
 			} catch ( \Exception $e ) {
 				$result['errors'][] = sprintf(
+					/* translators: 1: option name, 2: error message */
 					__( '导入 %1$s 失败: %2$s', 'wpbridge' ),
 					$option_name,
 					$e->getMessage()
@@ -172,6 +180,7 @@ class ConfigManager {
 		// 检查版本兼容性
 		if ( ! empty( $config['version'] ) && version_compare( $config['version'], self::CONFIG_VERSION, '>' ) ) {
 			$errors[] = sprintf(
+				/* translators: 1: imported config version, 2: supported config version */
 				__( '配置版本 %1$s 高于当前支持的版本 %2$s', 'wpbridge' ),
 				$config['version'],
 				self::CONFIG_VERSION

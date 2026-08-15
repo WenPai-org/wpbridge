@@ -82,7 +82,7 @@ class ThemeUpdater {
 	 * @return object
 	 */
 	public function check_updates( $transient ) {
-		if ( empty( $transient ) || ! is_object( $transient ) ) {
+		if ( ! is_object( $transient ) ) {
 			$transient = new \stdClass();
 		}
 

@@ -14,6 +14,7 @@ use WPBridge\UpdateSource\SourceModel;
 use WPBridge\UpdateSource\SourceType;
 use WPBridge\Cache\HealthChecker;
 use WPBridge\Performance\BackgroundUpdater;
+use WPBridge\HubSpoke\HubSpokeStore;
 use WP_CLI;
 use WP_CLI\Utils;
 
@@ -61,6 +62,23 @@ class BridgeCommand {
 	public function __construct() {
 		$this->settings       = new Settings();
 		$this->source_manager = new SourceManager( $this->settings );
+	}
+
+	/**
+	 * Show or retry durable Hub-Spoke compensation records.
+	 *
+	 * [--process]
+	 * : Retry due remote revocations before printing status.
+	 *
+	 * @subcommand hub-reconcile
+	 */
+	public function hub_reconcile( $args, $assoc_args ): void {
+		unset( $args );
+		$store = new HubSpokeStore();
+		if ( Utils\get_flag_value( $assoc_args, 'process', false ) ) {
+			WP_CLI::log( wp_json_encode( $store->process_reconciles() ) );
+		}
+		WP_CLI::log( wp_json_encode( $store->reconcile_statuses() ) );
 	}
 
 	/**
@@ -504,7 +522,7 @@ class BridgeCommand {
 			$file_path = $args[0];
 			// 验证路径是否可写
 			$dir = dirname( $file_path );
-			if ( ! is_dir( $dir ) || ! is_writable( $dir ) ) {
+			if ( ! is_dir( $dir ) || ! wp_is_writable( $dir ) ) {
 				WP_CLI::error( '目标目录不存在或不可写' );
 			}
 			// 使用 WordPress 文件系统 API
@@ -625,7 +643,7 @@ class BridgeCommand {
 	 * @return string
 	 */
 	private function generate_source_name( string $url, string $type ): string {
-		$parsed = parse_url( $url );
+		$parsed = wp_parse_url( $url );
 		$host   = $parsed['host'] ?? '';
 		$path   = $parsed['path'] ?? '';
 

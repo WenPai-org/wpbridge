@@ -134,7 +134,7 @@ $debug_mode = ! empty( $settings['debug_mode'] );
 			printf(
 				/* translators: %d: number of enabled sources */
 				esc_html__( '%d 个更新源已启用', 'wpbridge' ),
-				$stats['enabled']
+				absint( $stats['enabled'] )
 			);
 			?>
 		</span>

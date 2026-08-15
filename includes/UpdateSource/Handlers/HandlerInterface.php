@@ -168,6 +168,33 @@ class UpdateInfo {
 	 */
 	public string $description = '';
 
+	/** SHA-256 digest advertised by the update service. */
+	public string $sha256 = '';
+
+	/** Detached artifact signature scheme. */
+	public string $signature_scheme = '';
+
+	/** Key identifier selected from the locally configured artifact keyring. */
+	public string $signature_kid = '';
+
+	/** Base64url detached Ed25519 signature. */
+	public string $signature = '';
+
+	/** Whether this update must pass detached artifact signature verification. */
+	public bool $signature_required = false;
+
+	/** Signed artifact size in bytes. */
+	public int $artifact_size = 0;
+
+	/** Exact signed artifact basename. */
+	public string $artifact_file = '';
+
+	/** RFC3339 UTC release signing time bound into the canonical string. */
+	public string $artifact_signed_at = '';
+
+	/** Locally configured trust roots; never populated from Bridge metadata. */
+	public array $artifact_public_keys = [];
+
 	/**
 	 * 从数组创建
 	 *
@@ -189,6 +216,18 @@ class UpdateInfo {
 		$info->banners      = $data['banners'] ?? [];
 		$info->changelog    = $data['changelog'] ?? $data['sections']['changelog'] ?? '';
 		$info->description  = $data['description'] ?? $data['sections']['description'] ?? '';
+		$info->sha256      = strtolower( (string) ( $data['sha256'] ?? $data['checksum_sha256'] ?? '' ) );
+		if ( ! preg_match( '/^[a-f0-9]{64}$/', $info->sha256 ) ) {
+			$info->sha256 = '';
+		}
+		$info->signature_scheme    = strtolower( trim( (string) ( $data['signature_scheme'] ?? '' ) ) );
+		$info->signature_kid       = trim( (string) ( $data['signature_kid'] ?? '' ) );
+		$info->signature           = trim( (string) ( $data['signature'] ?? '' ) );
+		$info->signature_required  = ! empty( $data['signature_required'] );
+		$info->artifact_size       = max( 0, (int) ( $data['artifact_size'] ?? 0 ) );
+		$info->artifact_file       = trim( (string) ( $data['artifact_file'] ?? '' ) );
+		$info->artifact_signed_at  = trim( (string) ( $data['artifact_signed_at'] ?? '' ) );
+		$info->artifact_public_keys = is_array( $data['_wpbridge_artifact_keys'] ?? null ) ? $data['_wpbridge_artifact_keys'] : [];
 
 		return $info;
 	}
@@ -209,6 +248,15 @@ class UpdateInfo {
 			'requires_php' => $this->requires_php,
 			'icons'        => $this->icons,
 			'banners'      => $this->banners,
+			'sha256'       => $this->sha256,
+			'signature_scheme'          => $this->signature_scheme,
+			'signature_kid'             => $this->signature_kid,
+			'signature'                 => $this->signature,
+			'signature_required'        => $this->signature_required,
+			'artifact_size'             => $this->artifact_size,
+			'artifact_file'             => $this->artifact_file,
+			'artifact_signed_at'        => $this->artifact_signed_at,
+			'_wpbridge_artifact_keys'   => $this->artifact_public_keys,
 		];
 	}
 
@@ -274,6 +322,9 @@ class HealthStatus {
 	 * @var int
 	 */
 	public int $checked_at = 0;
+
+	/** Sanitized protocol diagnostics for the management UI/CLI. */
+	public array $details = [];
 
 	/**
 	 * 创建健康状态

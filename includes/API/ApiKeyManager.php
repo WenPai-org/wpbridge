@@ -48,7 +48,7 @@ class ApiKeyManager {
 	public function generate( string $name, ?string $expires_at = null, array $permissions = [] ): array {
 		// 权限检查
 		if ( ! current_user_can( 'manage_options' ) ) {
-			throw new \Exception( __( '权限不足', 'wpbridge' ) );
+			throw new \Exception( esc_html__( '权限不足', 'wpbridge' ) );
 		}
 
 		$api_key = Encryption::generate_token( 32 );

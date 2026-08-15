@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace WPBridge\Commercial\Vendors;
 
 use WPBridge\Core\Logger;
+use WPBridge\Security\SafeHttpClient;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -132,9 +133,8 @@ abstract class AbstractVendor implements VendorInterface {
 			$args['body'] = $params;
 		}
 
-		$response = $method === 'GET'
-			? wp_remote_get( $url, $args )
-			: wp_remote_post( $url, $args );
+		$args['method'] = $method;
+		$response       = $this->http_request( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
 			Logger::error(
@@ -177,6 +177,17 @@ abstract class AbstractVendor implements VendorInterface {
 		}
 
 		return $data;
+	}
+
+	/**
+	 * Send a request through the DNS-pinned client.
+	 *
+	 * @param string $url  URL.
+	 * @param array  $args Request arguments.
+	 * @return array|\WP_Error
+	 */
+	protected function http_request( string $url, array $args = [] ) {
+		return SafeHttpClient::request( $url, $args );
 	}
 
 	/**

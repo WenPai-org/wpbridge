@@ -137,19 +137,21 @@ class SourceResolver {
 		$model->type      = $type;
 		$model->api_url   = $api_url;
 		$model->item_type = $item_type;
-		$model->slug      = $force_slug ? $slug : '';
+		$model->slug      = $force_slug ? $slug : (string) ( $source['slug'] ?? '' );
 		$model->enabled   = ! empty( $source['enabled'] );
 		$model->priority  = (int) ( $source['priority'] ?? $source['default_priority'] ?? 50 );
 		$model->is_preset = ! empty( $source['is_preset'] );
 		$model->metadata  = [
 			'auth_scheme'        => $source['auth_type'] ?? '',
 			'signature_required' => ! empty( $source['signature_required'] ),
+			'artifact_public_keys' => is_array( $source['artifact_public_keys'] ?? null ) ? $source['artifact_public_keys'] : [],
 			'vendor_id'          => $source['metadata']['vendor_id'] ?? '',
+			'spoke_link_id'       => $source['metadata']['spoke_link_id'] ?? '',
 		];
 
 		$secret_ref = $source['auth_secret_ref'] ?? '';
 		if ( ! empty( $secret_ref ) ) {
-			$secret = get_option( 'wpbridge_secret_' . $secret_ref, '' );
+			$secret = is_multisite() ? get_site_option( 'wpbridge_secret_' . $secret_ref, '' ) : get_option( 'wpbridge_secret_' . $secret_ref, '' );
 			if ( ! empty( $secret ) ) {
 				// 避免双重加密：如果已经是加密数据则直接使用
 				if ( Encryption::is_encrypted( $secret ) ) {
@@ -196,6 +198,9 @@ class SourceResolver {
 
 			case SourceRegistry::TYPE_VENDOR:
 				return SourceType::VENDOR;
+
+			case SourceRegistry::TYPE_HUB_SPOKE:
+				return SourceType::HUB_SPOKE;
 
 			default:
 				return null;
