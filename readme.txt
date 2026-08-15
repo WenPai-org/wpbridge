@@ -4,7 +4,7 @@ Tags: updates, mirror, plugin updates, theme updates, bridge
 Requires at least: 5.9
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.2.4
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,10 @@ The plugin uses an external Update URI and is distributed through WenPai infrast
 3. Open WPBridge in the administrator menu and configure trusted update sources.
 
 == Changelog ==
+
+= 1.3.0 =
+* Promote the hub-spoke credential/authorization architecture, protected update grants, and artifact Ed25519 signing/keyring verification to a minor release (previously staged under 1.2.4).
+* No functional change from the 1.2.4 candidate; version level corrected to reflect the feature-scope additions.
 
 = 1.2.4 =
 * Validate and pin public DNS addresses on every remote request and redirect hop.
