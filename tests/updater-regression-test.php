@@ -41,5 +41,7 @@ $assert( false === stripos( $markdown, 'href="javascript:' ), 'Unsafe changelog 
 
 $source = file_get_contents( dirname( __DIR__ ) . '/includes/class-wenpai-updater.php' );
 $assert( false === strpos( $source, 'str_starts_with(' ), 'Updater does not call PHP 8-only str_starts_with' );
+$assert( false !== strpos( $source, "\$plugin_data['Version']" ) && false !== strpos( $source, '$disk_version !== $this->version' ), 'Updater rejects stale in-memory version transitions before network access' );
+$assert( false !== strpos( $source, 'class_exists(' ) && false !== strpos( $source, 'SafeHttpClient' ), 'Updater fails closed when its transition-time HTTP dependency is unavailable' );
 
 exit( $failures > 0 ? 1 : 0 );

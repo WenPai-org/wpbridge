@@ -129,6 +129,15 @@ class WPBridge_Updater {
 			return $update;
 		}
 
+		// WordPress may run the updater-complete hooks after replacing this
+		// plugin's files.  The updater object still represents the version
+		// loaded at request start, so it must not execute against a different
+		// on-disk version during an upgrade or rollback transition.
+		$disk_version = sanitize_text_field( (string) ( $plugin_data['Version'] ?? '' ) );
+		if ( '' === $disk_version || $disk_version !== $this->version ) {
+			return $update;
+		}
+
 		$response = $this->api_request(
 			'update-check',
 			[
@@ -297,6 +306,13 @@ class WPBridge_Updater {
 	 * @return array|\WP_Error 解码后的响应或错误。
 	 */
 	private function api_request( string $endpoint, ?array $body = null ) {
+		if ( ! class_exists( '\\WPBridge\\Security\\SafeHttpClient' ) ) {
+			return new WP_Error(
+				'wpbridge_http_client_unavailable',
+				'WPBridge HTTP client is unavailable during the plugin file transition.'
+			);
+		}
+
 		$url = self::API_URL . '/' . ltrim( $endpoint, '/' );
 
 		$args = [
