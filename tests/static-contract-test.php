@@ -112,4 +112,122 @@ $bridge_client = (string) file_get_contents( $root . '/includes/Commercial/Bridg
 $assert( false !== strpos( $bridge_client, "'/api/v1/capabilities'" ) && false !== strpos( $bridge_client, "'legacy'      => true" ), 'Bridge client discovers capabilities and preserves a legacy route profile' );
 $assert( false !== strpos( $bridge_client, 'Authorization' ) && false !== strpos( $bridge_client, 'Bearer ' ), 'Bridge client can attach short-lived bearer grants to protected metadata and package requests' );
 
+// T4: admin template accessibility contracts (label association, external link rel).
+// First-party hosts keep the referrer (rel="noopener" only) so source statistics survive; every other
+// target="_blank" link, including dynamic PHP-built hrefs, uses rel="noopener noreferrer".
+// Allowlist decided by the WPBridge lead bot on 2026-10-19. "*.example.com" matches subdomains only.
+const WPBRIDGE_T4_FIRST_PARTY_HOSTS = array( 'wpcy.com', 'mall.weixiaoduo.com', '*.weixiaoduo.com', '*.wenpai.net' );
+const T4_PHP_MARKER                 = '__WPBRIDGE_PHP__';
+$t4_strip_php = static function ( string $source ): string {
+	// Replace PHP blocks with a marker plus their newlines, so tag regexes see plain HTML, dynamic attributes stay detectable and line numbers stay stable.
+	return (string) preg_replace_callback(
+		'/<\?php.*?(\?>|\z)/s',
+		static function ( array $m ): string {
+			return T4_PHP_MARKER . str_repeat( "\n", substr_count( $m[0], "\n" ) );
+		},
+		$source
+	);
+};
+$t4_line      = static function ( string $html, int $offset ): int {
+	return substr_count( substr( $html, 0, $offset ), "\n" ) + 1;
+};
+$t4_templates = array();
+$t4_iterator  = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root . '/templates', FilesystemIterator::SKIP_DOTS ) );
+foreach ( $t4_iterator as $t4_file ) {
+	if ( 'php' === $t4_file->getExtension() ) {
+		$t4_templates[ substr( $t4_file->getPathname(), strlen( $root . '/templates/' ) ) ] = $t4_strip_php( (string) file_get_contents( $t4_file->getPathname() ) );
+	}
+}
+ksort( $t4_templates );
+
+// T4-1: target="_blank" anchors (single- or multi-line) carry the rel tokens required by the link policy.
+$t4_blank_total   = 0;
+$t4_no_opener     = array();
+$t4_need_noref    = array();
+$t4_first_noref   = array();
+$t4_is_first_host = static function ( string $host ): bool {
+	$host = strtolower( $host );
+	foreach ( WPBRIDGE_T4_FIRST_PARTY_HOSTS as $t4_allowed ) {
+		if ( 0 === strpos( $t4_allowed, '*.' ) ) {
+			$t4_suffix = substr( $t4_allowed, 1 );
+			if ( strlen( $host ) > strlen( $t4_suffix ) && substr( $host, -strlen( $t4_suffix ) ) === $t4_suffix ) {
+				return true;
+			}
+		} elseif ( $host === $t4_allowed ) {
+			return true;
+		}
+	}
+	return false;
+};
+foreach ( $t4_templates as $t4_rel_path => $t4_html ) {
+	preg_match_all( '/<a\b[^>]*>/is', $t4_html, $t4_anchors, PREG_OFFSET_CAPTURE );
+	foreach ( $t4_anchors[0] as $t4_anchor ) {
+		if ( ! preg_match( '/\btarget\s*=\s*["\']_blank["\']/i', $t4_anchor[0] ) ) {
+			continue;
+		}
+		++$t4_blank_total;
+		$t4_where   = $t4_rel_path . ':' . $t4_line( $t4_html, $t4_anchor[1] );
+		$t4_has_rel = preg_match( '/\brel\s*=\s*["\']([^"\']*)["\']/i', $t4_anchor[0], $t4_rel_match );
+		$t4_tokens  = $t4_has_rel ? preg_split( '/\s+/', strtolower( trim( $t4_rel_match[1] ) ) ) : array();
+		$t4_href    = preg_match( '/\bhref\s*=\s*"([^"]*)"/i', $t4_anchor[0], $t4_href_match ) ? $t4_href_match[1] : '';
+		$t4_dynamic = '' === $t4_href || false !== strpos( $t4_href, T4_PHP_MARKER );
+		$t4_host    = $t4_dynamic ? '' : (string) parse_url( $t4_href, PHP_URL_HOST ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- plain CLI test, WordPress is not loaded.
+		$t4_first   = ! $t4_dynamic && '' !== $t4_host && $t4_is_first_host( $t4_host );
+		if ( ! in_array( 'noopener', $t4_tokens, true ) ) {
+			$t4_no_opener[] = $t4_where;
+		}
+		if ( $t4_first && in_array( 'noreferrer', $t4_tokens, true ) ) {
+			$t4_first_noref[] = $t4_where . ' (' . $t4_host . ')';
+		} elseif ( ! $t4_first && ! in_array( 'noreferrer', $t4_tokens, true ) ) {
+			$t4_need_noref[] = $t4_where . ' (' . ( $t4_dynamic ? 'dynamic href' : $t4_host ) . ')';
+		}
+	}
+}
+$assert( $t4_blank_total > 0, 'T4-1 template scan finds target="_blank" anchors (' . $t4_blank_total . ' found)' );
+$assert( array() === $t4_no_opener, 'T4-1a every target="_blank" anchor has rel noopener' . ( $t4_no_opener ? ' (missing ' . count( $t4_no_opener ) . ': ' . implode( ', ', $t4_no_opener ) . ')' : '' ) );
+$assert( array() === $t4_need_noref, 'T4-1b third-party and dynamic-href target="_blank" anchors have rel noreferrer' . ( $t4_need_noref ? ' (missing ' . count( $t4_need_noref ) . ': ' . implode( ', ', $t4_need_noref ) . ')' : '' ) );
+$assert( array() === $t4_first_noref, 'T4-1b first-party allowlisted anchors keep the referrer (no noreferrer)' . ( $t4_first_noref ? ' (unexpected ' . count( $t4_first_noref ) . ': ' . implode( ', ', $t4_first_noref ) . ')' : '' ) );
+
+// T4-2: every .wpbridge-form-label in the source editor is associated with a control or names a role=group.
+$t4_editor_path = 'admin/source-editor.php';
+$t4_editor      = $t4_templates[ $t4_editor_path ] ?? '';
+preg_match_all( '/(?<![\w-])id\s*=\s*"([^"]+)"/', $t4_editor, $t4_id_match );
+$t4_editor_ids = $t4_id_match[1];
+$t4_group_refs = array();
+preg_match_all( '/<[a-z]+\b[^>]*>/is', $t4_editor, $t4_tags );
+foreach ( $t4_tags[0] as $t4_tag ) {
+	if ( preg_match( '/\brole\s*=\s*"group"/i', $t4_tag ) && preg_match( '/\baria-labelledby\s*=\s*"([^"]+)"/i', $t4_tag, $t4_ref ) ) {
+		$t4_group_refs = array_merge( $t4_group_refs, preg_split( '/\s+/', trim( $t4_ref[1] ) ) );
+	}
+}
+preg_match_all( '/<label\b[^>]*\bclass\s*=\s*"[^"]*\bwpbridge-form-label\b[^"]*"[^>]*>/is', $t4_editor, $t4_labels, PREG_OFFSET_CAPTURE );
+$t4_label_bad = array();
+foreach ( $t4_labels[0] as $t4_label ) {
+	$t4_ok = false;
+	if ( preg_match( '/(?<![\w-])for\s*=\s*"([^"]+)"/i', $t4_label[0], $t4_for ) ) {
+		$t4_ok = in_array( $t4_for[1], $t4_editor_ids, true );
+	} elseif ( preg_match( '/(?<![\w-])id\s*=\s*"([^"]+)"/i', $t4_label[0], $t4_label_id ) ) {
+		$t4_ok = in_array( $t4_label_id[1], $t4_group_refs, true );
+	}
+	if ( ! $t4_ok ) {
+		$t4_label_bad[] = $t4_editor_path . ':' . $t4_line( $t4_editor, $t4_label[1] );
+	}
+}
+$assert( 8 === count( $t4_labels[0] ), 'T4-2 source editor has 8 .wpbridge-form-label elements (' . count( $t4_labels[0] ) . ' found)' );
+$assert( array() === $t4_label_bad, 'T4-2 every .wpbridge-form-label has a matching for/id or is referenced by role="group" aria-labelledby' . ( $t4_label_bad ? ' (unassociated ' . count( $t4_label_bad ) . ': ' . implode( ', ', $t4_label_bad ) . ')' : '' ) );
+
+// T4-3: ids introduced for label association are unique across all templates.
+$t4_new_ids = array( 'wpbridge-source-name', 'wpbridge-source-auth-token', 'wpbridge-source-priority', 'wpbridge-source-enabled', 'wpbridge-wenpai-pairing-label' );
+$t4_id_bad  = array();
+foreach ( $t4_new_ids as $t4_id ) {
+	$t4_count = 0;
+	foreach ( $t4_templates as $t4_html ) {
+		$t4_count += preg_match_all( '/(?<![\w-])id\s*=\s*"' . preg_quote( $t4_id, '/' ) . '"/', $t4_html );
+	}
+	if ( 1 !== $t4_count ) {
+		$t4_id_bad[] = $t4_id . '=' . $t4_count;
+	}
+}
+$assert( array() === $t4_id_bad, 'T4-3 label-association ids each appear exactly once in templates' . ( $t4_id_bad ? ' (' . implode( ', ', $t4_id_bad ) . ')' : '' ) );
+
 exit( $failures > 0 ? 1 : 0 );

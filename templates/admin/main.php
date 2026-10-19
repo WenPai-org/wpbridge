@@ -61,15 +61,15 @@ foreach ( $sources as $source ) {
 	</div>
 
 	<div class="wpbridge-header-right">
-		<a href="https://wpcy.com/bridge" target="_blank" class="wpbridge-header-link">
+		<a href="https://wpcy.com/bridge" target="_blank" rel="noopener" class="wpbridge-header-link">
 			<span class="dashicons dashicons-book"></span>
 			<?php esc_html_e( '文档', 'wpbridge' ); ?>
 		</a>
-		<a href="https://github.com/WenPai-org/wpbridge" target="_blank" class="wpbridge-header-link">
+		<a href="https://github.com/WenPai-org/wpbridge" target="_blank" rel="noopener noreferrer" class="wpbridge-header-link">
 			<span class="dashicons dashicons-editor-code"></span>
 			<?php esc_html_e( 'GitHub', 'wpbridge' ); ?>
 		</a>
-		<a href="https://wpcy.com/support" target="_blank" class="wpbridge-header-link">
+		<a href="https://wpcy.com/support" target="_blank" rel="noopener" class="wpbridge-header-link">
 			<span class="dashicons dashicons-sos"></span>
 			<?php esc_html_e( '支持', 'wpbridge' ); ?>
 		</a>
