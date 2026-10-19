@@ -554,6 +554,20 @@ namespace {
 		$assert( 'filter' === $by && $sha256 === $h, 'T4 rewritten URL serving the genuine package installs after strict verification' );
 		$GLOBALS['wpb_download_body'] = $body;
 
+		// Another plugin's upgrade (hook_extra names it) is never touched, even if it reuses our URL.
+		$check( $signed_item );
+		$GLOBALS['wpb_download_body'] = $evil;
+		$assert( false === $updater->enforce_self_update_record( false, $package, null, [ 'plugin' => 'other/other.php' ] ), 'T4 strict guard leaves another plugin\'s download alone (hook_extra plugin=other)' );
+		$assert( 'x' === $updater->final_self_update_check( 'x', $package, null, [ 'plugin' => 'other/other.php' ] ), 'T4 strict final check leaves another plugin\'s reply alone' );
+		$GLOBALS['wpb_download_body'] = $body;
+
+		// A later filter turning the guard's refusal into a file is still rejected by the final check.
+		$check( $signed_item );
+		$GLOBALS['wpb_download_body'] = $evil;
+		[ $by ] = $run_chain( $package, [ 'plugin' => 'wpbridge/wpbridge.php' ], [ 10 => static fn( $r ) => $evil_file ] );
+		$assert( 'error' === $by, 'T2c a later filter replacing the guard\'s WP_Error with a file is rejected (nothing was verified)' );
+		$GLOBALS['wpb_download_body'] = $body;
+
 		// R16: temp file removed after a failed strict verification.
 		$check( $signed_item );
 		$GLOBALS['wpb_dl_files'] = [];
@@ -674,6 +688,9 @@ namespace {
 		$assert( $sha_reject( $base_item + [ 'sha256' => 12345 ] ), "N2' none: numeric sha256 is malformed => not offered" );
 		$assert( $sha_reject( $base_item + [ 'sha256' => (object) [ 'a' => 1 ] ] ), "N2' none: object sha256 is malformed => not offered" );
 		$assert( $sha_reject( $base_item + [ 'sha256' => $sha256, 'checksum_sha256' => [ 'x' ] ] ), "N2' none: a malformed checksum_sha256 next to a valid sha256 is still rejected" );
+		$assert( $sha_reject( $base_item + [ 'sha256' => $sha256, 'checksum_sha256' => hash( 'sha256', 'other' ) ] ), "N2' none: two well-formed but different digests are rejected" );
+		$check( $base_item + [ 'sha256' => $sha256, 'checksum_sha256' => strtoupper( $sha256 ) ] );
+		$assert( 'file' === $code( $download( $package, $body ) ), "N2' none: the same digest in both fields (any case) is accepted" );
 		$check( $base_item + [ 'sha256' => null, 'checksum_sha256' => $sha256 ] );
 		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), "N2' none: null sha256 counts as absent and checksum_sha256 is enforced" );
 
