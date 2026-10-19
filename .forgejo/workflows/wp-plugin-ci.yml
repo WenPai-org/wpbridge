@@ -37,6 +37,7 @@ jobs:
           vendor/bin/phpstan analyse -c phpstan.neon.dist --no-progress --memory-limit=1G --error-format=raw
 
       - name: Reproducible private release package
+        shell: bash
         run: |
           output_dir="$(mktemp -d)"
           trap 'rm -rf "$output_dir"' EXIT
