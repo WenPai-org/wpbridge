@@ -77,6 +77,15 @@ class WPBridge_Updater {
 	private $verified_download = null;
 
 	/**
+	 * 守卫这次自己用 download_url() 下载的文件路径；没下载时为空串.
+	 *
+	 * 失败时只删这个路径（精确相等才删）；前面 filter 给的路径、symlink 一律不删.
+	 *
+	 * @var string
+	 */
+	private $own_download = '';
+
+	/**
 	 * 初始化更新器。
 	 *
 	 * @param string $plugin_file 插件主文件路径（plugin_basename 格式）.
@@ -359,6 +368,7 @@ class WPBridge_Updater {
 	 */
 	public function enforce_self_update_record( $reply, $package, $upgrader = null, $hook_extra = [] ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed -- upgrader_pre_download 的参数顺序由 WordPress 决定.
 		$this->verified_download = null;
+		$this->own_download      = '';
 		if ( ! is_string( $package ) ) {
 			return $reply;
 		}
@@ -375,7 +385,8 @@ class WPBridge_Updater {
 			if ( false === $reply ) {
 				return $this->verify_strict_download( $record_key, $package, $version, '' );
 			}
-			if ( is_string( $reply ) && '' !== $reply && is_file( $reply ) ) {
+			// 先拒绝 symlink（不跟随），再看是不是普通文件.
+			if ( is_string( $reply ) && '' !== $reply && ! is_link( $reply ) && is_file( $reply ) ) {
 				return $this->verify_strict_download( $record_key, $package, $version, $reply );
 			}
 			$this->log_integrity_event(
@@ -453,7 +464,9 @@ class WPBridge_Updater {
 	 */
 	public function final_self_update_check( $reply, $package, $upgrader = null, $hook_extra = [] ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed -- upgrader_pre_download 的参数顺序由 WordPress 决定.
 		$verified                = $this->verified_download;
+		$own                     = $this->own_download;
 		$this->verified_download = null;
+		$this->own_download      = '';
 		if ( ! $this->strict_mode() || ! is_string( $package ) ) {
 			return $reply;
 		}
@@ -462,17 +475,17 @@ class WPBridge_Updater {
 			return $reply;
 		}
 		if ( is_wp_error( $reply ) ) {
-			if ( null !== $verified && is_file( $verified['path'] ) ) {
-				wp_delete_file( $verified['path'] );
+			if ( null !== $verified ) {
+				self::delete_own_download( $verified['path'], $own );
 			}
 			return $reply;
 		}
-		if ( null !== $verified && is_string( $reply ) && $reply === $verified['path'] && is_file( $reply ) && hash_equals( $verified['sha256'], (string) hash_file( 'sha256', $reply ) ) ) {
+		if ( null !== $verified && is_string( $reply ) && $reply === $verified['path'] && ! is_link( $reply ) && is_file( $reply ) && hash_equals( $verified['sha256'], (string) hash_file( 'sha256', $reply ) ) ) {
 			return $reply;
 		}
 
-		if ( null !== $verified && is_file( $verified['path'] ) ) {
-			wp_delete_file( $verified['path'] );
+		if ( null !== $verified ) {
+			self::delete_own_download( $verified['path'], $own );
 		}
 		$this->log_integrity_event(
 			'error',
@@ -539,9 +552,6 @@ class WPBridge_Updater {
 		];
 
 		if ( [] === $ring || [] === $record || $this->slug !== ( $record['slug'] ?? '' ) || empty( $record['signature_required'] ) || '' === (string) ( $record['signature'] ?? '' ) ) {
-			if ( '' !== $local ) {
-				wp_delete_file( $local );
-			}
 			$this->log_integrity_event( 'error', 'strict_record_invalid', '严格模式：自更新包没有可信的签名完整性记录，已中止安装', $context, false );
 			return new WP_Error(
 				'wpbridge_selfupdate_signature_record_missing',
@@ -561,13 +571,16 @@ class WPBridge_Updater {
 			if ( is_wp_error( $file ) ) {
 				return $file;
 			}
+			$this->own_download = $file;
 		}
 
 		// 先算摘要再验签：验签后文件再被改动，最后一道检查能发现.
 		$digest   = (string) hash_file( 'sha256', $file );
 		$verified = \WPBridge\Security\PackageIntegrityVerifier::verify_downloaded_file( $file, $record );
 		if ( is_wp_error( $verified ) ) {
-			wp_delete_file( $file );
+			// 只删守卫自己下载的文件；前面 filter 给的本地文件只拒绝、不删.
+			self::delete_own_download( $file, $this->own_download );
+			$this->own_download = '';
 			$this->log_integrity_event( 'error', 'strict_verify_failed', '严格模式：自更新包签名校验失败，已中止安装', $context, false );
 			return $verified;
 		}
@@ -578,6 +591,18 @@ class WPBridge_Updater {
 			'sha256' => $digest,
 		];
 		return $file;
+	}
+
+	/**
+	 * 删除守卫自己下载的临时文件：路径必须与记下的 download_url() 返回值完全一致.
+	 *
+	 * @param string $path 要删的路径.
+	 * @param string $own  守卫记下的自己下载的路径；为空表示这次没有自己下载.
+	 */
+	private static function delete_own_download( string $path, string $own ): void {
+		if ( '' !== $own && $path === $own ) {
+			wp_delete_file( $own );
+		}
 	}
 
 	/**

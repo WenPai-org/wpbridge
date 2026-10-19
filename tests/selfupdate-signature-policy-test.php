@@ -503,15 +503,27 @@ namespace {
 		$evil_file = tempnam( sys_get_temp_dir(), 'wpb-evil-' );
 		file_put_contents( $evil_file, $evil );
 		$check( $signed_item );
-		[ $by ] = $run_chain( $package, [ 'plugin' => 'wpbridge/wpbridge.php' ], [ 10 => static fn( $r ) => $evil_file ] );
+		$seen   = null;
+		[ $by ] = $run_chain(
+			$package,
+			[ 'plugin' => 'wpbridge/wpbridge.php' ],
+			[
+				10 => static function ( $r ) use ( $evil_file, &$seen ) {
+					$seen = $r;
+					return $evil_file;
+				},
+			]
+		);
 		$assert( 'error' === $by, 'T2 a later filter replacing the verified path is rejected by the final check' );
+		$assert( is_string( $seen ) && ! file_exists( $seen ) && file_exists( $evil_file ), 'NB6/X9 T2: the guard\'s own verified download is deleted, the foreign replacement path is not' );
 
 		$check( $signed_item );
 		[ $by ] = $run_chain(
 			$package,
 			[ 'plugin' => 'wpbridge/wpbridge.php' ],
 			[
-				20 => static function ( $r ) use ( $evil ) {
+				20 => static function ( $r ) use ( $evil, &$seen ) {
+					$seen = $r;
 					if ( is_string( $r ) && is_file( $r ) ) {
 						file_put_contents( $r, $evil );
 					}
@@ -519,13 +531,75 @@ namespace {
 				},
 			]
 		);
+		$assert( is_string( $seen ) && ! file_exists( $seen ), 'NB6 T2b: the rewritten own download is deleted by the final check' );
 		$assert( 'error' === $by, 'T2b in-place rewrite of the verified file after the guard is rejected by the final check' );
 
 		$check( $signed_item );
 		$early = tempnam( sys_get_temp_dir(), 'wpb-early-' );
 		file_put_contents( $early, $evil );
 		[ $by ] = $run_chain( $package, [ 'plugin' => 'wpbridge/wpbridge.php' ], [ 0 => static fn( $r ) => $early ] );
-		$assert( 'error' === $by && ! file_exists( $early ), 'T3 strict: an earlier filter returning a tampered local file is re-verified, rejected and deleted' );
+		$assert( 'error' === $by && file_exists( $early ), 'T3/NB2 strict: an earlier filter returning a tampered external file is rejected and NOT deleted' );
+
+		// NB2: an earlier symlink reply is refused without following it; neither link nor target is deleted.
+		$link_target = tempnam( sys_get_temp_dir(), 'wpb-lnkt-' );
+		$link        = $link_target . '.lnk';
+		file_put_contents( $link_target, $evil );
+		symlink( $link_target, $link );
+		$check( $signed_item );
+		[ $by, $c ] = $run_chain( $package, [ 'plugin' => 'wpbridge/wpbridge.php' ], [ 0 => static fn( $r ) => $link ] );
+		$assert( 'error' === $by && is_link( $link ) && file_exists( $link_target ), 'NB2 strict: an earlier symlink to a tampered file is rejected; link and target are kept' );
+		file_put_contents( $link_target, $body );
+		$check( $signed_item );
+		[ $by, $c ] = $run_chain( $package, [ 'plugin' => 'wpbridge/wpbridge.php' ], [ 0 => static fn( $r ) => $link ] );
+		$assert( 'error' === $by && 'wpbridge_selfupdate_unverifiable_package' === $c && is_link( $link ), 'NB2 strict: an earlier symlink is not followed even when its target is the genuine package' );
+
+		// NB2: a symlink handed to the final check (re-pointed at the verified file) is rejected; the link is kept.
+		$late_link = $link_target . '.late';
+		$check( $signed_item );
+		[ $by ] = $run_chain(
+			$package,
+			[ 'plugin' => 'wpbridge/wpbridge.php' ],
+			[
+				20 => static function ( $r ) use ( $late_link ) {
+					symlink( $r, $late_link );
+					return $late_link;
+				},
+			]
+		);
+		$assert( 'error' === $by && is_link( $late_link ), 'NB2 strict: a re-pointed symlink at the final check is rejected and not deleted' );
+
+		// NB6/X15: a later WP_Error still removes the guard's own verified download.
+		$check( $signed_item );
+		$seen   = null;
+		[ $by, $c ] = $run_chain(
+			$package,
+			[ 'plugin' => 'wpbridge/wpbridge.php' ],
+			[
+				10 => static function ( $r ) use ( &$seen ) {
+					$seen = $r;
+					return new WP_Error( 'later_failure' );
+				},
+			]
+		);
+		$assert( 'later_failure' === $c && is_string( $seen ) && ! file_exists( $seen ), 'NB6/X15 a later WP_Error is kept and the verified own download is deleted' );
+
+		// NB4/B3-3: the guard itself refuses a non-file earlier reply (not only the final check).
+		$check( $signed_item );
+		$assert( 'wpbridge_selfupdate_unverifiable_package' === $code( $updater->enforce_self_update_record( 'https://elsewhere.example/x.zip', $package, null, [ 'plugin' => 'wpbridge/wpbridge.php' ] ) ), 'NB4 guard refuses a URL reply from an earlier filter' );
+		$assert( 'wpbridge_selfupdate_unverifiable_package' === $code( $updater->enforce_self_update_record( true, $package, null, [ 'plugin' => 'wpbridge/wpbridge.php' ] ) ), 'NB4 guard refuses a non-string earlier reply' );
+
+		// NB5/X16 (N1-b): shared-era record (signature, signature_required=false) + strict check with malformed metadata.
+		$GLOBALS['wpb_site_transients'] = [];
+		$GLOBALS['wpb_transients']      = [];
+		$shared_rec                     = $signed_item;
+		unset( $shared_rec['package'], $shared_rec['id'] );
+		$shared_rec['signature_required']   = false;
+		$shared_rec['artifact_public_keys'] = WPBRIDGE_ARTIFACT_PUBLIC_KEYS;
+		PackageIntegrityVerifier::remember( $package, $sha256, 86400, $shared_rec );
+		$broken                       = $signed_item;
+		$broken['artifact_file']      = '';
+		$broken['signature_required'] = false;
+		$assert( ! $offered( $check( $broken, false ) ), 'NB5 strict: a shared-era record does not make a malformed strict response look recorded (N1-b)' );
 
 		$check( $signed_item );
 		$early_ok = tempnam( sys_get_temp_dir(), 'wpb-early-' );
