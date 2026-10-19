@@ -110,6 +110,10 @@ class WPBridge_Updater {
 
 		// 插件详情弹窗.
 		add_filter( 'plugins_api', [ $this, 'plugin_info' ], 20, 3 );
+
+		// 配置了本地公钥时，自更新包下载前必须有带签名要求的完整性记录.
+		// 优先级 9：先于 PackageIntegrityVerifier::verify（10）.
+		add_filter( 'upgrader_pre_download', [ $this, 'enforce_self_update_record' ], 9, 2 );
 	}
 
 	/**
@@ -158,7 +162,12 @@ class WPBridge_Updater {
 		$new_version        = sanitize_text_field( (string) ( $data['version'] ?? '' ) );
 		$package            = esc_url_raw( (string) ( $data['package'] ?? '' ) );
 		$sha256             = strtolower( sanitize_text_field( (string) ( $data['sha256'] ?? $data['checksum_sha256'] ?? '' ) ) );
-		$signature_required = ! empty( $data['signature_required'] );
+		$public_keys        = $this->artifact_public_keys();
+		// 站点在 wp-config.php 配置了 WPBRIDGE_ARTIFACT_PUBLIC_KEYS 就强制验签.
+		// 服务端的 signature_required 只能加严、不能放宽：否则响应里去掉签名字段
+		// 并声明不需要签名，就能把校验降级成只看摘要甚至不校验（fail-open）.
+		$enforce_signature  = [] !== $public_keys;
+		$signature_required = $enforce_signature || ! empty( $data['signature_required'] );
 		$signature_scheme   = strtolower( sanitize_text_field( (string) ( $data['signature_scheme'] ?? '' ) ) );
 		$signature_kid      = sanitize_text_field( (string) ( $data['signature_kid'] ?? '' ) );
 		$signature          = sanitize_text_field( (string) ( $data['signature'] ?? '' ) );
@@ -171,7 +180,22 @@ class WPBridge_Updater {
 			return $update;
 		}
 
-		if ( class_exists( '\\WPBridge\\Security\\PackageIntegrityVerifier' ) ) {
+		$integrity_context = [
+			'plugin'           => $this->plugin_file,
+			'version'          => $new_version,
+			'enforced_locally' => $enforce_signature,
+			'server_required'  => ! empty( $data['signature_required'] ),
+			'has_sha256'       => 1 === preg_match( '/^[a-f0-9]{64}$/', $sha256 ),
+			'has_signature'    => '' !== $signature,
+			'signature_kid'    => $signature_kid,
+		];
+
+		if ( ! class_exists( '\\WPBridge\\Security\\PackageIntegrityVerifier' ) ) {
+			// 无法校验时，要求签名的更新一律不提供.
+			if ( $signature_required ) {
+				return $update;
+			}
+		} else {
 			$remembered = \WPBridge\Security\PackageIntegrityVerifier::remember(
 				$package,
 				$sha256,
@@ -186,12 +210,17 @@ class WPBridge_Updater {
 					'signature_kid'        => $signature_kid,
 					'signature'            => $signature,
 					'signature_required'   => $signature_required,
-					'artifact_public_keys' => $this->artifact_public_keys(),
+					'artifact_public_keys' => $public_keys,
 				]
 			);
 			if ( $signature_required && ! $remembered ) {
+				$this->log_integrity_event( 'error', '自更新包缺少有效的签名或 SHA-256，已拒绝提供这次更新', $integrity_context );
 				return $update;
 			}
+		}
+
+		if ( ! $signature_required && '' === $signature ) {
+			$this->log_integrity_event( 'warning', '自更新包没有签名，本站未配置 WPBRIDGE_ARTIFACT_PUBLIC_KEYS，按旧方式提供更新', $integrity_context );
 		}
 
 		return (object) [
@@ -219,7 +248,71 @@ class WPBridge_Updater {
 	}
 
 	/**
+	 * 配置了本地公钥时，拒绝没有签名完整性记录的自更新包下载.
+	 *
+	 * check_update() 在强制验签时只会为带有效签名元数据的更新写记录；记录
+	 * 过期或被对象缓存淘汰时，PackageIntegrityVerifier::verify() 会按旧来源
+	 * 放行，这里把这个缺口堵上。只处理 WordPress 当前缓存的本插件更新包.
+	 *
+	 * @param mixed $reply   之前的 upgrader_pre_download 结果.
+	 * @param mixed $package 安装包地址.
+	 * @return mixed
+	 */
+	public function enforce_self_update_record( $reply, $package ) {
+		if ( false !== $reply || ! is_string( $package ) || [] === $this->artifact_public_keys() ) {
+			return $reply;
+		}
+
+		$updates = get_site_transient( 'update_plugins' );
+		$offer   = is_object( $updates ) && isset( $updates->response[ $this->plugin_file ] ) ? $updates->response[ $this->plugin_file ] : null;
+		if ( ! is_object( $offer ) || ! isset( $offer->package ) || $offer->package !== $package ) {
+			return $reply;
+		}
+
+		$record = class_exists( '\\WPBridge\\Security\\PackageIntegrityVerifier' )
+			? \WPBridge\Security\PackageIntegrityVerifier::expected_integrity( $package )
+			: [];
+		if ( empty( $record['signature_required'] ) ) {
+			$this->log_integrity_event(
+				'error',
+				'自更新包没有签名完整性记录，已中止安装',
+				[
+					'plugin'  => $this->plugin_file,
+					'version' => (string) ( $offer->new_version ?? '' ),
+				]
+			);
+			return new WP_Error(
+				'wpbridge_selfupdate_signature_record_missing',
+				__( 'WPBridge 更新包缺少签名校验记录，已中止安装。请重新检查更新后再试。', 'wpbridge' )
+			);
+		}
+
+		return $reply;
+	}
+
+	/**
+	 * 记录完整性相关日志，只使用本次请求里已经加载的 Logger 和 Settings.
+	 *
+	 * @param string $level   error 或 warning.
+	 * @param string $message 日志内容.
+	 * @param array  $context 上下文.
+	 */
+	private function log_integrity_event( string $level, string $message, array $context ): void {
+		if ( ! class_exists( '\\WPBridge\\Core\\Logger', false ) || ! class_exists( '\\WPBridge\\Core\\Settings', false ) ) {
+			return;
+		}
+		if ( 'error' === $level ) {
+			\WPBridge\Core\Logger::error( $message, $context );
+			return;
+		}
+		\WPBridge\Core\Logger::warning( $message, $context );
+	}
+
+	/**
 	 * Self-updater trust roots configured by deployment, indexed by key id.
+	 *
+	 * 只来自 wp-config.php 里的 WPBRIDGE_ARTIFACT_PUBLIC_KEYS 常量，插件不自带
+	 * 默认公钥。非空即视为站点明确要求自更新验签.
 	 *
 	 * @return array
 	 */

@@ -69,6 +69,11 @@ class SiteHealth {
 			'test'  => [ $this, 'test_updater_version' ],
 		];
 
+		$tests['direct']['wpbridge_selfupdate_signature'] = [
+			'label' => __( 'WPBridge 自身更新包签名校验', 'wpbridge' ),
+			'test'  => [ $this, 'test_selfupdate_signature' ],
+		];
+
 		return $tests;
 	}
 
@@ -328,6 +333,54 @@ class SiteHealth {
 				esc_html__( '前往插件页面', 'wpbridge' )
 			),
 			'test'        => 'wpbridge_updater_version',
+		];
+	}
+
+	/**
+	 * 自更新包签名校验是否启用
+	 *
+	 * 只看 wp-config.php 里的 WPBRIDGE_ARTIFACT_PUBLIC_KEYS，不发请求、不存状态。
+	 *
+	 * @return array
+	 */
+	public function test_selfupdate_signature(): array {
+		$keys = defined( 'WPBRIDGE_ARTIFACT_PUBLIC_KEYS' ) && is_array( WPBRIDGE_ARTIFACT_PUBLIC_KEYS ) ? WPBRIDGE_ARTIFACT_PUBLIC_KEYS : [];
+
+		if ( [] !== $keys ) {
+			return [
+				'label'       => __( 'WPBridge: 自身更新包强制验签', 'wpbridge' ),
+				'status'      => 'good',
+				'badge'       => [
+					'label' => __( '正常', 'wpbridge' ),
+					'color' => 'green',
+				],
+				'description' => sprintf(
+					'<p>%s</p>',
+					esc_html(
+						sprintf(
+							/* translators: %d: number of configured public keys */
+							__( '已在 wp-config.php 配置 WPBRIDGE_ARTIFACT_PUBLIC_KEYS（%d 个公钥）。WPBridge 自身的更新包必须带有效的 Ed25519 签名和 SHA-256，缺少或无效时会拒绝更新。', 'wpbridge' ),
+							count( $keys )
+						)
+					)
+				),
+				'test'        => 'wpbridge_selfupdate_signature',
+			];
+		}
+
+		return [
+			'label'       => __( 'WPBridge: 自身更新包未做签名校验', 'wpbridge' ),
+			'status'      => 'recommended',
+			'badge'       => [
+				'label' => __( '建议', 'wpbridge' ),
+				'color' => 'orange',
+			],
+			'description' => sprintf(
+				'<p>%s</p><p>%s</p>',
+				esc_html__( '此站点没有在 wp-config.php 配置 WPBRIDGE_ARTIFACT_PUBLIC_KEYS，WPBridge 自身的更新包不做签名校验，只依赖 HTTPS 和更新服务器本身的安全；服务端提供 SHA-256 时仍会校验摘要。', 'wpbridge' ),
+				esc_html__( '配置公钥后，缺少签名或签名无效的自更新都会被拒绝。请在更新服务器开始提供签名之后再配置，否则此站点会收不到 WPBridge 的更新。', 'wpbridge' )
+			),
+			'test'        => 'wpbridge_selfupdate_signature',
 		];
 	}
 
