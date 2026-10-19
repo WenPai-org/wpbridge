@@ -31,7 +31,7 @@
 
 ## 1.3.1：升级、回滚安全 ← 当前目标
 
-范围已冻结（2026-10-19）。合并顺序：#12 → #19 → #16 → #20 → #15 → #13 → #14 → #17 → #21 → 发版准备。
+范围已冻结（2026-10-19）。合并顺序：#12 → #19 → dotdot → #16 → #20 → #15 → #13 → #14 → #17 → #21 → 发版准备。
 
 ### 升级与回滚
 - [ ] WordPress 在同一请求里替换插件文件后，旧版本的更新器对象不再发起网络请求，按失败关闭处理（#12）
@@ -43,7 +43,7 @@
 - [ ] 自更新验签：新增 `WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS`，服务端返回的字段只能加严不能放宽；服务端下发 `sha256` 后，安装包必须和它一致（#20）
 
 ### 修复
-- [ ] `GET /bridge/v1/wenpai-git/{repo}/releases` 的 `repo` 第二段拒绝 `.` 和 `..`，防止拼进 git.wenpai.org 的 URL 路径时发生穿越（PR 待开）
+- [ ] `GET /bridge/v1/wenpai-git/{repo}/releases` 的 `repo` 第二段拒绝 `.` 和 `..`，防止拼进 git.wenpai.org 的 URL 路径时发生穿越（topic `wpbridge-repo-param-dotdot`）
 - [ ] 启用默认 wenpai-open 源时，打开 Site Health 不再出现致命错误（#19）
 
 ### 可访问性
