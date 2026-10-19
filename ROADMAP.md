@@ -68,6 +68,7 @@
 - [ ] `POST /wpbridge/v2/spoke-links/accept` 按错误类型返回 400、403、409、503 或 502；远端 Hub 的状态码不再透传，原值放进 `hub_status`；`wenpai-git/{repo}/releases` 的远端状态码透传也一起改（topic `wpbridge-spoke-accept-status`）。#21 带的 Spoke 红测试（单独跑 4 条失败）现在没接进 `tests/run-tests.sh`，修的时候必须接进去，让 npm test 能跑到
 - [ ] 预设源 `PluginUpdater::plugin_info` 也加上版本守卫
 - [ ] 补 #20 之后的签名和校验和合同测试：CT-1、2、3、5、6、7、11，以及 CT-12 里的 sha256 部分
+- [ ] 补上 #18 评审里没被测试抓到的三处变异：`BackupManager` 的 `..` 检查（`rollback-contract` 要同时检查错误码）；`uninstall.php` 清理网络级选项和 site transient；`SafeHttpClient` 对 `authorization` 头的脱敏
 
 ### 可访问性和 i18n
 - [ ] 对比度：#9ca3af 的白底正文和「已安装」徽标提到 4.5 以上；「即将上线」卡片要用文字或 aria 写明状态，不能只靠变灰（topic `wpbridge-a11y-contrast`）
