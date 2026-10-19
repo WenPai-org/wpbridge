@@ -1,404 +1,96 @@
 # WPBridge 开发路线图
 
-> 自定义源桥接器 - 版本规划和开发任务
+> 自定义源桥接器：版本规划和开发任务
 
-*创建日期: 2026-02-04*
+*创建日期：2026-02-04 · 最后更新：2026-10-19*
 
 ---
 
-## 当前版本: v0.8.0
+## 当前版本：1.3.0（2026-08-15）
 
-## 版本规划
+各版本的具体改动见 [CHANGELOG.md](CHANGELOG.md)。架构说明见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+
+## 版本脉络
 
 ```
-v0.1.0 - MVP：最小可用桥接 + 基础缓存/降级 ✅ 已完成
+0.2.0 – 0.9.6  初版实现、Bridge API、导入导出、版本锁定（2026-02）       ✅
+1.0.0          wenpai-bridge 集成、供应商系统、加密 API 密钥（2026-03）   ✅
+1.1.0          订阅管理、Kestrel；删除 12 个非核心模块（2026-03）         ✅
+1.2.0 – 1.2.2  后台重设计（8 Tab → 5）、安全审查修复（2026-03）           ✅
+1.2.3          更新器唯一类名，避免与其他文派插件冲突（2026-07）          ✅
+1.3.0          Hub-Spoke 授权、受保护的更新授权、制品 Ed25519 签名（2026-08）✅
     ↓
-v0.2.0 - Git 仓库支持 + WP-CLI + 性能优化 ✅ 已完成
+1.3.1          升级和回滚过程中的更新器安全（评审中）                    ← 当前目标
     ↓
-v0.3.0 - 源分组 + 商业插件检测 ✅ 已完成
+1.3.x          可访问性修复、后台 URL 收口、和服务端的接口合同测试
     ↓
-v0.4.0 - Bridge API ✅ 已完成
-    ↓
-v0.8.0 - 配置导入导出 + 稳定性优化 ✅ 已完成
-    ↓
-v0.9.0 - 版本控制 + 用户体验 ← 当前目标
-    ↓
-v1.0.0 - 正式发布
-```
-
----
-
-## v0.1.0 - MVP：最小可用桥接 + 基础缓存/降级 ✅
-
-### 目标
-实现最小可用的更新源桥接功能，确保基础稳定性
-
-### 任务清单
-
-#### 插件基础结构
-- [x] 主文件 `wpbridge.php`
-- [x] 自动加载器 `Loader.php`
-- [x] 设置页面框架 `Settings.php`
-- [x] 数据存储结构
-
-#### 预置更新源
-- [x] 文派开源更新源（默认启用）
-- [x] ArkPress 支持（文派自托管方案）
-- [x] AspireCloud 支持（可选）
-
-#### 更新源管理（基础）
-- [x] 更新源数据模型（使用统一 SourceType 枚举）
-- [x] 更新源 CRUD 操作
-- [x] 更新源列表界面
-- [x] 添加/编辑更新源表单
-
-#### 核心桥接功能
-- [x] `pre_set_site_transient_update_plugins` 钩子
-- [x] `pre_set_site_transient_update_themes` 钩子
-- [x] JSON API 处理器（JsonHandler）
-- [x] ArkPress 处理器（ArkPressHandler）
-- [x] AspireCloud 处理器（AspireCloudHandler）
-- [x] Plugin Update Checker JSON 格式兼容（PUCHandler）
-
-#### 基础缓存与降级
-- [x] Transient 缓存（12 小时 TTL）
-- [x] 源健康状态缓存（1 小时 TTL）
-- [x] 失败源冷却机制（30 分钟）
-- [x] 过期缓存兜底（源不可用时返回旧数据）
-- [x] 请求超时限制（10 秒）
-
-#### 安全基础
-- [x] URL 格式校验
-- [x] API Key 加密存储
-- [x] JSON 响应结构校验
-
-#### 日志与错误处理
-- [x] 调试日志（可开关）
-- [x] 用户友好的错误信息
-
----
-
-## v0.2.0 - Git 仓库支持 + WP-CLI + 性能优化 ✅
-
-### 目标
-支持 Git 仓库作为更新源，提供命令行工具，实现性能优化
-
-### 任务清单
-
-#### 性能优化（核心）
-- [x] 并行请求（`ParallelRequestManager`）
-- [x] 条件请求（ETag/Last-Modified）
-- [x] WP-Cron 后台预热任务（`BackgroundUpdater`）
-- [ ] 请求去重与合并窗口
-- [ ] 缓存分层（对象缓存优先，DB 兜底）
-
-#### WP-CLI 支持（`wp bridge`）
-- [x] `wp bridge source list` - 列出所有源
-- [x] `wp bridge source add <url>` - 添加源
-- [x] `wp bridge source remove <id>` - 删除源
-- [x] `wp bridge source enable/disable <id>` - 启用/禁用源
-- [x] `wp bridge check` - 检查所有源
-- [x] `wp bridge cache clear` - 清除缓存
-- [x] `wp bridge diagnose` - 诊断报告
-- [ ] `wp bridge config export/import` - 配置导入导出
-
-#### Git 仓库支持
-- [x] 统一接口 SourceHandlerInterface
-- [x] GitHub Releases 支持（GitHubHandler）
-- [x] GitLab Releases 支持（GitLabHandler）
-- [x] Gitee Releases 支持（GiteeHandler，国内）
-- [x] 菲码源库支持（WenPaiGitHandler）
-- [x] 私有仓库认证
-
-#### 诊断工具
-- [x] 诊断页面（源状态、请求日志）
-- [x] 一键测试源连通性
-- [ ] 导出诊断报告
-
-#### 配置管理
-- [ ] 导入/导出配置
-- [ ] 配置备份
-
-#### 认证支持
-- [x] API Key 认证
-- [x] Basic Auth 认证
-- [x] 自定义 HTTP 头
-
-#### 源优先级
-- [x] 源优先级设置
-- [x] 多源冲突处理（版本号最高优先）
-
-#### FAIR 支持
-- [x] FAIR Package Manager 处理器（FairHandler）
-
----
-
-## v0.3.0 - 源分组 + 商业插件检测 ✅
-
-### 目标
-支持源分组管理，实现商业插件检测
-
-### 任务清单
-
-#### 源分组管理
-- [x] 源组数据模型（GroupModel）
-- [x] 批量管理界面（GroupManager）
-- [x] 共享认证信息
-- [x] 统一启用/禁用
-
-#### 商业插件适配
-- [x] 商业插件检测机制（CommercialDetector）
-- [x] 远程 JSON 配置支持
-- [x] 检测结果永久缓存
-- [x] 手动刷新检测功能
-- [ ] 授权验证代理（可选）
-- [ ] 版本锁定功能
-- [ ] 回滚机制（更新前备份）
-
-#### 通知系统
-- [x] 邮件通知（EmailHandler）
-- [x] Webhook 通知（WebhookHandler）
-- [ ] 更新日志聚合显示
-
----
-
-## v0.4.0 - Bridge API ✅
-
-### 目标
-提供 REST API 服务，支持外部调用
-
-### 任务清单
-
-#### Bridge API 基础
-- [x] REST API 端点设计（`/wp-json/bridge/v1/`）
-- [x] 认证机制（API Key）
-- [x] 状态端点 `/status`
-- [ ] 限流策略
-- [ ] 可用性 SLA 定义
-
-#### API 端点
-- [x] GET /bridge/v1/status - 获取状态
-- [ ] GET /bridge/v1/sources - 获取可用更新源列表
-- [ ] GET /bridge/v1/check/{source_id} - 检查指定源更新
-- [ ] GET /bridge/v1/plugins/{slug}/info - 获取插件信息
-- [ ] GET /bridge/v1/themes/{slug}/info - 获取主题信息
-
----
-
-## v0.8.0 - 配置导入导出 + 稳定性优化 ✅
-
-### 目标
-完善配置管理，提升稳定性
-
-### 任务清单
-
-#### 配置管理
-- [x] 导入配置（JSON 格式）
-- [x] 导出配置（JSON 格式）
-- [x] 配置备份/恢复
-- [x] WP-CLI 配置命令
-
-#### 稳定性优化
-- [x] 完善错误处理
-- [x] 安全性检查（nonce、权限、输入清理）
-- [ ] 添加单元测试（v1.0 前完成）
-- [ ] 性能优化（请求去重）
-- [ ] 缓存分层优化
-
----
-
-## v0.9.0 - 版本控制 + 用户体验 ← 当前目标
-
-### 目标
-实现版本锁定和回滚机制，提升用户体验
-
-### 任务清单
-
-#### 版本锁定
-- [ ] 锁定插件/主题到当前版本
-- [ ] 锁定到指定版本
-- [ ] 忽略特定版本更新
-- [ ] 版本锁定 UI
-
-#### 回滚机制
-- [ ] 更新前自动备份
-- [ ] 备份存储管理
-- [ ] 一键回滚功能
-- [ ] 保留最近 N 个版本
-
-#### 更新日志聚合
-- [ ] 从更新源获取 changelog
-- [ ] 统一显示格式
-- [ ] 在更新页面显示
-
-#### Site Health 集成
-- [ ] 更新源连通性检查
-- [ ] 配置完整性检查
-- [ ] 提供修复建议
-
-#### Bridge API 完善
-- [ ] GET /sources - 获取更新源列表
-- [ ] GET /check/{source_id} - 检查指定源
-- [ ] GET /plugins/{slug}/info - 获取插件信息
-- [ ] GET /themes/{slug}/info - 获取主题信息
-
----
-
-## v1.0.0 - 正式发布
-
-### 目标
-稳定版本，完善文档和用户体验
-
-### 任务清单
-
-#### 文档完善
-- [x] 用户指南
-- [ ] 开发者文档（如何创建兼容的更新服务器）
-- [x] API 文档
-- [x] 常见问题
-- [ ] 视频教程
-
-#### 用户体验
-- [ ] 状态仪表板优化
-- [ ] 性能基准测试报告
-
-#### 高级功能（延后）
-- [ ] 多站点 (Multisite) 支持
-- [ ] 安全扫描集成（VirusTotal/Patchstack）
-- [ ] 白标/OEM 支持
-
-#### 发布准备
-- [ ] GitHub Release
-- [ ] 菲码源库 Release
-- [ ] 更新日志
-- [ ] 宣传材料
-
----
-
-## AI 桥接层（暂缓）
-
-> 以下功能暂缓开发，待核心功能稳定后考虑
-
-### OpenAI 兼容层
-- [ ] `pre_http_request` 拦截器
-- [ ] 用户可配置白名单
-- [ ] OpenAI Chat API 转发
-- [ ] 响应格式转换
-- [ ] 自定义端点支持（透传模式）
-- [ ] WPMind 集成（可选）
-
-### 商业插件 AI 适配
-- [x] AI 网关基础（AIGateway）
-- [x] Yoast SEO Pro 适配器
-- [x] Rank Math 适配器
-- [ ] 嗅探模式（收集 API 格式）
-
----
-
-## 技术架构
-
-```
-wpbridge/
-├── wpbridge.php                 # 主文件
-├── includes/
-│   ├── Core/
-│   │   ├── Plugin.php           # 插件主类
-│   │   ├── Loader.php           # 自动加载
-│   │   ├── Settings.php         # 设置管理
-│   │   ├── Logger.php           # 日志系统
-│   │   ├── CommercialDetector.php # 商业插件检测
-│   │   ├── RemoteConfig.php     # 远程配置
-│   │   └── ItemSourceManager.php # 项目源管理
-│   │
-│   ├── UpdateSource/
-│   │   ├── SourceManager.php    # 更新源管理
-│   │   ├── SourceModel.php      # 数据模型
-│   │   ├── SourceType.php       # 源类型枚举
-│   │   ├── PluginUpdater.php    # 插件更新器
-│   │   ├── ThemeUpdater.php     # 主题更新器
-│   │   └── Handlers/            # 各类处理器
-│   │       ├── JsonHandler.php
-│   │       ├── GitHubHandler.php
-│   │       ├── GitLabHandler.php
-│   │       ├── GiteeHandler.php
-│   │       ├── ArkPressHandler.php
-│   │       ├── AspireCloudHandler.php
-│   │       ├── FairHandler.php
-│   │       └── ...
-│   │
-│   ├── SourceGroup/
-│   │   ├── GroupManager.php     # 分组管理
-│   │   └── GroupModel.php       # 分组模型
-│   │
-│   ├── Cache/
-│   │   ├── CacheManager.php     # 缓存管理
-│   │   ├── HealthChecker.php    # 健康检查
-│   │   └── FallbackStrategy.php # 降级策略
-│   │
-│   ├── Performance/
-│   │   ├── ParallelRequestManager.php # 并行请求
-│   │   ├── ConditionalRequest.php     # 条件请求
-│   │   └── BackgroundUpdater.php      # 后台更新
-│   │
-│   ├── API/
-│   │   ├── RestController.php   # REST API
-│   │   └── ApiKeyManager.php    # API Key 管理
-│   │
-│   ├── CLI/
-│   │   └── BridgeCommand.php    # WP-CLI 命令
-│   │
-│   ├── Notification/
-│   │   ├── NotificationManager.php
-│   │   ├── EmailHandler.php
-│   │   └── WebhookHandler.php
-│   │
-│   ├── AIBridge/
-│   │   ├── AIGateway.php        # AI 网关
-│   │   └── Adapters/
-│   │       ├── YoastAdapter.php
-│   │       └── RankMathAdapter.php
-│   │
-│   └── Admin/
-│       └── AdminPage.php        # 管理页面
-│
-├── templates/
-│   └── admin/
-│       ├── main.php
-│       └── tabs/
-│           ├── overview.php
-│           ├── sources.php
-│           ├── diagnostics.php
-│           └── api.php
-│
-└── assets/
-    ├── css/
-    └── js/
+后续           接入文派 Admin UI 套件（排在套件迁移的最后）
 ```
 
 ---
 
-## 依赖关系
+## 1.3.1：升级、回滚安全 ← 当前目标
 
-```
-WPBridge 核心功能
-├── 更新源桥接 - 无依赖，独立运行
-├── 商业插件检测 - 无依赖，独立运行
-├── Bridge API - 无依赖，独立运行
-└── AI 桥接 - 可选依赖 WPMind（暂缓）
-```
+- [ ] WordPress 在同一请求里替换插件文件后，旧版本的更新器对象不再发起网络请求（fail closed）
+- [ ] HTTP 客户端在文件切换期间不可用时，返回错误而不是致命错误
+- [ ] CI 打包版本号从插件头读取，不再写死 1.2.4
+- [ ] 回归测试：`npm test` 全绿，测试站验收 1.3.0 → 1.3.1 → 回滚
+- [ ] 发版说明，`readme.txt` 和 `CHANGELOG.md` 同步更新
+
+## 1.3.x 后续小版本：质量和合同
+
+### 可访问性
+- [ ] 8 个后台表单 label：单个控件补 `for`，成组输入改用 `role=group` 加 `aria-labelledby`
+- [ ] 19 处站外链接补 `rel`：文派自家域名只加 `noopener`，第三方链接加 `noopener noreferrer`
+- [ ] 合同测试守住 label 和 rel 规则，测试站上对真实后台页面做 axe 前后对比
+
+### 管理后台
+- [ ] 16 处写死的 `admin.php?page=wpbridge` 收口到 `AdminPage::url()`，加合同测试（为以后迁移菜单做准备，本阶段不搬菜单、不碰加密）
+- [ ] 后台 CSS 同时兼容现有一级菜单和以后「设置」子菜单两套页面选择器
+
+### 服务端接口合同
+- [ ] 梳理插件与 wpbridge-server、wenpai-bridge 之间的接口
+- [ ] 形成合同测试清单，补到 `tests/`
+
+## 后续：接入文派 Admin UI 套件
+
+套件正式宣布可以接入之后才开始。云桥排在文派插件迁移顺序的最后。
+
+- [ ] 一级菜单「云桥」移到「设置」下，用 Tab 加二级导航，旧 URL 自动跳转
+- [ ] 密钥加密对接套件的 `secret` / `encrypt`，或保留自有 `Encryption` 并对接，附升级回调
+- [ ] 更新检查和授权**不进套件**，继续由云桥和文派更新器负责
+- [ ] 套件暂时没有的部分（模态框、导入导出、Site Health）由插件自己保留
+- [ ] 集成测试：和其他文派插件自带的更新器共存
 
 ---
 
-## 待讨论事项
+## 早期规划的落实情况（2026-02 版路线图）
 
-- [x] 是否需要云端配置同步？→ 暂不需要，v1.0 后考虑
-- [x] 是否支持多站点？→ 付费功能（v1.0.0）
-- [x] 定价策略（免费 vs 付费）？→ 基础免费 + 高级付费
-- [x] 与文派叶子的集成方式？→ 独立运行，检测 WPCY 存在时官方源走 WPCY
+2026-02 的路线图按 0.x 版本拆分任务。下表记录这些计划后来的去向，方便对照。
+
+| 计划项 | 现状 |
+|---|---|
+| 更新源桥接、缓存与降级、WP-CLI（`wp bridge`）、Git 源（GitHub、GitLab、Gitee、WenPaiGit）、FAIR、ArkPress、AspireCloud | ✅ 已实现 |
+| Bridge API（REST，可选启用） | ✅ 已实现 |
+| 配置导入导出 | ✅ 已实现（0.8.0） |
+| 版本锁定 | ✅ 已实现（`Core/VersionLock`） |
+| 更新前备份、一键回滚 | ✅ 已实现（`Core/BackupManager`），1.2.4 起备份原子替换 |
+| Site Health 集成 | ✅ 已实现（`Core/SiteHealth`） |
+| 多站点支持 | ✅ 1.2.4 加入新站点初始化和卸载清理；1.3.0 加入 Hub-Spoke 凭据代理 |
+| 商业插件检测（CommercialDetector） | ❌ 1.1.0 删除，改由供应商系统和 AutoMatcher 处理 |
+| 更新日志聚合（ChangelogManager） | ❌ 1.1.0 删除，WordPress 原生已有更新日志展示 |
+| 源分组 | ❌ 1.1.0 删除（后台没有入口） |
+| 通知系统（邮件、Webhook） | ❌ 1.1.0 删除 |
+| AI 桥接层（OpenAI 兼容层、商业插件 AI 适配） | ❌ 1.1.0 删除，AI 桥接归 WPMind 负责 |
+| 开发者文档（如何搭建兼容的更新服务器） | ⏳ 未完成，产品文档放在 wpcy.com |
+| 安全扫描集成、白标 | ⏳ 未排期 |
+
+## 待讨论事项（2026-02 结论，保留备查）
+
+- [x] 是否需要云端配置同步？→ 暂不需要
+- [x] 是否支持多站点？→ 当时定为付费功能（v1.0.0）；后来 1.2.4、1.3.0 已在插件内实现多站点支持
+- [x] 定价策略？→ 基础免费 + 高级付费
+- [x] 与文派叶子的集成方式？→ 独立运行，检测到 WPCY 时官方源走 WPCY
 - [x] 预置更新源？→ 文派开源（默认）、ArkPress、AspireCloud、FAIR
 - [x] WP-CLI 命令前缀？→ `wp bridge`
 - [x] 自托管方案支持？→ ArkPress、AspireCloud、UpdatePulse Server、PUC 格式
-
----
-
-*最后更新: 2026-02-05*
