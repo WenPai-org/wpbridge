@@ -81,6 +81,8 @@
 - [ ] SodiumSafe：放宽 4 处 `sodium_memzero` 是否存在的前置检查（#23 评审）
 - [ ] 生成签名和密钥对的 sodium 调用也包上 try，异常按失败处理（#23 评审）
 - [ ] 文档写明：产品代码不依赖 vendor 里的 `paragonie/sodium_compat`，它只是测试用的 dev 依赖；线上没有扩展时用 WordPress 自带的 sodium_compat（#23 评审）
+- [ ] 无 sodium 测试：导出完整性日志的 context 字段，核对里面没有密钥和签名（#23 验收）
+- [ ] 给 `HubSpokeStore` 的 verify 调用（:180）单独补无 sodium 的反例测试（#23 验收）
 
 ### 可访问性和 i18n
 - [ ] 对比度：#9ca3af 的白底正文和「已安装」徽标提到 4.5 以上；「即将上线」卡片要用文字或 aria 写明状态，不能只靠变灰（topic `wpbridge-a11y-contrast`）
