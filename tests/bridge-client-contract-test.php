@@ -78,6 +78,13 @@ namespace {
 	function wp_remote_retrieve_header( $response, string $name ): string {
 		return (string) ( $response['headers'][ $name ] ?? '' );
 	}
+	function get_transient( string $key ) {
+		return $GLOBALS['bc_transients'][ $key ] ?? false;
+	}
+	function set_transient( string $key, $value, int $ttl = 0 ): bool {
+		$GLOBALS['bc_transients'][ $key ] = $value;
+		return true;
+	}
 	function is_wp_error( $value ): bool {
 		return $value instanceof WP_Error;
 	}

@@ -277,6 +277,7 @@ namespace {
 	}
 
 	$ct_root = dirname( __DIR__ );
+	require_once $ct_root . '/includes/Security/SodiumSafe.php';
 	require_once $ct_root . '/includes/Security/Encryption.php';
 	require_once $ct_root . '/includes/HubSpoke/InstallationIdentity.php';
 	require_once $ct_root . '/includes/HubSpoke/CredentialEnvelope.php';
