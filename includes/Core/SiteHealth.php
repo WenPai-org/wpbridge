@@ -8,6 +8,7 @@
 namespace WPBridge\Core;
 
 use WPBridge\Cache\HealthChecker;
+use WPBridge\UpdateSource\SourceModel;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -82,6 +83,10 @@ class SiteHealth {
 		$failed_sources = [];
 
 		foreach ( $sources as $source ) {
+			// Settings 返回的是存储用的数组，HealthChecker::check() 要求 SourceModel.
+			if ( ! $source instanceof SourceModel ) {
+				$source = SourceModel::from_array( (array) $source );
+			}
 			$status = $health_checker->check( $source );
 
 			if ( $status->status === 'healthy' ) {
