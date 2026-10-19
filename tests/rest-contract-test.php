@@ -195,7 +195,7 @@ $expected_rest = [
 	'GET /check/(?P<source_id>[a-zA-Z0-9_-]+)'                           => 'check_source|check_api_permission',
 	'GET /plugins/(?P<slug>[a-z0-9-]+)/info'                             => 'get_plugin_info|check_api_permission',
 	'GET /themes/(?P<slug>[a-z0-9-]+)/info'                              => 'get_theme_info|check_api_permission',
-	'GET /wenpai-git/(?P<repo>[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+)/releases' => 'get_wenpai_git_releases|check_api_permission',
+	'GET /wenpai-git/(?P<repo>[a-zA-Z0-9_-]+/(?!\.{1,2}/)[a-zA-Z0-9_.-]+)/releases' => 'get_wenpai_git_releases|check_api_permission',
 	'GET /status'                                                        => 'get_status|__return_true',
 ];
 ksort( $expected_rest );
@@ -218,16 +218,16 @@ $assert( [ true, 'sanitize_text_field' ] === ( $args['/sources/(?P<id>[a-zA-Z0-9
 $assert( [ true, 'sanitize_text_field' ] === ( $args['/check/(?P<source_id>[a-zA-Z0-9_-]+)']['source_id'] ?? null ), 'GET /check/{source_id}: source_id is required and sanitize_text_field' );
 $assert( [ true, 'sanitize_title' ] === ( $args['/plugins/(?P<slug>[a-z0-9-]+)/info']['slug'] ?? null ), 'GET /plugins/{slug}/info: slug is required and sanitize_title' );
 $assert( [ true, 'sanitize_title' ] === ( $args['/themes/(?P<slug>[a-z0-9-]+)/info']['slug'] ?? null ), 'GET /themes/{slug}/info: slug is required and sanitize_title' );
-$repo_route = '/wenpai-git/(?P<repo>[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+)/releases';
+$repo_route = '/wenpai-git/(?P<repo>[a-zA-Z0-9_-]+/(?!\.{1,2}/)[a-zA-Z0-9_.-]+)/releases';
 $assert( [ true, 'sanitize_text_field' ] === ( $args[ $repo_route ]['repo'] ?? null ), 'GET /wenpai-git/{repo}/releases: repo is required and sanitize_text_field' );
 $validate = $args[ $repo_route ]['__validate'] ?? null;
 $assert( is_callable( $validate ), 'GET /wenpai-git/{repo}/releases: repo has a validate_callback' );
 if ( is_callable( $validate ) ) {
 	foreach ( [ 'WenPai-org/wpbridge', 'org_1/repo.name-2' ] as $ok ) {
-		$assert( 1 === $validate( $ok ), "repo validate_callback accepts {$ok}" );
+		$assert( true === $validate( $ok ), "repo validate_callback accepts {$ok}" );
 	}
 	foreach ( [ 'wpbridge', 'a/b/c', 'org/repo?x=1', 'org /repo', '../repo', 'org/repo#x' ] as $bad ) {
-		$assert( 1 !== $validate( $bad ), "repo validate_callback rejects {$bad}" );
+		$assert( false === $validate( $bad ), "repo validate_callback rejects {$bad}" );
 	}
 }
 $assert( [] === array_filter( $actual_rest, static fn( string $v ): bool => false !== strpos( $v, 'MISSING' ) ), 'Every bridge/v1 endpoint declares a permission_callback' );

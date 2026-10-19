@@ -216,6 +216,7 @@ namespace {
 	// CT-4: self-updater rejects downgrade, same version and non-HTTPS packages.
 	$plugin_file = 'wpbridge/wpbridge.php';
 	$updater     = new WPBridge_Updater( $plugin_file, '1.3.0' );
+	$plugin_data = [ 'Version' => '1.3.0' ]; // #16 version guard: disk version must match the loaded updater.
 	$offer       = static function ( array $plugin ) use ( $plugin_file, $reply ): void {
 		\WPBridge\Security\SafeHttpClient::$responder = static function () use ( $plugin, $plugin_file, $reply ) {
 			return $reply( 200, [ 'plugins' => [ $plugin_file => $plugin ] ] );
@@ -232,21 +233,21 @@ namespace {
 		'missing version'   => [ 'package' => 'https://updates.wenpai.net/p.zip' ],
 	] as $label => $plugin ) {
 		$offer( $plugin );
-		$assert( $sentinel === $updater->check_update( $sentinel, [], $plugin_file, [] ), "CT-4 updater {$label}: existing update value is returned unchanged" );
+		$assert( $sentinel === $updater->check_update( $sentinel, $plugin_data, $plugin_file, [] ), "CT-4 updater {$label}: existing update value is returned unchanged" );
 	}
 	$offer( [ 'version' => '1.4.0', 'package' => 'https://updates.wenpai.net/p.zip', 'slug' => 'wpbridge' ] );
-	$update = $updater->check_update( false, [], $plugin_file, [] );
+	$update = $updater->check_update( false, $plugin_data, $plugin_file, [] );
 	$assert( is_object( $update ) && '1.4.0' === $update->new_version && 'https://updates.wenpai.net/p.zip' === $update->package && $plugin_file === $update->plugin, 'CT-4 updater: newer HTTPS package is offered (positive control)' );
 	\WPBridge\Security\SafeHttpClient::$calls = [];
-	$assert( $sentinel === $updater->check_update( $sentinel, [], 'other/other.php', [] ) && [] === \WPBridge\Security\SafeHttpClient::$calls, 'CT-4 updater: other plugin files are passed through without a request' );
+	$assert( $sentinel === $updater->check_update( $sentinel, $plugin_data, 'other/other.php', [] ) && [] === \WPBridge\Security\SafeHttpClient::$calls, 'CT-4 updater: other plugin files are passed through without a request' );
 	\WPBridge\Security\SafeHttpClient::$responder = static function () use ( $reply ) {
 		return $reply( 500, [ 'error' => 'x' ] );
 	};
-	$assert( $sentinel === $updater->check_update( $sentinel, [], $plugin_file, [] ), 'CT-4 updater: API HTTP 500 keeps the existing update value' );
+	$assert( $sentinel === $updater->check_update( $sentinel, $plugin_data, $plugin_file, [] ), 'CT-4 updater: API HTTP 500 keeps the existing update value' );
 	\WPBridge\Security\SafeHttpClient::$responder = static function () use ( $reply ) {
 		return $reply( 200, '<html>' );
 	};
-	$assert( $sentinel === $updater->check_update( $sentinel, [], $plugin_file, [] ), 'CT-4 updater: non-JSON API response keeps the existing update value' );
+	$assert( $sentinel === $updater->check_update( $sentinel, $plugin_data, $plugin_file, [] ), 'CT-4 updater: non-JSON API response keeps the existing update value' );
 	$last = end( \WPBridge\Security\SafeHttpClient::$calls );
 	$assert( 'https://updates.wenpai.net/api/v1/update-check' === ( $last[0] ?? '' ) && 'POST' === ( $last[1]['method'] ?? '' ) && '1.3.0' === ( json_decode( (string) ( $last[1]['body'] ?? '' ), true )['plugins'][ $plugin_file ]['Version'] ?? '' ), 'CT-4 updater: update-check is a POST to the HTTPS update API carrying the installed version' );
 
