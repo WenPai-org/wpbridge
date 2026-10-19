@@ -18,6 +18,7 @@ run() {
 
 run "PHP syntax (all plugin PHP files)" bash -c 'find . -path ./node_modules -prune -o -path ./vendor -prune -o -path ./.git -prune -o -name "*.php" -print0 | xargs -0 -n1 php -l >/tmp/wpbridge-php-lint.log && cat /tmp/wpbridge-php-lint.log'
 run "Security regressions" php tests/security-regression-test.php
+run "REST repo param (no dot segments)" php tests/repo-param-dotdot-test.php
 run "Updater regressions" php tests/updater-regression-test.php
 run "Update authorization" php tests/update-authorization-test.php
 run "Hub-Spoke contract" php tests/hub-spoke-contract-test.php
