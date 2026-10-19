@@ -31,7 +31,7 @@
 
 ## 1.3.1：升级、回滚安全 ← 当前目标
 
-范围已冻结（2026-10-19）。合并顺序：#12 → #19 → #22 → #16 → #20 → #15 → #13 → #14 → #17 → #21 → 发版准备。
+范围已冻结（2026-10-19）。合并顺序：#12 → #19 → #22 → #16 → #20 → #15 → #13 → #14 → #17 → #21 → #18 → 发版准备。
 
 ### 升级与回滚
 - [ ] WordPress 在同一请求里替换插件文件后，旧版本的更新器对象不再发起网络请求，按失败关闭处理（#12）
@@ -65,7 +65,7 @@
 - [ ] 公开的 `/status` 不再暴露插件版本号（去掉，还是只给登录用户看，待定）
 
 ### 接口和错误码
-- [ ] `POST /wpbridge/v2/spoke-links/accept` 按错误类型返回 400、403、409、503 或 502；远端 Hub 的状态码不再透传，原值放进 `hub_status`；`wenpai-git/{repo}/releases` 的远端状态码透传也一起改（topic `wpbridge-spoke-accept-status`）
+- [ ] `POST /wpbridge/v2/spoke-links/accept` 按错误类型返回 400、403、409、503 或 502；远端 Hub 的状态码不再透传，原值放进 `hub_status`；`wenpai-git/{repo}/releases` 的远端状态码透传也一起改（topic `wpbridge-spoke-accept-status`）。#21 带的 Spoke 红测试（单独跑 4 条失败）现在没接进 `tests/run-tests.sh`，修的时候必须接进去，让 npm test 能跑到
 - [ ] 预设源 `PluginUpdater::plugin_info` 也加上版本守卫
 - [ ] 补 #20 之后的签名和校验和合同测试：CT-1、2、3、5、6、7、11，以及 CT-12 里的 sha256 部分
 
