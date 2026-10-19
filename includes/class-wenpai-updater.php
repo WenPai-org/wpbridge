@@ -86,6 +86,13 @@ class WPBridge_Updater {
 	private $own_download = '';
 
 	/**
+	 * 这次 upgrader_pre_download 里守卫是否已经记过下载阶段的 error（避免终检重复记）.
+	 *
+	 * @var bool
+	 */
+	private $reject_logged = false;
+
+	/**
 	 * 初始化更新器。
 	 *
 	 * @param string $plugin_file 插件主文件路径（plugin_basename 格式）.
@@ -184,8 +191,9 @@ class WPBridge_Updater {
 		$new_version        = sanitize_text_field( self::string_field( $data, 'version' ) );
 		$package            = esc_url_raw( self::string_field( $data, 'package' ) );
 		// wpbridge-server 的 checksum 字段算法未约定，有意不读.
-		[ $sha256, $sha256_invalid ] = self::sha256_fields( $data );
-		$sha256_valid                = '' !== $sha256 && ! $sha256_invalid;
+		[ $sha256, $sha256_malformed, $sha256_mismatch ] = self::sha256_fields( $data );
+		$sha256_invalid                                  = $sha256_malformed || $sha256_mismatch;
+		$sha256_valid                                    = '' !== $sha256 && ! $sha256_invalid;
 		// 三种模式，都只由本站 wp-config.php 决定，服务端字段只能加严、不能放宽：
 		// - 定义了 WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS（只看 defined）：严格模式，必须带
 		// 有效签名和 SHA-256，否则拒绝（防止响应去掉签名字段把校验降级）；常量里
@@ -251,6 +259,10 @@ class WPBridge_Updater {
 		}
 
 		// 服务端给了摘要但格式不对（含非字符串、两个字段不一致）：无法保证下载校验，不提供这次更新.
+		if ( $sha256_mismatch && ! $sha256_malformed ) {
+			$this->log_integrity_event( 'error', 'sha256_field_mismatch', 'sha256 与 checksum_sha256 两个摘要字段不一致，已拒绝提供这次更新', $integrity_context );
+			return $update;
+		}
 		if ( $sha256_invalid ) {
 			$this->log_integrity_event( 'error', 'sha256_malformed', '自更新包的 SHA-256 格式无效，已拒绝提供这次更新', $integrity_context );
 			return $update;
@@ -369,6 +381,7 @@ class WPBridge_Updater {
 	public function enforce_self_update_record( $reply, $package, $upgrader = null, $hook_extra = [] ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed -- upgrader_pre_download 的参数顺序由 WordPress 决定.
 		$this->verified_download = null;
 		$this->own_download      = '';
+		$this->reject_logged     = false;
 		if ( ! is_string( $package ) ) {
 			return $reply;
 		}
@@ -465,13 +478,33 @@ class WPBridge_Updater {
 	public function final_self_update_check( $reply, $package, $upgrader = null, $hook_extra = [] ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed -- upgrader_pre_download 的参数顺序由 WordPress 决定.
 		$verified                = $this->verified_download;
 		$own                     = $this->own_download;
+		$already_logged          = $this->reject_logged;
 		$this->verified_download = null;
 		$this->own_download      = '';
-		if ( ! $this->strict_mode() || ! is_string( $package ) ) {
+		$this->reject_logged     = false;
+		if ( ! is_string( $package ) ) {
 			return $reply;
 		}
 		$self = $this->self_update_download( $package, $hook_extra );
 		if ( null === $self ) {
+			return $reply;
+		}
+		// 任何模式：自更新下载以错误结束、而守卫自己没记过 error（例如共用/无密钥模式下
+		// PackageIntegrityVerifier::verify 拒绝了摘要或签名），在这里补记，下载阶段不去重.
+		if ( is_wp_error( $reply ) && ! $already_logged ) {
+			$this->log_integrity_event(
+				'error',
+				'download_rejected',
+				'自更新包下载或校验失败，已中止安装：' . $reply->get_error_code(),
+				[
+					'plugin'     => $this->plugin_file,
+					'version'    => $self[1],
+					'error_code' => $reply->get_error_code(),
+				],
+				false
+			);
+		}
+		if ( ! $this->strict_mode() ) {
 			return $reply;
 		}
 		if ( is_wp_error( $reply ) ) {
@@ -612,11 +645,12 @@ class WPBridge_Updater {
 	 * 或两个字段都有效但不一致，都算格式错误。无效字段不会被另一个有效字段盖掉.
 	 *
 	 * @param array $data 响应数据.
-	 * @return array{0: string, 1: bool} [有效的小写摘要或空串, 是否有格式错误].
+	 * @return array{0: string, 1: bool, 2: bool} [有效的小写摘要或空串, 是否有格式错误, 两个有效摘要是否不一致].
 	 */
 	private static function sha256_fields( array $data ): array {
-		$sha256  = '';
-		$invalid = false;
+		$sha256   = '';
+		$invalid  = false;
+		$mismatch = false;
 		foreach ( [ 'sha256', 'checksum_sha256' ] as $field ) {
 			if ( ! isset( $data[ $field ] ) ) {
 				continue;
@@ -629,13 +663,17 @@ class WPBridge_Updater {
 			if ( '' === $value ) {
 				continue;
 			}
-			if ( 1 !== preg_match( '/^[a-f0-9]{64}$/', $value ) || ( '' !== $sha256 && $sha256 !== $value ) ) {
+			if ( 1 !== preg_match( '/^[a-f0-9]{64}$/', $value ) ) {
 				$invalid = true;
+				continue;
+			}
+			if ( '' !== $sha256 && $sha256 !== $value ) {
+				$mismatch = true;
 				continue;
 			}
 			$sha256 = $value;
 		}
-		return [ $sha256, $invalid ];
+		return [ $sha256, $invalid, $mismatch ];
 	}
 
 	/**
@@ -668,6 +706,9 @@ class WPBridge_Updater {
 	 * @param bool   $dedupe  是否每天去重.
 	 */
 	private function log_integrity_event( string $level, string $event, string $message, array $context, bool $dedupe = true ): void {
+		if ( ! $dedupe && 'error' === $level ) {
+			$this->reject_logged = true;
+		}
 		$ready = $this->integrity_logger_ready();
 		if ( $ready && ! \WPBridge\Core\Logger::is_enabled( $level ) ) {
 			return;

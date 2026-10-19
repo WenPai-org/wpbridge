@@ -401,6 +401,17 @@ namespace {
 		return ! $raised && ! $offered( $result );
 	};
 
+	// Errors logged since $from (index into Logger::$history), optionally filtered by message needle.
+	$errors_since = static function ( int $from, string $needle = '' ): int {
+		$n = 0;
+		foreach ( array_slice( Logger::$history, $from ) as $entry ) {
+			if ( 'error' === $entry[0] && ( '' === $needle || false !== strpos( $entry[1], $needle ) ) ) {
+				++$n;
+			}
+		}
+		return $n;
+	};
+
 	if ( in_array( $mode, [ 'empty', 'string', 'badkey' ], true ) ) {
 		$assert( ! $offered( $check( $signed_item ) ), 'E1 dedicated constant without a valid key: even a validly signed update is not offered (fail closed)' );
 		$assert( ! $offered( $check( $base_item ) ), 'E2 dedicated constant without a valid key: unsigned update is not offered' );
@@ -670,6 +681,28 @@ namespace {
 		$errors = count( array_filter( Logger::$history, static fn( $e ) => 'error' === $e[0] ) ) - $before;
 		$assert( $errors >= 2, 'N8 two strict verification failures for the same version log two errors' );
 
+		// Every download-stage rejection logs an error (not deduped, N8).
+		$reject_cases = [
+			'later filter swaps the path'       => [ 10 => static fn( $r ) => $evil_file ],
+			'earlier filter WP_Error'           => [ 0 => static fn( $r ) => new WP_Error( 'early_failure' ) ],
+			'earlier non-file reply'            => [ 0 => static fn( $r ) => 'https://elsewhere.example/x.zip' ],
+			'earlier symlink reply'             => [ 0 => static fn( $r ) => $link ],
+			'later filter returns a WP_Error'   => [ 10 => static fn( $r ) => new WP_Error( 'later_failure' ) ],
+			'earlier tampered local file'       => [ 0 => static fn( $r ) => $early ],
+		];
+		foreach ( $reject_cases as $label => $extra ) {
+			file_put_contents( $early, $evil );
+			$check( $signed_item );
+			$GLOBALS['wpb_download_body'] = $body;
+			$h0                           = count( Logger::$history );
+			[ $by ]                       = $run_chain( $package, [ 'plugin' => 'wpbridge/wpbridge.php' ], $extra );
+			$assert( 'error' === $by && 1 === $errors_since( $h0 ), "LOG strict rejection ({$label}) logs exactly one error (got " . $errors_since( $h0 ) . ')' );
+		}
+		$check( $signed_item );
+		$h0 = count( Logger::$history );
+		$download( $package, $evil );
+		$assert( 1 === $errors_since( $h0 ), 'LOG strict verify failure (tampered download) logs exactly one error' );
+
 		// D13 (review N4): takeover by wp-china-yes means our hooks are not registered.
 		$GLOBALS['wpb_override'] = true;
 		$status                  = $health_status();
@@ -718,6 +751,20 @@ namespace {
 		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'S11 empty sha256 does not mask a valid checksum_sha256 (review N2)' );
 		$assert( $sha_reject( $sha_only + [ 'checksum_sha256' => [ 'x' ] ] ), "S12 shared: malformed checksum_sha256 rejects even with a valid sha256 (N2')" );
 
+		// Tester e293805: A-3/A-5/A-m5 were refused by PackageIntegrityVerifier::verify (priority 10) without any log.
+		foreach ( [
+			'A-5 tampered package vs advertised sha256 (signature valid)' => [ $signed_item, $evil ],
+			'A-3 signature does not match the downloaded package'          => [ $signed_item, $body . 'x' ],
+			'sha-only offer, tampered package'                             => [ $sha_only, $evil ],
+		] as $label => [ $offer_item, $served ] ) {
+			$check( $offer_item );
+			$GLOBALS['wpb_download_body'] = $served;
+			$h0                           = count( Logger::$history );
+			[ $by ]                       = $run_chain( $package );
+			$assert( 'error' === $by && 1 === $errors_since( $h0 ), "LOG shared rejection ({$label}) logs one error (got " . $errors_since( $h0 ) . ')' );
+		}
+		$GLOBALS['wpb_download_body'] = $body;
+
 		$status = $health_status();
 		$assert( $status['registered'] && 'good' === ( $status['status'] ?? '' ) && false !== strpos( (string) ( $status['description'] ?? '' ), 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' ), 'S8 Site Health is good (not recommended) and explains WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' );
 	} else {
@@ -763,6 +810,22 @@ namespace {
 		$assert( $sha_reject( $base_item + [ 'sha256' => (object) [ 'a' => 1 ] ] ), "N2' none: object sha256 is malformed => not offered" );
 		$assert( $sha_reject( $base_item + [ 'sha256' => $sha256, 'checksum_sha256' => [ 'x' ] ] ), "N2' none: a malformed checksum_sha256 next to a valid sha256 is still rejected" );
 		$assert( $sha_reject( $base_item + [ 'sha256' => $sha256, 'checksum_sha256' => hash( 'sha256', 'other' ) ] ), "N2' none: two well-formed but different digests are rejected" );
+		$h0 = count( Logger::$history );
+		$sha_reject( $base_item + [ 'sha256' => $sha256, 'checksum_sha256' => hash( 'sha256', 'other' ) ] );
+		$assert( 1 === $errors_since( $h0, '不一致' ) && 0 === $errors_since( $h0, '格式无效' ), 'MISMATCH two different digests log their own message (not the malformed-format one)' );
+		$h0 = count( Logger::$history );
+		$sha_reject( $base_item + [ 'sha256' => [ $sha256 ] ] );
+		$sha_reject( $base_item + [ 'sha256' => 'abc' ] );
+		$assert( 2 === $errors_since( $h0, '格式无效' ) && 0 === $errors_since( $h0, '不一致' ), 'MISMATCH malformed digests keep the format-invalid message' );
+		$h0 = count( Logger::$history );
+		$sha_reject( $base_item + [ 'sha256' => 'abc', 'checksum_sha256' => hash( 'sha256', 'other' ) ] );
+		$assert( 1 === $errors_since( $h0, '格式无效' ), 'MISMATCH one malformed plus one valid digest reports the format error' );
+		$check( $sha_only );
+		$GLOBALS['wpb_download_body'] = $evil;
+		$h0                           = count( Logger::$history );
+		[ $by ]                       = $run_chain( $package );
+		$assert( 'error' === $by && 1 === $errors_since( $h0 ), 'LOG none-mode checksum mismatch at download logs one error' );
+		$GLOBALS['wpb_download_body'] = $body;
 		$check( $base_item + [ 'sha256' => $sha256, 'checksum_sha256' => strtoupper( $sha256 ) ] );
 		$assert( 'file' === $code( $download( $package, $body ) ), "N2' none: the same digest in both fields (any case) is accepted" );
 		$check( $base_item + [ 'sha256' => null, 'checksum_sha256' => $sha256 ] );
