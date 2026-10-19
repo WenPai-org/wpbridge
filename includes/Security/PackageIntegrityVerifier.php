@@ -172,7 +172,7 @@ class PackageIntegrityVerifier {
 		}
 
 		$canonical = self::canonical( $record );
-		if ( ! sodium_crypto_sign_verify_detached( $signature, $canonical, $public_key ) ) {
+		if ( ! SodiumSafe::verify_detached( $signature, $canonical, $public_key ) ) {
 			return new \WP_Error( 'wpbridge_signature_mismatch', __( '更新包 Ed25519 签名校验失败，已中止安装。', 'wpbridge' ) );
 		}
 		return true;

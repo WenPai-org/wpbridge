@@ -33,6 +33,7 @@ namespace WPBridge\UpdateSource\Handlers {
 }
 
 namespace {
+	require_once dirname( __DIR__ ) . '/includes/Security/SodiumSafe.php';
 	require_once dirname( __DIR__ ) . '/includes/Security/PackageIntegrityVerifier.php';
 	require_once dirname( __DIR__ ) . '/includes/Commercial/BridgeClient.php';
 	require_once dirname( __DIR__ ) . '/includes/UpdateSource/Handlers/BridgeServerHandler.php';

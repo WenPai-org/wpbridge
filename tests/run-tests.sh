@@ -35,6 +35,7 @@ run "Hub protected package E2E" "$PHP_BIN" "$SODIUM_PREPEND" tests/hub-protected
 run "Hub stream guard" "$PHP_BIN" "$SODIUM_PREPEND" tests/hub-stream-guard-test.php
 run "Hub controller package E2E" "$PHP_BIN" "$SODIUM_PREPEND" tests/hub-controller-package-e2e-test.php
 run "Artifact signatures" "$PHP_BIN" "$SODIUM_PREPEND" tests/artifact-signature-test.php
+run "Sodium safe wrappers" "$PHP_BIN" "$SODIUM_PREPEND" tests/sodium-safe-test.php
 run "Site Health sources" "$PHP_BIN" "$SODIUM_PREPEND" tests/site-health-sources-test.php
 run "Repository contracts" "$PHP_BIN" "$SODIUM_PREPEND" tests/static-contract-test.php
 run "Admin JavaScript syntax" node --check assets/js/admin.js

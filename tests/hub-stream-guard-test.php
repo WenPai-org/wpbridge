@@ -16,6 +16,7 @@ class WP_REST_Response {
 	public function __construct( $data ) { $this->data = $data; }
 	public function get_data() { return $this->data; }
 }
+require_once dirname( __DIR__ ) . '/includes/Security/SodiumSafe.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeStore.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/HostCanonicalizer.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/LinkAuthorizer.php';
