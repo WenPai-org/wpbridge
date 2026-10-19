@@ -99,9 +99,19 @@ $fixture  = static function ( $preempt, $request, $url ) {
 	];
 };
 add_filter( 'pre_http_request', $fixture, 10, 3 );
-$result = $updater->check_update( $previous, [], 'wpbridge/wpbridge.php', [] );
+$result = $updater->check_update( $previous, [ 'Version' => '1.2.4' ], 'wpbridge/wpbridge.php', [] );
 remove_filter( 'pre_http_request', $fixture, 10 );
 wpbridge_contract_assert( $previous === $result, 'Downgrade and insecure package preserve previous update' );
+
+$stale_network_calls = 0;
+$stale_fixture       = static function ( $preempt, $request, $url ) use ( &$stale_network_calls ) {
+	$stale_network_calls++;
+	return $preempt;
+};
+add_filter( 'pre_http_request', $stale_fixture, 10, 3 );
+$result = $updater->check_update( $previous, [ 'Version' => '1.2.3' ], 'wpbridge/wpbridge.php', [] );
+remove_filter( 'pre_http_request', $stale_fixture, 10 );
+wpbridge_contract_assert( $previous === $result && 0 === $stale_network_calls, 'Stale in-memory updater skips network access after plugin file replacement' );
 
 $pass = $GLOBALS['wpbridge_contract_pass'];
 $fail = $GLOBALS['wpbridge_contract_fail'];

@@ -72,6 +72,21 @@ $assert( false !== strpos( $release_builder, 'git archive HEAD' ), 'Release buil
 $assert( false !== strpos( $release_builder, 'touch -h -t 198001010000' ) && false !== strpos( $release_builder, 'zip -X' ), 'Release builder normalizes ZIP timestamps and metadata' );
 $assert( false !== strpos( $release_builder, 'manifest.json' ), 'Release builder emits a file manifest' );
 
+$ci_workflow = (string) file_get_contents( $root . '/.forgejo/workflows/wp-plugin-ci.yml' );
+$assert( false !== strpos( $ci_workflow, "version=\"\$(sed -n 's/^ \\* Version:" ), 'CI derives the candidate version from the plugin header' );
+$assert( false !== strpos( $ci_workflow, 'build-candidate.sh --version "$version"' ), 'CI passes the derived version to the release builder' );
+$assert( false !== strpos( $ci_workflow, 'wpbridge-$version.zip.sha256' ) && false !== strpos( $ci_workflow, 'wpbridge-$version.zip"' ), 'CI verifies the derived candidate filenames' );
+$assert( false === strpos( $ci_workflow, '--version 1.2.4' ) && false === strpos( $ci_workflow, 'wpbridge-1.2.4.zip' ), 'CI contains no retired 1.2.4 release filename or builder argument' );
+
+// Mirror the CI header extraction (sed 's/^ \* Version:[[:space:]]*//p' | head -1) instead of reading
+// private guidance files such as CLAUDE.md, which the public docs gate removed from the tree.
+$plugin_main = (string) file_get_contents( $root . '/wpbridge.php' );
+preg_match( '/^ \* Version:[ \t]*(.*)$/m', $plugin_main, $ci_header_match );
+$ci_version = rtrim( (string) ( $ci_header_match[1] ?? '' ), "\r" );
+$assert( $version === $ci_version, 'CI-derived header version matches the plugin candidate version' );
+$assert( 1 === preg_match( '/^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$/', $ci_version ), 'CI-derived header version passes the CI version format gate' );
+$assert( $ci_version === ( $stable_match[1] ?? null ), 'CI-derived header version matches the readme stable tag' );
+
 $release_workflow = (string) file_get_contents( $root . '/.forgejo/workflows/release.yml' );
 $assert( false !== strpos( $release_workflow, '只构建并发布 Release；目标站部署必须走独立审批和独立流程' ), 'Release workflow documents the separate deployment approval boundary' );
 $assert( false === strpos( $release_workflow, 'DEPLOY_HOST' ) && false === strpos( $release_workflow, 'DEPLOY_SSH_KEY' ), 'Release workflow cannot consume deployment host or SSH credentials' );

@@ -129,6 +129,15 @@ class WPBridge_Updater {
 			return $update;
 		}
 
+		// WordPress may run the updater-complete hooks after replacing this
+		// plugin's files.  The updater object still represents the version
+		// loaded at request start, so it must not execute against a different
+		// on-disk version during an upgrade or rollback transition.
+		$disk_version = sanitize_text_field( (string) ( $plugin_data['Version'] ?? '' ) );
+		if ( '' === $disk_version || $disk_version !== $this->version ) {
+			return $update;
+		}
+
 		$response = $this->api_request(
 			'update-check',
 			[
@@ -144,10 +153,10 @@ class WPBridge_Updater {
 			return $update;
 		}
 
-		$data        = $response['plugins'][ $this->plugin_file ];
-		$new_version = sanitize_text_field( (string) ( $data['version'] ?? '' ) );
-		$package     = esc_url_raw( (string) ( $data['package'] ?? '' ) );
-		$sha256      = strtolower( sanitize_text_field( (string) ( $data['sha256'] ?? $data['checksum_sha256'] ?? '' ) ) );
+		$data               = $response['plugins'][ $this->plugin_file ];
+		$new_version        = sanitize_text_field( (string) ( $data['version'] ?? '' ) );
+		$package            = esc_url_raw( (string) ( $data['package'] ?? '' ) );
+		$sha256             = strtolower( sanitize_text_field( (string) ( $data['sha256'] ?? $data['checksum_sha256'] ?? '' ) ) );
 		$signature_required = ! empty( $data['signature_required'] );
 		$signature_scheme   = strtolower( sanitize_text_field( (string) ( $data['signature_scheme'] ?? '' ) ) );
 		$signature_kid      = sanitize_text_field( (string) ( $data['signature_kid'] ?? '' ) );
@@ -156,7 +165,7 @@ class WPBridge_Updater {
 		$artifact_size      = max( 0, (int) ( $data['artifact_size'] ?? 0 ) );
 		$artifact_signed_at = sanitize_text_field( (string) ( $data['artifact_signed_at'] ?? '' ) );
 
-		// 失败时保留 WordPress 已有结果；拒绝降级、同版本和非 HTTPS 安装包。
+		// 失败时保留 WordPress 已有结果；拒绝降级、同版本和非 HTTPS 安装包.
 		if ( ! version_compare( $new_version, $this->version, '>' ) || 'https' !== wp_parse_url( $package, PHP_URL_SCHEME ) ) {
 			return $update;
 		}
@@ -167,15 +176,15 @@ class WPBridge_Updater {
 				$sha256,
 				DAY_IN_SECONDS,
 				[
-					'slug'               => $this->slug,
-					'version'            => $new_version,
-					'artifact_file'      => $artifact_file,
-					'artifact_signed_at' => $artifact_signed_at,
-					'artifact_size'      => $artifact_size,
-					'signature_scheme'   => $signature_scheme,
-					'signature_kid'      => $signature_kid,
-					'signature'          => $signature,
-					'signature_required' => $signature_required,
+					'slug'                 => $this->slug,
+					'version'              => $new_version,
+					'artifact_file'        => $artifact_file,
+					'artifact_signed_at'   => $artifact_signed_at,
+					'artifact_size'        => $artifact_size,
+					'signature_scheme'     => $signature_scheme,
+					'signature_kid'        => $signature_kid,
+					'signature'            => $signature,
+					'signature_required'   => $signature_required,
 					'artifact_public_keys' => $this->artifact_public_keys(),
 				]
 			);
@@ -185,19 +194,19 @@ class WPBridge_Updater {
 		}
 
 		return (object) [
-			'id'           => $data['id'] ?? '',
-			'slug'         => $data['slug'] ?? $this->slug,
-			'plugin'       => $this->plugin_file,
-			'version'      => $new_version,
-			'new_version'  => $new_version,
-			'url'          => $data['url'] ?? '',
-			'package'      => $package,
-			'icons'        => $data['icons'] ?? [],
-			'banners'      => $data['banners'] ?? [],
-			'requires'     => $data['requires'] ?? '',
-			'tested'       => $data['tested'] ?? '',
-			'requires_php' => $data['requires_php'] ?? '',
-			'sha256'       => preg_match( '/^[a-f0-9]{64}$/', $sha256 ) ? $sha256 : '',
+			'id'                 => $data['id'] ?? '',
+			'slug'               => $data['slug'] ?? $this->slug,
+			'plugin'             => $this->plugin_file,
+			'version'            => $new_version,
+			'new_version'        => $new_version,
+			'url'                => $data['url'] ?? '',
+			'package'            => $package,
+			'icons'              => $data['icons'] ?? [],
+			'banners'            => $data['banners'] ?? [],
+			'requires'           => $data['requires'] ?? '',
+			'tested'             => $data['tested'] ?? '',
+			'requires_php'       => $data['requires_php'] ?? '',
+			'sha256'             => preg_match( '/^[a-f0-9]{64}$/', $sha256 ) ? $sha256 : '',
 			'signature_scheme'   => $signature_scheme,
 			'signature_kid'      => $signature_kid,
 			'signature'          => $signature,
@@ -297,6 +306,13 @@ class WPBridge_Updater {
 	 * @return array|\WP_Error 解码后的响应或错误。
 	 */
 	private function api_request( string $endpoint, ?array $body = null ) {
+		if ( ! class_exists( '\\WPBridge\\Security\\SafeHttpClient' ) ) {
+			return new WP_Error(
+				'wpbridge_http_client_unavailable',
+				'WPBridge HTTP client is unavailable during the plugin file transition.'
+			);
+		}
+
 		$url = self::API_URL . '/' . ltrim( $endpoint, '/' );
 
 		$args = [
