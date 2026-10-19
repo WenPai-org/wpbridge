@@ -344,11 +344,11 @@ class SiteHealth {
 	 * @return array
 	 */
 	public function test_selfupdate_signature(): array {
-		$keys = defined( 'WPBRIDGE_ARTIFACT_PUBLIC_KEYS' ) && is_array( WPBRIDGE_ARTIFACT_PUBLIC_KEYS ) ? WPBRIDGE_ARTIFACT_PUBLIC_KEYS : [];
+		$strict_keys = defined( 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' ) && is_array( WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS ) ? WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS : [];
 
-		if ( [] !== $keys ) {
+		if ( [] !== $strict_keys ) {
 			return [
-				'label'       => __( 'WPBridge: 自身更新包强制验签', 'wpbridge' ),
+				'label'       => __( 'WPBridge: 自身更新包严格验签已启用', 'wpbridge' ),
 				'status'      => 'good',
 				'badge'       => [
 					'label' => __( '正常', 'wpbridge' ),
@@ -359,8 +359,8 @@ class SiteHealth {
 					esc_html(
 						sprintf(
 							/* translators: %d: number of configured public keys */
-							__( '已在 wp-config.php 配置 WPBRIDGE_ARTIFACT_PUBLIC_KEYS（%d 个公钥）。WPBridge 自身的更新包必须带有效的 Ed25519 签名和 SHA-256，缺少或无效时会拒绝更新。', 'wpbridge' ),
-							count( $keys )
+							__( '已在 wp-config.php 配置 WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS（%d 个公钥）。WPBridge 自身的更新包必须带有效的 Ed25519 签名和 SHA-256，缺少或无效时会拒绝更新。', 'wpbridge' ),
+							count( $strict_keys )
 						)
 					)
 				),
@@ -369,16 +369,16 @@ class SiteHealth {
 		}
 
 		return [
-			'label'       => __( 'WPBridge: 自身更新包未做签名校验', 'wpbridge' ),
-			'status'      => 'recommended',
+			'label'       => __( 'WPBridge: 自身更新包签名校验（未启用严格模式）', 'wpbridge' ),
+			'status'      => 'good',
 			'badge'       => [
-				'label' => __( '建议', 'wpbridge' ),
-				'color' => 'orange',
+				'label' => __( '正常', 'wpbridge' ),
+				'color' => 'green',
 			],
 			'description' => sprintf(
 				'<p>%s</p><p>%s</p>',
-				esc_html__( '此站点没有在 wp-config.php 配置 WPBRIDGE_ARTIFACT_PUBLIC_KEYS，WPBridge 自身的更新包不做签名校验，只依赖 HTTPS 和更新服务器本身的安全；服务端提供 SHA-256 时仍会校验摘要。', 'wpbridge' ),
-				esc_html__( '配置公钥后，缺少签名或签名无效的自更新都会被拒绝。请在更新服务器开始提供签名之后再配置，否则此站点会收不到 WPBridge 的更新。', 'wpbridge' )
+				esc_html__( 'WPBridge 自身的更新包目前不强制要求签名：更新服务器提供 SHA-256 时会校验摘要；带签名且已配置 WPBRIDGE_ARTIFACT_PUBLIC_KEYS 时会验证签名，无效即拒绝；没有签名时照常更新并记录日志。', 'wpbridge' ),
+				esc_html__( '更新服务器开始发布签名后，可在 wp-config.php 定义 WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS 启用严格验签，之后缺少签名或签名无效的自更新都会被拒绝。', 'wpbridge' )
 			),
 			'test'        => 'wpbridge_selfupdate_signature',
 		];

@@ -2,17 +2,18 @@
 /**
  * Self-update signature policy contracts (P0: signature downgrade).
  *
- * Run twice, because WPBRIDGE_ARTIFACT_PUBLIC_KEYS is a constant:
- *   php tests/selfupdate-signature-policy-test.php keys    (operator pinned a key in wp-config.php)
- *   php tests/selfupdate-signature-policy-test.php nokeys  (shipped default: no key)
+ * Run three times, because the key rings are constants:
+ *   php tests/selfupdate-signature-policy-test.php dedicated  (WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS set: strict)
+ *   php tests/selfupdate-signature-policy-test.php shared     (only WPBRIDGE_ARTIFACT_PUBLIC_KEYS set)
+ *   php tests/selfupdate-signature-policy-test.php none       (shipped default: no key)
  *
  * Policy under test:
- * - Keys configured locally => every self-update must carry a valid Ed25519
- *   signature and SHA-256. No server field (signature_required=false, missing
- *   fields) can weaken this.
- * - No keys => an unsigned update is still offered (existing sites keep
- *   updating), with a Logger warning and a Site Health notice.
- * - A signature that is present but invalid/untrusted is always rejected.
+ * - Dedicated ring set => every self-update must carry a valid Ed25519
+ *   signature and SHA-256; no server field can weaken this.
+ * - Shared ring only => a present signature is verified against it and
+ *   rejected if invalid/untrusted; a missing signature is allowed + warning.
+ * - No ring => cannot verify signatures: allowed + warning.
+ * - All modes: an advertised SHA-256 must match the downloaded package.
  */
 
 namespace WPBridge\Security {
@@ -54,8 +55,8 @@ namespace WPBridge\Core {
 
 namespace {
 	$mode = $argv[1] ?? '';
-	if ( ! in_array( $mode, [ 'keys', 'nokeys' ], true ) ) {
-		fwrite( STDERR, "usage: php selfupdate-signature-policy-test.php keys|nokeys\n" );
+	if ( ! in_array( $mode, [ 'dedicated', 'shared', 'none' ], true ) ) {
+		fwrite( STDERR, "usage: php selfupdate-signature-policy-test.php dedicated|shared|none\n" );
 		exit( 2 );
 	}
 
@@ -72,17 +73,22 @@ namespace {
 	define( 'WP_PLUGIN_DIR', sys_get_temp_dir() . '/wpbridge-sigpolicy-' . getmypid() );
 	define( 'DAY_IN_SECONDS', 86400 );
 	define( 'WPBRIDGE_VERSION', '1.3.1' );
-	if ( 'keys' === $mode ) {
-		define(
-			'WPBRIDGE_ARTIFACT_PUBLIC_KEYS',
-			[
-				'release-2026q3' => [
-					'public_key' => $public_key,
-					'status'     => 'active',
-					'not_before' => '2026-01-01T00:00:00Z',
-				],
-			]
-		);
+	$ring = static function ( string $key ): array {
+		return [
+			'release-2026q3' => [
+				'public_key' => $key,
+				'status'     => 'active',
+				'not_before' => '2026-01-01T00:00:00Z',
+			],
+		];
+	};
+	if ( 'dedicated' === $mode ) {
+		define( 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS', $ring( $public_key ) );
+		// Same kid, different key: proves the self-updater does not read the shared ring in strict mode.
+		$other = sodium_crypto_sign_publickey( sodium_crypto_sign_seed_keypair( str_repeat( "\x44", SODIUM_CRYPTO_SIGN_SEEDBYTES ) ) );
+		define( 'WPBRIDGE_ARTIFACT_PUBLIC_KEYS', $ring( $b64url( $other ) ) );
+	} elseif ( 'shared' === $mode ) {
+		define( 'WPBRIDGE_ARTIFACT_PUBLIC_KEYS', $ring( $public_key ) );
 	}
 
 	class WP_Error {
@@ -148,8 +154,10 @@ namespace {
 		return $response['body'] ?? '';
 	}
 	function set_site_transient( $key, $value, $ttl = 0 ): bool {
+		// Mirrors WordPress: updating an existing transient to the same value returns false.
+		$unchanged                              = array_key_exists( $key, $GLOBALS['wpb_site_transients'] ) && $GLOBALS['wpb_site_transients'][ $key ] === $value;
 		$GLOBALS['wpb_site_transients'][ $key ] = $value;
-		return true;
+		return ! $unchanged;
 	}
 	function get_site_transient( $key ) {
 		return $GLOBALS['wpb_site_transients'][ $key ] ?? false;
@@ -220,14 +228,16 @@ namespace {
 	$updater  = new WPBridge_Updater( 'wpbridge/wpbridge.php', WPBRIDGE_VERSION );
 
 	// Run one update check against a canned server item, then (optionally) the download.
-	$check = static function ( array $item ) use ( $updater, $previous ) {
+	$check = static function ( array $item, bool $fresh = true ) use ( $updater, $previous ) {
 		SafeHttpClient::$calls          = 0;
 		SafeHttpClient::$response       = [
 			'code' => 200,
 			'body' => json_encode( [ 'plugins' => [ 'wpbridge/wpbridge.php' => $item ] ] ),
 		];
 		Logger::$entries                = [];
-		$GLOBALS['wpb_site_transients'] = [];
+		if ( $fresh ) {
+			$GLOBALS['wpb_site_transients'] = [];
+		}
 		$result                         = $updater->check_update( $previous, [ 'Version' => WPBRIDGE_VERSION ], 'wpbridge/wpbridge.php', [] );
 		if ( is_object( $result ) && isset( $result->package ) ) {
 			// Mirror WordPress: the offer is cached in update_plugins until download.
@@ -254,86 +264,132 @@ namespace {
 	$bad_sig              = $signed_item;
 	$bad_sig['signature'] = str_repeat( 'A', 86 );
 
-	if ( 'keys' === $mode ) {
-		// K1 positive control.
-		$result = $check( $signed_item );
-		$assert( $offered( $result ) && true === $result->signature_required, 'K1 valid signed response is offered and marked signature_required' );
-		$assert( 'file' === $code( $download( $package, $body ) ), 'K1 valid signed package verifies at download' );
+	// A present-but-wrong signature, and a tampered body, are shared fixtures.
+	$bad_sig              = $signed_item;
+	$bad_sig['signature'] = str_repeat( 'A', 86 );
+	$sha_only             = $base_item + [ 'sha256' => $sha256 ];
+	$health_status        = static function (): array {
+		SafeHttpClient::$calls = 0;
+		$health                = ( new ReflectionClass( \WPBridge\Core\SiteHealth::class ) )->newInstanceWithoutConstructor();
+		$tests                 = $health->add_tests( [] );
+		$status                = method_exists( $health, 'test_selfupdate_signature' ) ? $health->test_selfupdate_signature() : [];
+		$status['registered']  = isset( $tests['direct']['wpbridge_selfupdate_signature'] );
+		return $status;
+	};
+	$warned_with = static function ( string $needle ): bool {
+		foreach ( Logger::$entries as $entry ) {
+			if ( 'warning' === $entry[0] && false !== strpos( $entry[1], $needle ) ) {
+				return true;
+			}
+		}
+		return false;
+	};
 
-		// K2 THE downgrade: server strips signature and says signature_required=false.
-		$stripped                       = $base_item + [ 'sha256' => $sha256 ];
+	if ( 'dedicated' === $mode ) {
+		// Shared constant holds a DIFFERENT key under the same kid: D1 only passes if the dedicated ring is used.
+		$result = $check( $signed_item );
+		$assert( $offered( $result ) && true === $result->signature_required, 'D1 valid signed response is offered and marked signature_required' );
+		$assert( 'file' === $code( $download( $package, $body ) ), 'D1 package verifies against WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS (not the shared ring)' );
+
+		$stripped                       = $sha_only;
 		$stripped['signature_required'] = false;
 		$result                         = $check( $stripped );
-		$assert( ! $offered( $result ), 'K2 server signature_required=false + no signature is rejected when a key is configured (downgrade blocked)' );
-		$assert( in_array( 'error', Logger::levels(), true ), 'K2 rejected unsigned self-update is logged at error level (always recorded)' );
+		$assert( ! $offered( $result ), 'D2 server signature_required=false + no signature is rejected in strict mode (downgrade blocked)' );
+		$assert( in_array( 'error', Logger::levels(), true ), 'D2 strict rejection is logged at error level' );
 
-		// K3 signature fields simply absent (current wenpai-bridge shape: no sha256, no signature).
-		$result = $check( $base_item );
-		$assert( ! $offered( $result ), 'K3 response without sha256 and signature is rejected when a key is configured' );
+		$assert( ! $offered( $check( $base_item ) ), 'D3 response without sha256 and signature is rejected in strict mode' );
 
-		// K4 signature present, sha256 missing.
 		$no_sha = $signed_item;
 		unset( $no_sha['sha256'] );
-		$no_sha['signature_required'] = false;
-		$result                       = $check( $no_sha );
-		$assert( ! $offered( $result ), 'K4 response without sha256 is rejected when a key is configured' );
+		$assert( ! $offered( $check( $no_sha ) ), 'D4 signed response without sha256 is rejected in strict mode' );
 
-		// K5 invalid signature: may be offered (format is valid) but never installs.
 		$check( $bad_sig );
-		$assert( 'wpbridge_signature_mismatch' === $code( $download( $package, $body ) ), 'K5 wrong signature is rejected at download' );
+		$assert( 'wpbridge_signature_mismatch' === $code( $download( $package, $body ) ), 'D5 wrong signature is rejected at download' );
 
-		// K6 unknown kid with signature_required=false from server.
 		$unknown                       = $signed_item;
 		$unknown['signature_kid']      = 'attacker-key';
 		$unknown['signature_required'] = false;
 		$check( $unknown );
-		$assert( 'wpbridge_signature_unknown_key' === $code( $download( $package, $body ) ), 'K6 signature from an untrusted kid is rejected at download even if the server says not required' );
+		$assert( 'wpbridge_signature_unknown_key' === $code( $download( $package, $body ) ), 'D6 untrusted kid is rejected at download even if the server says not required' );
 
-		// K7 tampered package with valid metadata.
 		$check( $signed_item );
-		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'K7 tampered package is rejected at download' );
+		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'D7 SHA-256 mismatch is rejected at download (strict)' );
 
-		// K8 integrity record lost (cache eviction) but WordPress still has the offer cached.
 		$check( $signed_item );
 		PackageIntegrityVerifier::forget( $package );
-		$assert( is_wp_error( $download( $package, $body ) ), 'K8 offered self-update package without an integrity record is refused at download when a key is configured' );
+		$assert( is_wp_error( $download( $package, $body ) ), 'D8 offered package without an integrity record is refused at download in strict mode' );
 
-		// K9 Site Health reports enforcement.
-		SafeHttpClient::$calls = 0;
-		$health = ( new ReflectionClass( \WPBridge\Core\SiteHealth::class ) )->newInstanceWithoutConstructor();
-		$tests  = $health->add_tests( [] );
-		$assert( isset( $tests['direct']['wpbridge_selfupdate_signature'] ), 'K9 Site Health registers wpbridge_selfupdate_signature' );
-		$status = method_exists( $health, 'test_selfupdate_signature' ) ? $health->test_selfupdate_signature() : [];
-		$assert( 'good' === ( $status['status'] ?? '' ), 'K9 Site Health signature check is good when a key is configured' );
-	} else {
-		// N1 current production shape: no sha256, no signature => still offered, warned.
-		$result = $check( $base_item );
-		$assert( $offered( $result ) && false === $result->signature_required, 'N1 unsigned response is still offered when no key is configured (existing sites keep updating)' );
-		$assert( in_array( 'warning', Logger::levels(), true ), 'N1 unsigned self-update offer logs a warning' );
-		$assert( false === $download( $package, $body ), 'N1 unsigned package without a record is left to WordPress (legacy path unchanged)' );
-
-		// N2 sha256 only: still verified at download.
-		$check( $base_item + [ 'sha256' => $sha256 ] );
-		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'N2 advertised sha256 is still enforced at download' );
-
-		// N3 signature present but no local key: always rejected.
 		$check( $signed_item );
-		$assert( 'wpbridge_signature_unknown_key' === $code( $download( $package, $body ) ), 'N3 a present signature with no trusted local key is rejected at download' );
+		$result = $check( $signed_item, false );
+		$assert( $offered( $result ), 'D9 a repeated identical check is still offered (set_site_transient returns false when unchanged)' );
+
+		$status = $health_status();
+		$assert( $status['registered'] && 'good' === ( $status['status'] ?? '' ) && false !== strpos( (string) ( $status['description'] ?? '' ), 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' ), 'D10 Site Health is good and names the strict-mode constant' );
+	} elseif ( 'shared' === $mode ) {
+		$result = $check( $base_item );
+		$assert( $offered( $result ), 'S1 unsigned response is offered when only the shared ring is set (commercial-source sites keep self-updating)' );
+		$assert( in_array( 'warning', Logger::levels(), true ), 'S1 unsigned offer logs a warning' );
+		$assert( false === $download( $package, $body ), 'S1 unsigned package without sha256 is left to WordPress' );
+
+		$check( $sha_only );
+		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'S2 SHA-256 mismatch is rejected at download (shared-only, unsigned)' );
+
+		$result = $check( $signed_item );
+		$assert( $offered( $result ), 'S3 valid signature is offered' );
+		$assert( 'file' === $code( $download( $package, $body ) ), 'S3 present signature verifies against the shared ring' );
+
+		$wrong                       = $bad_sig;
+		$wrong['signature_required'] = false;
+		$check( $wrong );
+		$assert( 'wpbridge_signature_mismatch' === $code( $download( $package, $body ) ), 'S4 present wrong signature is rejected even when the server says signature_required=false' );
+
+		$unknown                       = $signed_item;
+		$unknown['signature_kid']      = 'attacker-key';
+		$unknown['signature_required'] = false;
+		$check( $unknown );
+		$assert( 'wpbridge_signature_unknown_key' === $code( $download( $package, $body ) ), 'S5 present signature from an untrusted kid is rejected' );
+
+		$broken                       = $signed_item;
+		$broken['artifact_file']      = '';
+		$broken['signature_required'] = false;
+		$assert( ! $offered( $check( $broken ) ), 'S6 present signature with malformed metadata is not offered (cannot fall back to unsigned)' );
+
+		$check( $sha_only );
+		PackageIntegrityVerifier::forget( $package );
+		$assert( is_wp_error( $download( $package, $body ) ), 'S7 advertised sha256 whose record was lost is refused at download' );
+
+		$status = $health_status();
+		$assert( $status['registered'] && 'good' === ( $status['status'] ?? '' ) && false !== strpos( (string) ( $status['description'] ?? '' ), 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' ), 'S8 Site Health is good (not recommended) and explains WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' );
+	} else {
+		$result = $check( $base_item );
+		$assert( $offered( $result ) && false === $result->signature_required, 'N1 unsigned response is offered when no key is configured' );
+		$assert( in_array( 'warning', Logger::levels(), true ), 'N1 unsigned offer logs a warning' );
+		$assert( false === $download( $package, $body ), 'N1 unsigned package without sha256 is left to WordPress' );
+
+		$check( $sha_only );
+		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'N2 SHA-256 mismatch is rejected at download (no keys)' );
+
+		$result = $check( $signed_item );
+		$assert( $offered( $result ) && $warned_with( '未配置公钥，签名未校验' ), 'N3 present signature with no key configured is allowed with warning 未配置公钥，签名未校验' );
+		$assert( 'file' === $code( $download( $package, $body ) ), 'N3 package with an unverifiable signature installs after its SHA-256 matches' );
+
 		$check( $bad_sig );
-		$assert( is_wp_error( $download( $package, $body ) ), 'N3 a present invalid signature is rejected at download' );
+		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'N4 unverifiable signature does not skip the SHA-256 check' );
 
-		// N4 server may strengthen: signature_required=true without signature => not offered.
-		$result = $check( $base_item + [ 'sha256' => $sha256, 'signature_required' => true ] );
-		$assert( ! $offered( $result ), 'N4 server-declared signature_required with no signature is not offered' );
+		$result = $check( $sha_only + [ 'signature_required' => true ] );
+		$assert( $offered( $result ), 'N5 server signature_required without any local key cannot be verified: offered with warning' );
 
-		// N5 Site Health notice.
-		SafeHttpClient::$calls = 0;
-		$health = ( new ReflectionClass( \WPBridge\Core\SiteHealth::class ) )->newInstanceWithoutConstructor();
-		$tests  = $health->add_tests( [] );
-		$assert( isset( $tests['direct']['wpbridge_selfupdate_signature'] ), 'N5 Site Health registers wpbridge_selfupdate_signature' );
-		$status = method_exists( $health, 'test_selfupdate_signature' ) ? $health->test_selfupdate_signature() : [];
-		$assert( 'recommended' === ( $status['status'] ?? '' ) && false !== strpos( (string) ( $status['description'] ?? '' ), 'WPBRIDGE_ARTIFACT_PUBLIC_KEYS' ), 'N5 Site Health shows a notice naming WPBRIDGE_ARTIFACT_PUBLIC_KEYS when no key is configured' );
-		$assert( 0 === SafeHttpClient::$calls, 'N5 Site Health signature check makes no network calls' );
+		$malformed           = $base_item;
+		$malformed['sha256'] = 'not-a-sha256';
+		$assert( ! $offered( $check( $malformed ) ), 'N6 a malformed advertised sha256 is not offered' );
+
+		$check( $sha_only );
+		PackageIntegrityVerifier::forget( $package );
+		$assert( is_wp_error( $download( $package, $body ) ), 'N7 advertised sha256 whose record was lost is refused at download' );
+
+		$status = $health_status();
+		$assert( $status['registered'] && 'good' === ( $status['status'] ?? '' ) && false !== strpos( (string) ( $status['description'] ?? '' ), 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' ), 'N8 Site Health is good (not recommended) and explains WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' );
+		$assert( 0 === SafeHttpClient::$calls, 'N8 Site Health signature check makes no network calls' );
 	}
 
 	exit( $failures > 0 ? 1 : 0 );

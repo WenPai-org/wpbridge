@@ -20,8 +20,9 @@ run "PHP syntax (all plugin PHP files)" bash -c 'find . -path ./node_modules -pr
 run "Security regressions" php tests/security-regression-test.php
 run "Updater regressions" php tests/updater-regression-test.php
 run "Updater version guard and Site Health" php tests/version-guard-contract-test.php
-run "Self-update signature policy (key configured)" php tests/selfupdate-signature-policy-test.php keys
-run "Self-update signature policy (no key)" php tests/selfupdate-signature-policy-test.php nokeys
+run "Self-update signature policy (dedicated key: strict)" php tests/selfupdate-signature-policy-test.php dedicated
+run "Self-update signature policy (shared key only)" php tests/selfupdate-signature-policy-test.php shared
+run "Self-update signature policy (no key)" php tests/selfupdate-signature-policy-test.php none
 run "Update authorization" php tests/update-authorization-test.php
 run "Hub-Spoke contract" php tests/hub-spoke-contract-test.php
 run "Hub credential boundary" php tests/hub-credential-boundary-test.php
