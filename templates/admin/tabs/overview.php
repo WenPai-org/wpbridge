@@ -166,8 +166,8 @@ $debug_mode = ! empty( $settings['debug_mode'] );
 				<span class="wpbridge-metric-highlight"><?php echo esc_html( $stats['enabled'] ); ?></span> <?php esc_html_e( '已启用', 'wpbridge' ); ?>
 			</div>
 		</div>
-		<a href="#projects" class="wpbridge-metric-link" data-tab-link="projects" data-subtab="sources">
-			<span class="dashicons dashicons-arrow-right-alt2"></span>
+		<a href="#projects" class="wpbridge-metric-link" data-tab-link="projects" data-subtab="sources" aria-label="<?php esc_attr_e( '查看更新源', 'wpbridge' ); ?>">
+			<span class="dashicons dashicons-arrow-right-alt2" aria-hidden="true"></span>
 		</a>
 	</div>
 
@@ -182,8 +182,8 @@ $debug_mode = ! empty( $settings['debug_mode'] );
 				<?php echo esc_html( $plugins_count ); ?> <?php esc_html_e( '插件', 'wpbridge' ); ?> / <?php echo esc_html( $themes_count ); ?> <?php esc_html_e( '主题', 'wpbridge' ); ?>
 			</div>
 		</div>
-		<a href="#projects" class="wpbridge-metric-link" data-tab-link="projects">
-			<span class="dashicons dashicons-arrow-right-alt2"></span>
+		<a href="#projects" class="wpbridge-metric-link" data-tab-link="projects" aria-label="<?php esc_attr_e( '查看项目', 'wpbridge' ); ?>">
+			<span class="dashicons dashicons-arrow-right-alt2" aria-hidden="true"></span>
 		</a>
 	</div>
 
@@ -196,8 +196,8 @@ $debug_mode = ! empty( $settings['debug_mode'] );
 			<div class="wpbridge-metric-label"><?php esc_html_e( '供应商', 'wpbridge' ); ?></div>
 			<div class="wpbridge-metric-sub"><?php echo esc_html( $plan_label ); ?></div>
 		</div>
-		<a href="#vendors" class="wpbridge-metric-link" data-tab-link="vendors">
-			<span class="dashicons dashicons-arrow-right-alt2"></span>
+		<a href="#vendors" class="wpbridge-metric-link" data-tab-link="vendors" aria-label="<?php esc_attr_e( '查看供应商', 'wpbridge' ); ?>">
+			<span class="dashicons dashicons-arrow-right-alt2" aria-hidden="true"></span>
 		</a>
 	</div>
 
@@ -220,8 +220,8 @@ $debug_mode = ! empty( $settings['debug_mode'] );
 				<div class="wpbridge-metric-sub"><?php esc_html_e( '暂无检查数据', 'wpbridge' ); ?></div>
 			<?php endif; ?>
 		</div>
-		<a href="#projects" class="wpbridge-metric-link" data-tab-link="projects" data-subtab="sources">
-			<span class="dashicons dashicons-arrow-right-alt2"></span>
+		<a href="#projects" class="wpbridge-metric-link" data-tab-link="projects" data-subtab="sources" aria-label="<?php esc_attr_e( '查看更新源健康度', 'wpbridge' ); ?>">
+			<span class="dashicons dashicons-arrow-right-alt2" aria-hidden="true"></span>
 		</a>
 	</div>
 </div>

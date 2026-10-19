@@ -268,7 +268,7 @@
 
 .wpbridge-badge-inactive {
     background: var(--wpbridge-gray-100);
-    color: var(--wpbridge-gray-500);
+    color: var(--wpbridge-gray-600); /* gray-500 on gray-100 is 4.39:1, below WCAG AA */
 }
 
 .wpbridge-badge-coming-soon {

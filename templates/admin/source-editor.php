@@ -55,8 +55,8 @@ $type_hints = [
 <!-- 标题栏 -->
 <header class="wpbridge-header">
 	<div class="wpbridge-header-left">
-		<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge' ) ); ?>" class="wpbridge-back-link">
-			<span class="dashicons dashicons-arrow-left-alt2"></span>
+		<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpbridge' ) ); ?>" class="wpbridge-back-link" aria-label="<?php esc_attr_e( '返回云桥', 'wpbridge' ); ?>">
+			<span class="dashicons dashicons-arrow-left-alt2" aria-hidden="true"></span>
 		</a>
 		<h1 class="wpbridge-title"><?php echo esc_html( $title ); ?></h1>
 	</div>

@@ -230,4 +230,117 @@ foreach ( $t4_new_ids as $t4_id ) {
 }
 $assert( array() === $t4_id_bad, 'T4-3 label-association ids each appear exactly once in templates' . ( $t4_id_bad ? ' (' . implode( ', ', $t4_id_bad ) . ')' : '' ) );
 
+// T4-4..T4-7: a11y follow-up (icon-only links, bulk checkboxes, muted badge contrast). Checks raw template source so the
+// translation call and text domain are verified, not only the rendered attribute.
+$t4_raw = array();
+foreach ( array_keys( $t4_templates ) as $t4_rel ) {
+	$t4_raw[ $t4_rel ] = (string) file_get_contents( $root . '/templates/' . $t4_rel );
+}
+// A start tag whose attributes may contain PHP blocks (which themselves contain ">").
+const T4_TAG_ATTRS = '(?:<\?php.*?\?>|[^>])*>';
+$t4_named_by       = static function ( string $tag_src ): bool {
+	// aria-label must come from an escaped translation call in the wpbridge text domain.
+	return 1 === preg_match( '/aria-label\s*=\s*"<\?php\s+(?:esc_attr_e\s*\(|echo\s+esc_attr__\s*\(|echo\s+esc_attr\s*\(\s*sprintf\s*\(.*?__\s*\()[^?]*?\'wpbridge\'.*?\?>"/s', $tag_src );
+};
+
+// T4-4: icon-only links (back link, metric links) have an accessible name and hide the decorative dashicon.
+$t4_icon_links = array();
+$t4_icon_bad   = array();
+foreach ( $t4_raw as $t4_rel => $t4_src ) {
+	if ( ! preg_match_all( '/(<a\b' . T4_TAG_ATTRS . ')(.*?)<\/a>/s', $t4_src, $t4_m, PREG_SET_ORDER | PREG_OFFSET_CAPTURE ) ) {
+		continue;
+	}
+	foreach ( $t4_m as $t4_one ) {
+		if ( ! preg_match( '/class\s*=\s*"[^"]*\bwpbridge-(?:back-link|metric-link)\b/', $t4_one[1][0] ) ) {
+			continue;
+		}
+		$t4_where        = $t4_rel . ':' . $t4_line( $t4_src, $t4_one[0][1] );
+		$t4_icon_links[] = $t4_where;
+		$t4_has_sr_text  = 1 === preg_match( '/class\s*=\s*"[^"]*\bscreen-reader-text\b[^"]*"\s*>\s*<\?php\s+esc_html_e\s*\([^?]*\'wpbridge\'/s', $t4_one[2][0] );
+		if ( ! $t4_named_by( $t4_one[1][0] ) && ! $t4_has_sr_text ) {
+			$t4_icon_bad[] = $t4_where . ' no-name';
+		}
+		if ( preg_match_all( '/<span\b[^>]*\bdashicons\b[^>]*>/', $t4_one[2][0], $t4_icons ) ) {
+			foreach ( $t4_icons[0] as $t4_icon ) {
+				if ( false === strpos( $t4_icon, 'aria-hidden="true"' ) ) {
+					$t4_icon_bad[] = $t4_where . ' icon-not-hidden';
+				}
+			}
+		}
+	}
+}
+$assert( 5 === count( $t4_icon_links ), 'T4-4 finds 1 back link + 4 metric links (' . count( $t4_icon_links ) . ' found)' );
+$assert( array() === $t4_icon_bad, 'T4-4 icon-only links have a translated accessible name and aria-hidden icons' . ( $t4_icon_bad ? ' (' . implode( ', ', $t4_icon_bad ) . ')' : '' ) );
+
+// T4-5: vendor bulk-select checkboxes are labelled, in the template and when admin.js inserts one after install.
+$t4_bulk     = array();
+$t4_bulk_bad = array();
+foreach ( $t4_raw as $t4_rel => $t4_src ) {
+	if ( preg_match_all( '/<input\b' . T4_TAG_ATTRS . '/s', $t4_src, $t4_m, PREG_OFFSET_CAPTURE ) ) {
+		foreach ( $t4_m[0] as $t4_one ) {
+			if ( preg_match( '/class\s*=\s*"[^"]*\bwpbridge-bulk-check(?![\w-])/', $t4_one[0] ) ) {
+				$t4_where  = $t4_rel . ':' . $t4_line( $t4_src, $t4_one[1] );
+				$t4_bulk[] = $t4_where;
+				if ( ! $t4_named_by( $t4_one[0] ) ) {
+					$t4_bulk_bad[] = $t4_where;
+				}
+			}
+		}
+	}
+}
+$t4_admin_js = (string) file_get_contents( $root . '/assets/js/admin.js' );
+$t4_js_sites = preg_match_all( '/<input type="checkbox" class="wpbridge-bulk-check"/', $t4_admin_js, $t4_js_m, PREG_OFFSET_CAPTURE );
+$t4_js_bad   = 0;
+foreach ( $t4_js_m[0] as $t4_one ) {
+	if ( false === strpos( substr( $t4_admin_js, $t4_one[1], 600 ), "'aria-label'" ) ) {
+		++$t4_js_bad;
+	}
+}
+$assert( 1 === count( $t4_bulk ), 'T4-5 vendors template has 1 .wpbridge-bulk-check input (' . count( $t4_bulk ) . ' found)' );
+$assert( array() === $t4_bulk_bad, 'T4-5 template .wpbridge-bulk-check has a translated aria-label' . ( $t4_bulk_bad ? ' (' . implode( ', ', $t4_bulk_bad ) . ')' : '' ) );
+$assert( $t4_js_sites > 0 && 0 === $t4_js_bad, 'T4-5 admin.js sets aria-label on every dynamically inserted .wpbridge-bulk-check (' . (int) $t4_js_sites . ' sites, ' . $t4_js_bad . ' unlabelled)' );
+
+// T4-6: text on the gray-100 badge background meets WCAG AA 4.5:1 for the selectors axe flagged (.wpbridge-version, .wpbridge-badge-inactive).
+$t4_vars = array();
+if ( preg_match_all( '/(--wpbridge-[\w-]+)\s*:\s*(#[0-9a-fA-F]{6})\s*;/', (string) file_get_contents( $root . '/assets/css/variables.css' ), $t4_vm, PREG_SET_ORDER ) ) {
+	foreach ( $t4_vm as $t4_v ) {
+		$t4_vars[ $t4_v[1] ] = strtolower( $t4_v[2] );
+	}
+}
+$t4_resolve  = static function ( string $value ) use ( $t4_vars ): ?string {
+	$value = trim( $value );
+	if ( preg_match( '/^var\(\s*(--wpbridge-[\w-]+)\s*\)$/', $value, $m ) ) {
+		return $t4_vars[ $m[1] ] ?? null;
+	}
+	return preg_match( '/^#[0-9a-fA-F]{6}$/', $value ) ? strtolower( $value ) : null;
+};
+$t4_lum      = static function ( string $hex ): float {
+	$c = array();
+	foreach ( array( 1, 3, 5 ) as $i ) {
+		$s   = hexdec( substr( $hex, $i, 2 ) ) / 255;
+		$c[] = $s <= 0.03928 ? $s / 12.92 : ( ( $s + 0.055 ) / 1.055 ) ** 2.4;
+	}
+	return 0.2126 * $c[0] + 0.7152 * $c[1] + 0.0722 * $c[2];
+};
+$t4_ratio    = static function ( string $a, string $b ) use ( $t4_lum ): float {
+	$la = $t4_lum( $a );
+	$lb = $t4_lum( $b );
+	return ( max( $la, $lb ) + 0.05 ) / ( min( $la, $lb ) + 0.05 );
+};
+$t4_contrast = array(
+	'base.css'    => '.wpbridge-version',
+	'vendors.css' => '.wpbridge-badge-inactive',
+);
+foreach ( $t4_contrast as $t4_css => $t4_sel ) {
+	$t4_css_src = (string) file_get_contents( $root . '/assets/css/' . $t4_css );
+	$t4_found   = preg_match( '/(?:^|\})\s*(?:\/\*[^*]*\*\/\s*)*' . preg_quote( $t4_sel, '/' ) . '\s*\{([^}]*)\}/', $t4_css_src, $t4_rule );
+	$t4_fg      = ( $t4_found && preg_match( '/(?<![\w-])color\s*:\s*([^;]+);/', $t4_rule[1], $t4_c ) ) ? $t4_resolve( $t4_c[1] ) : null;
+	$t4_bg      = ( $t4_found && preg_match( '/background(?:-color)?\s*:\s*([^;]+);/', $t4_rule[1], $t4_c ) ) ? $t4_resolve( $t4_c[1] ) : null;
+	$t4_r       = ( $t4_fg && $t4_bg ) ? $t4_ratio( $t4_fg, $t4_bg ) : 0.0;
+	$assert( $t4_r >= 4.5, sprintf( 'T4-6 %s %s contrast %s on %s is %.2f:1 (>= 4.5)', $t4_css, $t4_sel, (string) $t4_fg, (string) $t4_bg, $t4_r ) );
+}
+
+// T4-7: scope guard. The shared palette is unchanged; only the flagged selectors switch to a darker token.
+$assert( '#6b7280' === ( $t4_vars['--wpbridge-gray-500'] ?? null ) && '#f3f4f6' === ( $t4_vars['--wpbridge-gray-100'] ?? null ), 'T4-7 palette tokens gray-500 (#6b7280) and gray-100 (#f3f4f6) are unchanged' );
+
 exit( $failures > 0 ? 1 : 0 );
