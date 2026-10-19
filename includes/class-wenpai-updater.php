@@ -135,6 +135,7 @@ class WPBridge_Updater {
 		// on-disk version during an upgrade or rollback transition.
 		$disk_version = sanitize_text_field( (string) ( $plugin_data['Version'] ?? '' ) );
 		if ( '' === $disk_version || $disk_version !== $this->version ) {
+			$this->log_version_guard_skip( $disk_version, 'check_update' );
 			return $update;
 		}
 
@@ -248,9 +249,18 @@ class WPBridge_Updater {
 			return $result;
 		}
 
-		$response = $this->api_request( "plugins/{$this->slug}/info" );
+		// 与 check_update() 相同的版本号守卫：插件文件已被替换或插件头损坏时，
+		// 内存中的更新器不得再发网络请求，直接走下面的本地兜底.
+		$plugin_path  = WP_PLUGIN_DIR . '/' . $this->plugin_file;
+		$disk_version = $this->disk_version( $plugin_path );
+		$response     = null;
+		if ( '' !== $disk_version && $disk_version === $this->version ) {
+			$response = $this->api_request( "plugins/{$this->slug}/info" );
+		} else {
+			$this->log_version_guard_skip( $disk_version, 'plugin_info' );
+		}
 
-		if ( ! is_wp_error( $response ) && ! isset( $response['error'] ) && ! empty( $response['name'] ) ) {
+		if ( is_array( $response ) && ! isset( $response['error'] ) && ! empty( $response['name'] ) ) {
 			$info                = new stdClass();
 			$info->name          = $response['name'];
 			$info->slug          = $response['slug'] ?? $this->slug;
@@ -270,8 +280,7 @@ class WPBridge_Updater {
 			return $info;
 		}
 
-		// API 不可用或插件未注册时，用本地插件头信息兜底.
-		$plugin_path = WP_PLUGIN_DIR . '/' . $this->plugin_file;
+		// API 不可用、版本号守卫拦截或插件未注册时，用本地插件头信息兜底.
 		if ( ! file_exists( $plugin_path ) ) {
 			return $result;
 		}
@@ -285,7 +294,7 @@ class WPBridge_Updater {
 		$info               = new stdClass();
 		$info->name         = $plugin_data['Name'] ?? $this->slug;
 		$info->slug         = $this->slug;
-		$info->version      = $this->version;
+		$info->version      = '' !== $disk_version ? $disk_version : $this->version;
 		$info->author       = $plugin_data['AuthorName'] ?? '';
 		$info->homepage     = $plugin_data['PluginURI'] ?? '';
 		$info->requires     = $plugin_data['RequiresWP'] ?? '';
@@ -296,6 +305,68 @@ class WPBridge_Updater {
 		$info->external     = true;
 
 		return $info;
+	}
+
+	/**
+	 * 读取磁盘上插件主文件头部的版本号.
+	 *
+	 * 只解析文件头，不翻译、不加标记，也不加载任何类.
+	 *
+	 * @param string $plugin_path 插件主文件绝对路径.
+	 * @return string 版本号；文件不存在或版本号为空时返回空字符串.
+	 */
+	private function disk_version( string $plugin_path ): string {
+		if ( ! file_exists( $plugin_path ) ) {
+			return '';
+		}
+
+		if ( ! function_exists( 'get_plugin_data' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$plugin_data = get_plugin_data( $plugin_path, false, false );
+		return sanitize_text_field( (string) ( $plugin_data['Version'] ?? '' ) );
+	}
+
+	/**
+	 * 版本号守卫跳过网络请求时记一条 debug 日志，同一对版本号每天最多一条.
+	 *
+	 * 只使用本次请求里已经加载的 Logger 和 Settings（class_exists 第二个参数为
+	 * false，不触发自动加载），避免在插件文件切换期间从磁盘加载另一个版本的类：
+	 * Logger 在 $settings 为空时会 new Settings()，所以两个类都要先确认已加载.
+	 * 调试日志关闭时直接返回，不写去重 transient，这样当天打开调试模式后
+	 * 第一次跳过就能记下日志.
+	 *
+	 * 读版本的来源有意不同：check_update() 用 WordPress 传入的 $plugin_data
+	 * （get_plugins 缓存），plugin_info() 和 Site Health 直接读磁盘文件头，
+	 * 缓存过期前两者可能短暂不一致.
+	 *
+	 * @param string $disk_version 磁盘上插件头的版本号（可能为空）.
+	 * @param string $context      触发位置：check_update 或 plugin_info.
+	 */
+	private function log_version_guard_skip( string $disk_version, string $context ): void {
+		if ( ! class_exists( '\\WPBridge\\Core\\Logger', false ) || ! class_exists( '\\WPBridge\\Core\\Settings', false ) ) {
+			return;
+		}
+		if ( ! method_exists( '\\WPBridge\\Core\\Logger', 'is_enabled' ) || ! \WPBridge\Core\Logger::is_enabled( 'debug' ) ) {
+			return;
+		}
+
+		$key = 'wpbridge_updater_vguard_' . md5( $this->plugin_file . '|' . $disk_version . '|' . $this->version );
+		if ( false !== get_transient( $key ) ) {
+			return;
+		}
+		set_transient( $key, 1, DAY_IN_SECONDS );
+
+		\WPBridge\Core\Logger::debug(
+			'自更新器版本号不一致，已跳过云桥自身的更新请求',
+			[
+				'plugin'         => $this->plugin_file,
+				'header_version' => '' === $disk_version ? '(empty)' : $disk_version,
+				'loaded_version' => $this->version,
+				'context'        => $context,
+			]
+		);
 	}
 
 	/**
