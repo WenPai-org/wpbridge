@@ -31,6 +31,9 @@ run "Hub controller package E2E" php tests/hub-controller-package-e2e-test.php
 run "Artifact signatures" php tests/artifact-signature-test.php
 run "Repository contracts" php tests/static-contract-test.php
 run "Admin JavaScript syntax" node --check assets/js/admin.js
+run "REST route contracts" php tests/rest-contract-test.php
+run "REST contracts (Hub-Spoke flag off)" php tests/rest-contract-flag-off-test.php
+run "Bridge client contracts" php tests/bridge-client-contract-test.php
 
 if (( failures > 0 )); then
   echo "Test groups failed: ${failures}"
