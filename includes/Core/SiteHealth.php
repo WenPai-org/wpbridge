@@ -8,6 +8,7 @@
 namespace WPBridge\Core;
 
 use WPBridge\Cache\HealthChecker;
+use WPBridge\UpdateSource\SourceModel;
 
 // 防止直接访问
 if ( ! defined( 'ABSPATH' ) ) {
@@ -64,6 +65,11 @@ class SiteHealth {
 			'test'  => [ $this, 'test_config' ],
 		];
 
+		$tests['direct']['wpbridge_updater_version'] = [
+			'label' => __( 'WPBridge 自身更新检查', 'wpbridge' ),
+			'test'  => [ $this, 'test_updater_version' ],
+		];
+
 		return $tests;
 	}
 
@@ -82,6 +88,10 @@ class SiteHealth {
 		$failed_sources = [];
 
 		foreach ( $sources as $source ) {
+			// Settings 返回的是存储用的数组，HealthChecker::check() 要求 SourceModel.
+			if ( ! $source instanceof SourceModel ) {
+				$source = SourceModel::from_array( (array) $source );
+			}
 			$status = $health_checker->check( $source );
 
 			if ( $status->status === 'healthy' ) {
@@ -251,6 +261,78 @@ class SiteHealth {
 				__( 'WPBridge 配置正确，所有功能正常运行。', 'wpbridge' )
 			),
 			'test'        => 'wpbridge_config',
+		];
+	}
+
+	/**
+	 * 测试插件头版本号与 WPBRIDGE_VERSION 是否一致
+	 *
+	 * 自更新器在两者不一致或插件头版本号为空时会跳过云桥自身的更新检查，
+	 * 这里把这种静默状态显示出来。只读插件文件头，不存储任何状态。
+	 *
+	 * @return array
+	 */
+	public function test_updater_version(): array {
+		if ( ! function_exists( 'get_plugin_data' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$plugin_data    = get_plugin_data( WPBRIDGE_FILE, false, false );
+		$header_version = sanitize_text_field( (string) ( $plugin_data['Version'] ?? '' ) );
+
+		// 网络启用时子站管理员在子站插件页无法重装，链接改指网络后台.
+		$plugins_url = admin_url( 'plugins.php' );
+		if ( is_multisite() && is_plugin_active_for_network( WPBRIDGE_BASENAME ) ) {
+			$plugins_url = network_admin_url( 'plugins.php' );
+		}
+
+		if ( '' !== $header_version && WPBRIDGE_VERSION === $header_version ) {
+			return [
+				'label'       => __( 'WPBridge: 自身更新检查正常', 'wpbridge' ),
+				'status'      => 'good',
+				'badge'       => [
+					'label' => __( '正常', 'wpbridge' ),
+					'color' => 'green',
+				],
+				'description' => sprintf(
+					'<p>%s</p>',
+					esc_html(
+						sprintf(
+							/* translators: %s: WPBridge version */
+							__( '插件头版本号与运行中的版本号一致（%s），云桥自身的更新检查正常进行。', 'wpbridge' ),
+							WPBRIDGE_VERSION
+						)
+					)
+				),
+				'test'        => 'wpbridge_updater_version',
+			];
+		}
+
+		return [
+			'label'       => __( 'WPBridge: 自身更新检查已暂停', 'wpbridge' ),
+			'status'      => 'recommended',
+			'badge'       => [
+				'label' => __( '建议', 'wpbridge' ),
+				'color' => 'orange',
+			],
+			'description' => sprintf(
+				'<p>%s</p><p>%s</p>',
+				esc_html(
+					sprintf(
+						/* translators: 1: version in the plugin file header, 2: running WPBRIDGE_VERSION */
+						__( '插件主文件头部的版本号（%1$s）与运行中的版本号（%2$s）不一致或为空，云桥自身的更新检查和插件详情请求已暂停，此站点将收不到 WPBridge 的更新。', 'wpbridge' ),
+						'' === $header_version ? __( '空', 'wpbridge' ) : $header_version,
+						WPBRIDGE_VERSION
+					)
+				),
+				esc_html__( '请重新安装当前版本的 WPBridge，或检查 wpbridge.php 是否被手动修改、只部署了部分文件或已损坏。', 'wpbridge' )
+			),
+			'actions'     => sprintf(
+				'<a href="%s">%s</a>',
+				esc_url( $plugins_url ),
+				esc_html__( '前往插件页面', 'wpbridge' )
+			),
+			'test'        => 'wpbridge_updater_version',
 		];
 	}
 

@@ -158,7 +158,7 @@ class RestController {
 		// 菲码源库 Releases
 		register_rest_route(
 			self::NAMESPACE,
-			'/wenpai-git/(?P<repo>[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+)/releases',
+			'/wenpai-git/(?P<repo>[a-zA-Z0-9_-]+/(?!\.{1,2}/)[a-zA-Z0-9_.-]+)/releases',
 			[
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => [ $this, 'get_wenpai_git_releases' ],
@@ -168,7 +168,8 @@ class RestController {
 						'required'          => true,
 						'sanitize_callback' => 'sanitize_text_field',
 						'validate_callback' => function ( $param ) {
-							return preg_match( '/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/', $param );
+							// 第二段拒绝 . 和 ..，防止拼进远端 API 路径时发生路径穿越。
+							return is_string( $param ) && 1 === preg_match( '/^[a-zA-Z0-9_-]+\/(?!\.{1,2}$)[a-zA-Z0-9_.-]+$/', $param );
 						},
 					],
 				],

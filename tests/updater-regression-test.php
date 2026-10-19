@@ -41,5 +41,10 @@ $assert( false === stripos( $markdown, 'href="javascript:' ), 'Unsafe changelog 
 
 $source = file_get_contents( dirname( __DIR__ ) . '/includes/class-wenpai-updater.php' );
 $assert( false === strpos( $source, 'str_starts_with(' ), 'Updater does not call PHP 8-only str_starts_with' );
+$assert( false !== strpos( $source, "\$plugin_data['Version']" ) && false !== strpos( $source, '$disk_version !== $this->version' ), 'Updater rejects stale in-memory version transitions before network access' );
+$assert( false !== strpos( $source, 'class_exists( \'\\\\WPBridge\\\\Security\\\\SafeHttpClient\' )' ), 'Updater fails closed when its transition-time HTTP dependency is unavailable' );
+$assert( false !== strpos( $source, '$this->log_version_guard_skip( $disk_version, \'check_update\' )' ) && false !== strpos( $source, '$this->log_version_guard_skip( $disk_version, \'plugin_info\' )' ), 'Updater logs version-guard skips for both update checks and plugin details' );
+$assert( false !== strpos( $source, 'class_exists( \'\\\\WPBridge\\\\Core\\\\Logger\', false )' ), 'Version-guard logging never autoloads classes during a file transition' );
+$assert( false !== strpos( $source, 'class_exists( \'\\\\WPBridge\\\\Core\\\\Settings\', false )' ), 'Version-guard logging also refuses to autoload Settings (Logger would new Settings())' );
 
 exit( $failures > 0 ? 1 : 0 );

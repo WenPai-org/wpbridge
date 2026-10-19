@@ -18,7 +18,9 @@ run() {
 
 run "PHP syntax (all plugin PHP files)" bash -c 'find . -path ./node_modules -prune -o -path ./vendor -prune -o -path ./.git -prune -o -name "*.php" -print0 | xargs -0 -n1 php -l >/tmp/wpbridge-php-lint.log && cat /tmp/wpbridge-php-lint.log'
 run "Security regressions" php tests/security-regression-test.php
+run "REST repo param (no dot segments)" php tests/repo-param-dotdot-test.php
 run "Updater regressions" php tests/updater-regression-test.php
+run "Updater version guard and Site Health" php tests/version-guard-contract-test.php
 run "Update authorization" php tests/update-authorization-test.php
 run "Hub-Spoke contract" php tests/hub-spoke-contract-test.php
 run "Hub credential boundary" php tests/hub-credential-boundary-test.php
@@ -29,6 +31,7 @@ run "Hub protected package E2E" php tests/hub-protected-package-e2e-test.php
 run "Hub stream guard" php tests/hub-stream-guard-test.php
 run "Hub controller package E2E" php tests/hub-controller-package-e2e-test.php
 run "Artifact signatures" php tests/artifact-signature-test.php
+run "Site Health sources" php tests/site-health-sources-test.php
 run "Repository contracts" php tests/static-contract-test.php
 run "Admin JavaScript syntax" node --check assets/js/admin.js
 run "REST route contracts" php tests/rest-contract-test.php
