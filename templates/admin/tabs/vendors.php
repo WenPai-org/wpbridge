@@ -160,6 +160,7 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 								<?php if ( ! empty( $preset['api_url'] ) ) : ?>
 									<a href="<?php echo esc_url( rtrim( $preset['api_url'], '/' ) . '/my-account/api-keys' ); ?>"
 										target="_blank"
+										rel="noopener noreferrer"
 										class="wpbridge-btn wpbridge-btn-secondary wpbridge-btn-sm">
 										<?php esc_html_e( '获取 ↗', 'wpbridge' ); ?>
 									</a>
@@ -214,7 +215,7 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 								<?php endif; ?>
 							<?php else : ?>
 								<span class="wpbridge-footer-sep"></span>
-								<a href="https://mall.weixiaoduo.com/item/wpbridge-pro" target="_blank" class="wpbridge-vendor-upgrade-link">
+								<a href="https://mall.weixiaoduo.com/item/wpbridge-pro" target="_blank" rel="noopener" class="wpbridge-vendor-upgrade-link">
 									<?php esc_html_e( '升级 Pro', 'wpbridge' ); ?>
 									<span class="dashicons dashicons-arrow-right-alt2"></span>
 								</a>
@@ -295,6 +296,7 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 							<?php if ( $is_feature_locked( 'bridge_api' ) ) : ?>
 								<a href="https://mall.weixiaoduo.com/item/wpbridge-pro"
 									target="_blank"
+									rel="noopener"
 									class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm">
 									<?php esc_html_e( '升级专业版  ↗', 'wpbridge' ); ?>
 								</a>
@@ -484,7 +486,7 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 									</button>
 								<?php endif; ?>
 								<?php if ( $homepage ) : ?>
-									<a href="<?php echo esc_url( $homepage ); ?>" target="_blank" class="wpbridge-plugin-action-link" title="<?php esc_attr_e( '查看产品', 'wpbridge' ); ?>">
+									<a href="<?php echo esc_url( $homepage ); ?>" target="_blank" rel="noopener noreferrer" class="wpbridge-plugin-action-link" title="<?php esc_attr_e( '查看产品', 'wpbridge' ); ?>">
 										<span class="dashicons dashicons-external"></span>
 									</a>
 								<?php endif; ?>

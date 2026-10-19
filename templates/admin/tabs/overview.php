@@ -288,15 +288,15 @@ $debug_mode = ! empty( $settings['debug_mode'] );
 					</span>
 				</div>
 				<?php if ( $is_free ) : ?>
-					<a href="https://mall.weixiaoduo.com/item/wpbridge-pro" target="_blank" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm">
+					<a href="https://mall.weixiaoduo.com/item/wpbridge-pro" target="_blank" rel="noopener" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm">
 						<?php esc_html_e( '升级 Pro', 'wpbridge' ); ?>
 					</a>
 				<?php elseif ( $plan_name === 'pro' ) : ?>
-					<a href="https://mall.weixiaoduo.com/item/wpbridge-pro" target="_blank" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm">
+					<a href="https://mall.weixiaoduo.com/item/wpbridge-pro" target="_blank" rel="noopener" class="wpbridge-btn wpbridge-btn-primary wpbridge-btn-sm">
 						<?php esc_html_e( '升级企业版', 'wpbridge' ); ?>
 					</a>
 				<?php elseif ( $plan_name === 'pro_enterprise' ) : ?>
-					<a href="https://mall.weixiaoduo.com/item/wpbridge-all-access" target="_blank" class="wpbridge-btn wpbridge-btn-sm wpbridge-btn-secondary">
+					<a href="https://mall.weixiaoduo.com/item/wpbridge-all-access" target="_blank" rel="noopener" class="wpbridge-btn wpbridge-btn-sm wpbridge-btn-secondary">
 						<?php esc_html_e( '了解 All Access', 'wpbridge' ); ?>
 					</a>
 				<?php endif; ?>
@@ -363,7 +363,7 @@ $debug_mode = ! empty( $settings['debug_mode'] );
 					<span class="wpbridge-plan-grid-label wpbridge-plan-grid-label--stacked">
 						<span class="dashicons dashicons-star-filled"></span>
 						<span>
-							<a href="https://mall.weixiaoduo.com/item/wpbridge-all-access" target="_blank">All Access</a>
+							<a href="https://mall.weixiaoduo.com/item/wpbridge-all-access" target="_blank" rel="noopener">All Access</a>
 							<small class="wpbridge-plan-grid-hint"><?php esc_html_e( '获得全部产品更新 + 去限制补丁 + 原创中文语言包', 'wpbridge' ); ?></small>
 						</span>
 					</span>
@@ -425,22 +425,22 @@ $debug_mode = ! empty( $settings['debug_mode'] );
 		</div>
 		<div class="wpbridge-panel-body">
 			<div class="wpbridge-link-list">
-				<a href="https://wpcy.com/bridge" target="_blank" class="wpbridge-link-item">
+				<a href="https://wpcy.com/bridge" target="_blank" rel="noopener" class="wpbridge-link-item">
 					<span class="dashicons dashicons-media-document"></span>
 					<?php esc_html_e( '快速入门指南', 'wpbridge' ); ?>
 					<span class="dashicons dashicons-external wpbridge-link-external"></span>
 				</a>
-				<a href="https://wpcy.com/bridge#faq" target="_blank" class="wpbridge-link-item">
+				<a href="https://wpcy.com/bridge#faq" target="_blank" rel="noopener" class="wpbridge-link-item">
 					<span class="dashicons dashicons-editor-help"></span>
 					<?php esc_html_e( '常见问题', 'wpbridge' ); ?>
 					<span class="dashicons dashicons-external wpbridge-link-external"></span>
 				</a>
-				<a href="https://wpcy.com/bridge#changelog" target="_blank" class="wpbridge-link-item">
+				<a href="https://wpcy.com/bridge#changelog" target="_blank" rel="noopener" class="wpbridge-link-item">
 					<span class="dashicons dashicons-list-view"></span>
 					<?php esc_html_e( '更新日志', 'wpbridge' ); ?>
 					<span class="dashicons dashicons-external wpbridge-link-external"></span>
 				</a>
-				<a href="https://wpcy.com/support" target="_blank" class="wpbridge-link-item">
+				<a href="https://wpcy.com/support" target="_blank" rel="noopener" class="wpbridge-link-item">
 					<span class="dashicons dashicons-sos"></span>
 					<?php esc_html_e( '获取支持', 'wpbridge' ); ?>
 					<span class="dashicons dashicons-external wpbridge-link-external"></span>
@@ -459,22 +459,22 @@ $debug_mode = ! empty( $settings['debug_mode'] );
 		</div>
 		<div class="wpbridge-panel-body">
 			<div class="wpbridge-link-list">
-				<a href="https://wpcy.com" target="_blank" class="wpbridge-link-item">
+				<a href="https://wpcy.com" target="_blank" rel="noopener" class="wpbridge-link-item">
 					<span class="dashicons dashicons-wordpress"></span>
 					<?php esc_html_e( '文派叶子 🍃', 'wpbridge' ); ?>
 					<span class="dashicons dashicons-external wpbridge-link-external"></span>
 				</a>
-				<a href="https://github.com/WenPai-org/wpbridge" target="_blank" class="wpbridge-link-item">
+				<a href="https://github.com/WenPai-org/wpbridge" target="_blank" rel="noopener noreferrer" class="wpbridge-link-item">
 					<span class="dashicons dashicons-editor-code"></span>
 					GitHub <?php esc_html_e( '仓库', 'wpbridge' ); ?>
 					<span class="dashicons dashicons-external wpbridge-link-external"></span>
 				</a>
-				<a href="https://wpcy.com/plugins" target="_blank" class="wpbridge-link-item">
+				<a href="https://wpcy.com/plugins" target="_blank" rel="noopener" class="wpbridge-link-item">
 					<span class="dashicons dashicons-admin-plugins"></span>
 					<?php esc_html_e( '更多文派插件', 'wpbridge' ); ?>
 					<span class="dashicons dashicons-external wpbridge-link-external"></span>
 				</a>
-				<a href="https://wpcommunity.com" target="_blank" class="wpbridge-link-item">
+				<a href="https://wpcommunity.com" target="_blank" rel="noopener noreferrer" class="wpbridge-link-item">
 					<span class="dashicons dashicons-groups"></span>
 					<?php esc_html_e( '文派社区', 'wpbridge' ); ?>
 					<span class="dashicons dashicons-external wpbridge-link-external"></span>

@@ -87,7 +87,7 @@ $type_hints = [
 						<h2 class="wpbridge-form-section-title"><?php esc_html_e( '更新源', 'wpbridge' ); ?></h2>
 
 						<div class="wpbridge-form-row">
-							<label class="wpbridge-form-label">
+							<label class="wpbridge-form-label" for="wpbridge-source-type">
 								<?php esc_html_e( '类型', 'wpbridge' ); ?>
 								<span class="required">*</span>
 							</label>
@@ -122,7 +122,7 @@ $type_hints = [
 						</div>
 
 						<div class="wpbridge-form-row">
-							<label class="wpbridge-form-label">
+							<label class="wpbridge-form-label" for="wpbridge-source-url">
 								<?php esc_html_e( '地址', 'wpbridge' ); ?>
 								<span class="required">*</span>
 							</label>
@@ -138,12 +138,13 @@ $type_hints = [
 						</div>
 
 						<div class="wpbridge-form-row">
-							<label class="wpbridge-form-label">
+							<label class="wpbridge-form-label" for="wpbridge-source-name">
 								<?php esc_html_e( '名称', 'wpbridge' ); ?>
 							</label>
 							<div>
 								<input type="text"
 										name="name"
+										id="wpbridge-source-name"
 										value="<?php echo esc_attr( $source->name ?? '' ); ?>"
 										class="wpbridge-form-input"
 										placeholder="<?php esc_attr_e( '留空自动生成', 'wpbridge' ); ?>">
@@ -157,7 +158,7 @@ $type_hints = [
 						<h2 class="wpbridge-form-section-title"><?php esc_html_e( '匹配与认证', 'wpbridge' ); ?></h2>
 
 						<div class="wpbridge-form-row">
-							<label class="wpbridge-form-label"><?php esc_html_e( '匹配目标', 'wpbridge' ); ?></label>
+							<label class="wpbridge-form-label" for="wpbridge-match-mode"><?php esc_html_e( '匹配目标', 'wpbridge' ); ?></label>
 							<div>
 								<?php
 								$current_slug      = $source->slug ?? '';
@@ -174,7 +175,7 @@ $type_hints = [
 								</select>
 								<div id="wpbridge-manual-match" style="<?php echo $match_mode === 'auto' ? 'display:none;' : ''; ?> margin-top: 8px;">
 									<div style="display: flex; gap: 8px; align-items: center;">
-										<select name="item_type" class="wpbridge-form-select" style="width: auto;">
+										<select name="item_type" class="wpbridge-form-select" style="width: auto;" aria-label="<?php esc_attr_e( '项目类型', 'wpbridge' ); ?>">
 											<option value="plugin" <?php selected( $current_item_type, 'plugin' ); ?>>
 												<?php esc_html_e( '插件', 'wpbridge' ); ?>
 											</option>
@@ -184,6 +185,7 @@ $type_hints = [
 										</select>
 										<input type="text"
 												name="slug"
+												aria-label="<?php esc_attr_e( '插件或主题标识', 'wpbridge' ); ?>"
 												value="<?php echo esc_attr( $current_slug ); ?>"
 												class="wpbridge-form-input"
 												placeholder="<?php esc_attr_e( 'my-plugin（留空匹配所有）', 'wpbridge' ); ?>"
@@ -197,10 +199,11 @@ $type_hints = [
 						</div>
 
 						<div class="wpbridge-form-row">
-							<label class="wpbridge-form-label"><?php esc_html_e( '访问令牌', 'wpbridge' ); ?></label>
+							<label class="wpbridge-form-label" for="wpbridge-source-auth-token"><?php esc_html_e( '访问令牌', 'wpbridge' ); ?></label>
 							<div>
 								<input type="password"
 										name="auth_token"
+										id="wpbridge-source-auth-token"
 										value="<?php echo esc_attr( ! empty( $source->auth_token ) ? '********' : '' ); ?>"
 										class="wpbridge-form-input"
 										autocomplete="new-password"
@@ -208,16 +211,18 @@ $type_hints = [
 							</div>
 						</div>
 
-						<div class="wpbridge-form-row" id="wpbridge-wenpai-pairing"<?php echo $is_bridge ? '' : ' hidden'; ?>>
-							<label class="wpbridge-form-label"><?php esc_html_e( '文派账户', 'wpbridge' ); ?></label>
+						<div class="wpbridge-form-row" id="wpbridge-wenpai-pairing" role="group" aria-labelledby="wpbridge-wenpai-pairing-label"<?php echo $is_bridge ? '' : ' hidden'; ?>>
+							<label class="wpbridge-form-label" id="wpbridge-wenpai-pairing-label"><?php esc_html_e( '文派账户', 'wpbridge' ); ?></label>
 							<div>
 								<input type="url"
 									name="license_server_url"
+									aria-label="<?php esc_attr_e( '授权服务地址', 'wpbridge' ); ?>"
 									value="<?php echo esc_url( $source->metadata['license_server_url'] ?? 'https://license.wenpai.net' ); ?>"
 									class="wpbridge-form-input"
 									placeholder="https://license.wenpai.net">
 								<input type="password"
 									name="update_pairing_code"
+									aria-label="<?php esc_attr_e( '一次性连接码', 'wpbridge' ); ?>"
 									value=""
 									class="wpbridge-form-input"
 									autocomplete="one-time-code"
@@ -236,7 +241,7 @@ $type_hints = [
 						</div>
 
 						<div class="wpbridge-form-row">
-							<label class="wpbridge-form-label"><?php esc_html_e( '优先级', 'wpbridge' ); ?></label>
+							<label class="wpbridge-form-label" for="wpbridge-source-priority"><?php esc_html_e( '优先级', 'wpbridge' ); ?></label>
 							<div>
 								<?php
 								$current_priority = $source->priority ?? 50;
@@ -248,7 +253,7 @@ $type_hints = [
 									$priority_level = 'fallback';
 								}
 								?>
-								<select name="priority_level" class="wpbridge-form-select">
+								<select name="priority_level" id="wpbridge-source-priority" class="wpbridge-form-select">
 									<option value="primary" <?php selected( $priority_level, 'primary' ); ?>>
 										<?php esc_html_e( '首选 — 优先使用此源', 'wpbridge' ); ?>
 									</option>
@@ -263,10 +268,10 @@ $type_hints = [
 						</div>
 
 						<div class="wpbridge-form-row">
-							<label class="wpbridge-form-label"><?php esc_html_e( '启用', 'wpbridge' ); ?></label>
+							<label class="wpbridge-form-label" for="wpbridge-source-enabled"><?php esc_html_e( '启用', 'wpbridge' ); ?></label>
 							<div>
 								<label class="wpbridge-toggle">
-									<input type="checkbox" name="enabled" value="1" <?php checked( $source->enabled ?? true ); ?>>
+									<input type="checkbox" name="enabled" id="wpbridge-source-enabled" value="1" <?php checked( $source->enabled ?? true ); ?>>
 									<span class="wpbridge-toggle-track"></span>
 								</label>
 							</div>
