@@ -331,14 +331,24 @@ class WPBridge_Updater {
 	/**
 	 * 版本号守卫跳过网络请求时记一条 debug 日志，同一对版本号每天最多一条.
 	 *
-	 * 只使用本次请求里已经加载的 Logger（class_exists 不触发自动加载），
-	 * 避免在插件文件切换期间从磁盘加载另一个版本的类.
+	 * 只使用本次请求里已经加载的 Logger 和 Settings（class_exists 第二个参数为
+	 * false，不触发自动加载），避免在插件文件切换期间从磁盘加载另一个版本的类：
+	 * Logger 在 $settings 为空时会 new Settings()，所以两个类都要先确认已加载.
+	 * 调试日志关闭时直接返回，不写去重 transient，这样当天打开调试模式后
+	 * 第一次跳过就能记下日志.
+	 *
+	 * 读版本的来源有意不同：check_update() 用 WordPress 传入的 $plugin_data
+	 * （get_plugins 缓存），plugin_info() 和 Site Health 直接读磁盘文件头，
+	 * 缓存过期前两者可能短暂不一致.
 	 *
 	 * @param string $disk_version 磁盘上插件头的版本号（可能为空）.
 	 * @param string $context      触发位置：check_update 或 plugin_info.
 	 */
 	private function log_version_guard_skip( string $disk_version, string $context ): void {
-		if ( ! class_exists( '\\WPBridge\\Core\\Logger', false ) ) {
+		if ( ! class_exists( '\\WPBridge\\Core\\Logger', false ) || ! class_exists( '\\WPBridge\\Core\\Settings', false ) ) {
+			return;
+		}
+		if ( ! method_exists( '\\WPBridge\\Core\\Logger', 'is_enabled' ) || ! \WPBridge\Core\Logger::is_enabled( 'debug' ) ) {
 			return;
 		}
 

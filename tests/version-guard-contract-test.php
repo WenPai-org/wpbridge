@@ -20,10 +20,22 @@ namespace WPBridge\Security {
 namespace WPBridge\Core {
 	class Logger {
 		public static array $entries = [];
+		public static bool $debug    = true;
+
+		public static function is_enabled( string $level ): bool {
+			return 'error' === $level || self::$debug;
+		}
 
 		public static function debug( string $message, array $context = [] ): void {
+			if ( ! self::$debug ) {
+				return; // Mirrors Logger::log(): debug entries are dropped while debug mode is off.
+			}
 			self::$entries[] = [ $message, $context ];
 		}
+	}
+
+	// Already-loaded Settings: the updater must see it via class_exists( ..., false ).
+	class Settings {
 	}
 }
 
@@ -38,6 +50,7 @@ namespace {
 	define( 'DAY_IN_SECONDS', 86400 );
 	define( 'WPBRIDGE_VERSION', '1.3.1' );
 	define( 'WPBRIDGE_FILE', WP_PLUGIN_DIR . '/wpbridge/wpbridge.php' );
+	define( 'WPBRIDGE_BASENAME', 'wpbridge/wpbridge.php' );
 
 	class WP_Error {
 		public $code;
@@ -48,6 +61,9 @@ namespace {
 
 	$GLOBALS['wpbridge_test_header'] = [ 'Name' => 'WPBridge', 'Version' => WPBRIDGE_VERSION ];
 	$GLOBALS['wpbridge_test_transients'] = [];
+	$GLOBALS['wpbridge_test_ttls']       = [];
+	$GLOBALS['wpbridge_test_multisite']  = false;
+	$GLOBALS['wpbridge_test_network']    = [];
 
 	function is_wp_error( $thing ): bool {
 		return $thing instanceof WP_Error;
@@ -70,6 +86,15 @@ namespace {
 	function admin_url( $path = '' ) {
 		return 'https://example.test/wp-admin/' . $path;
 	}
+	function network_admin_url( $path = '' ) {
+		return 'https://example.test/wp-admin/network/' . $path;
+	}
+	function is_multisite(): bool {
+		return $GLOBALS['wpbridge_test_multisite'];
+	}
+	function is_plugin_active_for_network( $plugin ): bool {
+		return in_array( $plugin, $GLOBALS['wpbridge_test_network'], true );
+	}
 	function apply_filters( $hook, $value ) {
 		return $value;
 	}
@@ -87,6 +112,7 @@ namespace {
 	}
 	function set_transient( $key, $value, $ttl = 0 ): bool {
 		$GLOBALS['wpbridge_test_transients'][ $key ] = $value;
+		$GLOBALS['wpbridge_test_ttls'][ $key ]       = $ttl;
 		return true;
 	}
 
@@ -103,7 +129,9 @@ namespace {
 	$reset = static function (): void {
 		\WPBridge\Security\SafeHttpClient::$calls = 0;
 		\WPBridge\Core\Logger::$entries           = [];
+		\WPBridge\Core\Logger::$debug             = true;
 		$GLOBALS['wpbridge_test_transients']      = [];
+		$GLOBALS['wpbridge_test_ttls']            = [];
 	};
 
 	$updater  = new WPBridge_Updater( 'wpbridge/wpbridge.php', WPBRIDGE_VERSION );
@@ -119,9 +147,20 @@ namespace {
 	$assert( 1 === count( \WPBridge\Core\Logger::$entries ), 'Repeated skips for the same version pair log one debug entry per day' );
 	$assert( '(empty)' === ( \WPBridge\Core\Logger::$entries[0][1]['header_version'] ?? null ) && 'check_update' === ( \WPBridge\Core\Logger::$entries[0][1]['context'] ?? null ), 'Skip log records the empty header version and the check_update context' );
 
+	$assert( [ DAY_IN_SECONDS ] === array_values( $GLOBALS['wpbridge_test_ttls'] ), 'Skip-log dedupe transient TTL is exactly DAY_IN_SECONDS' );
+
 	// check_update(): mismatched header version logs again (different pair), still no network.
 	$updater->check_update( $previous, [ 'Version' => '1.3.0' ], 'wpbridge/wpbridge.php', [] );
 	$assert( 0 === \WPBridge\Security\SafeHttpClient::$calls && 2 === count( \WPBridge\Core\Logger::$entries ), 'A different mismatched version pair is logged separately and makes 0 network calls' );
+
+	// Debug logging disabled: skip must not write the dedupe transient or log.
+	$reset();
+	\WPBridge\Core\Logger::$debug = false;
+	$updater->check_update( $previous, [ 'Version' => '' ], 'wpbridge/wpbridge.php', [] );
+	$assert( [] === $GLOBALS['wpbridge_test_transients'] && [] === \WPBridge\Core\Logger::$entries && 0 === \WPBridge\Security\SafeHttpClient::$calls, 'With debug logging disabled the skip writes no dedupe transient and no log entry' );
+	\WPBridge\Core\Logger::$debug = true;
+	$updater->check_update( $previous, [ 'Version' => '' ], 'wpbridge/wpbridge.php', [] );
+	$assert( 1 === count( \WPBridge\Core\Logger::$entries ), 'Enabling debug logging later the same day logs the next skip immediately' );
 
 	// Positive control: matching versions do reach the network client.
 	$reset();
@@ -167,6 +206,17 @@ namespace {
 	$GLOBALS['wpbridge_test_header'] = [ 'Version' => '' ];
 	$status = $health->test_updater_version();
 	$assert( 'recommended' === $status['status'], 'Site Health version test is recommended when the header version is empty' );
+	$assert( false !== strpos( $status['actions'], 'https://example.test/wp-admin/plugins.php' ), 'Single site: the plugins link points at the site admin' );
+
+	$GLOBALS['wpbridge_test_multisite'] = true;
+	$GLOBALS['wpbridge_test_network']   = [ 'wpbridge/wpbridge.php' ];
+	$status = $health->test_updater_version();
+	$assert( false !== strpos( $status['actions'], 'https://example.test/wp-admin/network/plugins.php' ), 'Multisite + network-active: the plugins link points at the network admin' );
+
+	$GLOBALS['wpbridge_test_network'] = [];
+	$status = $health->test_updater_version();
+	$assert( false === strpos( $status['actions'], '/network/' ) && false !== strpos( $status['actions'], 'wp-admin/plugins.php' ), 'Multisite but only site-active: the plugins link stays on the site admin' );
+	$GLOBALS['wpbridge_test_multisite'] = false;
 
 	$assert( 0 === \WPBridge\Security\SafeHttpClient::$calls && [] === $GLOBALS['wpbridge_test_transients'], 'Site Health version test is stateless and makes no network calls' );
 

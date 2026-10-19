@@ -275,6 +275,12 @@ class SiteHealth {
 		$plugin_data    = get_plugin_data( WPBRIDGE_FILE, false, false );
 		$header_version = sanitize_text_field( (string) ( $plugin_data['Version'] ?? '' ) );
 
+		// 网络启用时子站管理员在子站插件页无法重装，链接改指网络后台.
+		$plugins_url = admin_url( 'plugins.php' );
+		if ( is_multisite() && is_plugin_active_for_network( WPBRIDGE_BASENAME ) ) {
+			$plugins_url = network_admin_url( 'plugins.php' );
+		}
+
 		if ( '' !== $header_version && WPBRIDGE_VERSION === $header_version ) {
 			return [
 				'label'       => __( 'WPBridge: 自身更新检查正常', 'wpbridge' ),
@@ -318,7 +324,7 @@ class SiteHealth {
 			),
 			'actions'     => sprintf(
 				'<a href="%s">%s</a>',
-				esc_url( admin_url( 'plugins.php' ) ),
+				esc_url( $plugins_url ),
 				esc_html__( '前往插件页面', 'wpbridge' )
 			),
 			'test'        => 'wpbridge_updater_version',
