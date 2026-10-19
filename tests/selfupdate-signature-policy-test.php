@@ -213,6 +213,7 @@ namespace {
 		@unlink( $file );
 	}
 
+	require_once dirname( __DIR__ ) . '/includes/Security/SodiumSafe.php';
 	require_once dirname( __DIR__ ) . '/includes/Security/PackageIntegrityVerifier.php';
 	require_once dirname( __DIR__ ) . '/includes/class-wenpai-updater.php';
 	require_once dirname( __DIR__ ) . '/includes/Core/SiteHealth.php';

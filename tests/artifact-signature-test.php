@@ -18,6 +18,7 @@ class WP_Error {
 	public function get_error_code(): string { return $this->code; }
 }
 
+require_once dirname( __DIR__ ) . '/includes/Security/SodiumSafe.php';
 require_once dirname( __DIR__ ) . '/includes/Security/PackageIntegrityVerifier.php';
 require_once dirname( __DIR__ ) . '/includes/UpdateSource/Handlers/HandlerInterface.php';
 use WPBridge\Security\PackageIntegrityVerifier;

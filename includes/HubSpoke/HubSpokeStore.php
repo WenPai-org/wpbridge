@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace WPBridge\HubSpoke;
 
+use WPBridge\Security\SodiumSafe;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -177,7 +179,7 @@ final class HubSpokeStore {
 		}
 		$public_key = InstallationIdentity::base64url_decode( (string) $request['spoke_public_key'] );
 		$signature  = InstallationIdentity::base64url_decode( (string) $request['signature'] );
-		if ( ! is_string( $public_key ) || ! is_string( $signature ) || ! function_exists( 'sodium_crypto_sign_verify_detached' ) || ! sodium_crypto_sign_verify_detached( $signature, $canonical, $public_key ) ) {
+		if ( ! is_string( $public_key ) || ! is_string( $signature ) || ! SodiumSafe::verify_detached( $signature, $canonical, $public_key ) ) {
 			return new \WP_Error( 'wpbridge_acceptance_proof_invalid', __( 'Spoke 持钥证明无效。', 'wpbridge' ), [ 'status' => 401 ] );
 		}
 

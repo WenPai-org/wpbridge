@@ -13,6 +13,7 @@ use WPBridge\Security\Encryption;
 use WPBridge\Security\SafeHttpClient;
 use WPBridge\Security\Validator;
 use WPBridge\HubSpoke\HubSpokeStore;
+use WPBridge\Security\SodiumSafe;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -58,7 +59,7 @@ final class UpdateAuthorizationClient {
 		}
 		$public_key = sodium_crypto_sign_publickey( $keypair );
 		$secret_key = sodium_crypto_sign_secretkey( $keypair );
-		sodium_memzero( $keypair );
+		SodiumSafe::memzero( $keypair );
 		$body       = wp_json_encode(
 			[
 				'pairing_code' => $pairing_code,
@@ -67,7 +68,7 @@ final class UpdateAuthorizationClient {
 			]
 		);
 		if ( ! is_string( $body ) ) {
-			sodium_memzero( $secret_key );
+			SodiumSafe::memzero( $secret_key );
 			return new \WP_Error( 'wpbridge_pairing_encode_failed', __( '无法生成配对请求。', 'wpbridge' ) );
 		}
 		$request = $transport ?? [ SafeHttpClient::class, 'request' ];
@@ -82,22 +83,22 @@ final class UpdateAuthorizationClient {
 			]
 		);
 		if ( is_wp_error( $response ) ) {
-			sodium_memzero( $secret_key );
+			SodiumSafe::memzero( $secret_key );
 			return $response;
 		}
 		$status = (int) wp_remote_retrieve_response_code( $response );
 		$data   = json_decode( (string) wp_remote_retrieve_body( $response ), true );
 		if ( 201 !== $status || ! is_array( $data ) || ! self::valid_pair_response( $data, $site_url ) ) {
-			sodium_memzero( $secret_key );
+			SodiumSafe::memzero( $secret_key );
 			return new \WP_Error( 'wpbridge_pairing_rejected', __( '授权服务拒绝了配对请求。', 'wpbridge' ), [ 'status' => $status ] );
 		}
 		try {
 			$encrypted = Encryption::encrypt( self::base64url( $secret_key ) );
 		} catch ( \Throwable $error ) {
-			sodium_memzero( $secret_key );
+			SodiumSafe::memzero( $secret_key );
 			return new \WP_Error( 'wpbridge_pairing_storage_failed', __( '站点更新密钥无法安全保存。', 'wpbridge' ) );
 		}
-		sodium_memzero( $secret_key );
+		SodiumSafe::memzero( $secret_key );
 		if ( '' === $encrypted ) {
 			return new \WP_Error( 'wpbridge_pairing_storage_failed', __( '站点更新密钥无法安全保存。', 'wpbridge' ) );
 		}
@@ -131,14 +132,14 @@ final class UpdateAuthorizationClient {
 		}
 		$body = wp_json_encode( [ 'slug' => $slug, 'action' => $action ] );
 		if ( ! is_string( $body ) ) {
-			sodium_memzero( $secret_key );
+			SodiumSafe::memzero( $secret_key );
 			return new \WP_Error( 'wpbridge_update_grant_invalid', __( '无法生成更新授权请求。', 'wpbridge' ) );
 		}
 		$timestamp = (string) call_user_func( $this->clock );
 		$path      = '/api/v1/updates/grants';
 		$canonical = "POST\n{$path}\n{$timestamp}\n" . hash( 'sha256', $body );
 		$signature = sodium_crypto_sign_detached( $canonical, $secret_key );
-		sodium_memzero( $secret_key );
+		SodiumSafe::memzero( $secret_key );
 		$response = call_user_func(
 			$this->transport,
 			$license_url . $path,

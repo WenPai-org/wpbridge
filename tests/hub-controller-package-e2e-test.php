@@ -26,6 +26,7 @@ class WP_REST_Request implements ArrayAccess {
 class WP_REST_Response { private $data; private int $status; public array $headers = []; public function __construct( $data, int $status = 200 ) { $this->data = $data; $this->status = $status; } public function get_data() { return $this->data; } public function header( string $name, string $value ): void { $this->headers[ $name ] = $value; } }
 require_once dirname( __DIR__ ) . '/includes/Core/Logger.php';
 require_once dirname( __DIR__ ) . '/includes/Security/Validator.php';
+require_once dirname( __DIR__ ) . '/includes/Security/SodiumSafe.php';
 require_once dirname( __DIR__ ) . '/includes/Security/PackageIntegrityVerifier.php';
 require_once dirname( __DIR__ ) . '/includes/Security/Encryption.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/InstallationIdentity.php';
