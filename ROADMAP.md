@@ -43,6 +43,7 @@
 - [ ] 自更新验签：新增 `WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS`，服务端返回的字段只能加严不能放宽；服务端下发 `sha256` 后，安装包必须和它一致（#20）
 
 ### 修复
+- [ ] `GET /bridge/v1/wenpai-git/{repo}/releases` 的 `repo` 第二段拒绝 `.` 和 `..`，防止拼进 git.wenpai.org 的 URL 路径时发生穿越（PR 待开）
 - [ ] 启用默认 wenpai-open 源时，打开 Site Health 不再出现致命错误（#19）
 
 ### 可访问性
@@ -62,10 +63,9 @@
 - [ ] bridge/v1 的限流改到认证之前执行，用错 key 的请求也要计数，避免暴力猜 key
 - [ ] `require_auth=false` 时，限流不再按 key 区分，换 key 绕不过去
 - [ ] 公开的 `/status` 不再暴露插件版本号（去掉，还是只给登录用户看，待定）
-- [ ] `repo` 参数第二段允许 `..`：如果会拼进路径，改进 1.3.1；如果只用作查找的键，在这里收紧
 
 ### 接口和错误码
-- [ ] `POST /wpbridge/v2/spoke-links/accept` 按错误类型返回 400、403、409、503 或 502；远端 Hub 的状态码不再透传，原值放进 `hub_status`（topic `wpbridge-spoke-accept-status`）
+- [ ] `POST /wpbridge/v2/spoke-links/accept` 按错误类型返回 400、403、409、503 或 502；远端 Hub 的状态码不再透传，原值放进 `hub_status`；`wenpai-git/{repo}/releases` 的远端状态码透传也一起改（topic `wpbridge-spoke-accept-status`）
 - [ ] 预设源 `PluginUpdater::plugin_info` 也加上版本守卫
 - [ ] 补 #20 之后的签名和校验和合同测试：CT-1、2、3、5、6、7、11，以及 CT-12 里的 sha256 部分
 
