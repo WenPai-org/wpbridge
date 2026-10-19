@@ -69,6 +69,11 @@
 - [ ] 预设源 `PluginUpdater::plugin_info` 也加上版本守卫
 - [ ] 补 #20 之后的签名和校验和合同测试：CT-1、2、3、5、6、7、11，以及 CT-12 里的 sha256 部分
 - [ ] 补上 #18 评审里没被测试抓到的三处变异：`BackupManager` 的 `..` 检查（`rollback-contract` 要同时检查错误码）；`uninstall.php` 清理网络级选项和 site transient；`SafeHttpClient` 对 `authorization` 头的脱敏
+- [ ] 自更新守卫：`hook_extra` 缺失时不再退回按 URL 判断是不是自更新（#20 复审 NB1）
+- [ ] 自更新守卫：计算哈希和验签只读一次文件，消除两次读取之间的竞态（#20 复审 NB3）
+- [ ] 把 `tests/wordpress/bridge-contract.php` 接进 CI，至少加一条静态断言（#20 复审 NB7）
+- [ ] logger-context 测试要真正区分 WP-CLI、cron、后台等上下文，不只覆盖 3 条代码路径（#20 复审 NB8）
+- [ ] 日志写入做成共用 helper：Logger 不可用时只在 `WP_DEBUG && WP_DEBUG_LOG` 下写 error_log；#16 的 `log_version_guard_skip` 改用它
 
 ### 可访问性和 i18n
 - [ ] 对比度：#9ca3af 的白底正文和「已安装」徽标提到 4.5 以上；「即将上线」卡片要用文字或 aria 写明状态，不能只靠变灰（topic `wpbridge-a11y-contrast`）
