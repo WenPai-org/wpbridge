@@ -166,6 +166,7 @@ namespace {
 		return 'https://example.test';
 	}
 	function add_filter( ...$args ): bool {
+		$GLOBALS['wpb_filters'][] = $args;
 		return true;
 	}
 	function wp_json_encode( $data ) {
@@ -199,7 +200,13 @@ namespace {
 	}
 	function download_url( $url, $timeout = 300 ) {
 		$file = tempnam( sys_get_temp_dir(), 'wpb-sigpol-' );
-		file_put_contents( $file, $GLOBALS['wpb_download_body'] );
+		$body = $GLOBALS['wpb_download_body'];
+		if ( is_callable( $body ) ) {
+			$body = $body( $url );
+		}
+		file_put_contents( $file, $body );
+		$GLOBALS['wpb_dl_files'][] = $file;
+		$GLOBALS['wpb_dl_urls'][]  = $url;
 		return $file;
 	}
 	function wp_delete_file( $file ): void {
@@ -349,6 +356,51 @@ namespace {
 		return [ $result, $raised ];
 	};
 
+	// Mimics WP_Upgrader::download_package(): runs every registered upgrader_pre_download
+	// callback (plus test-only extras) in priority order with WordPress' argument list,
+	// then falls back to core's own download_url() when the chain returns false.
+	$run_chain = static function ( string $package_url, array $hook_extra = [ 'plugin' => 'wpbridge/wpbridge.php' ], array $extra = [] ) {
+		$chain = [];
+		$seq   = 0;
+		foreach ( $GLOBALS['wpb_filters'] as $f ) {
+			if ( 'upgrader_pre_download' === $f[0] ) {
+				$chain[] = [ $f[2] ?? 10, $seq++, $f[1], $f[3] ?? 1 ];
+			}
+		}
+		foreach ( $extra as $prio => $cb ) {
+			$chain[] = [ $prio, $seq++, $cb, 2 ];
+		}
+		usort( $chain, static fn( $a, $b ) => [ $a[0], $a[1] ] <=> [ $b[0], $b[1] ] );
+		$reply = false;
+		foreach ( $chain as $link ) {
+			$reply = call_user_func_array( $link[2], array_slice( [ $reply, $package_url, null, $hook_extra ], 0, $link[3] ) );
+		}
+		if ( is_wp_error( $reply ) ) {
+			return [ 'error', (string) $reply->get_error_code() ];
+		}
+		$by = 'filter';
+		if ( false === $reply ) {
+			$reply = download_url( $package_url );
+			$by    = 'core';
+		}
+		return [ $by, is_string( $reply ) && is_file( $reply ) ? hash_file( 'sha256', $reply ) : var_export( $reply, true ) ];
+	};
+	$filter_priority = static function ( string $method ): array {
+		$found = [];
+		foreach ( $GLOBALS['wpb_filters'] as $f ) {
+			if ( 'upgrader_pre_download' === $f[0] && is_array( $f[1] ) && ( $f[1][1] ?? '' ) === $method ) {
+				$found[] = [ $f[2] ?? 10, $f[3] ?? 1 ];
+			}
+		}
+		return $found;
+	};
+	$evil       = 'wpbridge-1.3.2-EVIL';
+	$mirror     = static fn( string $u ): string => str_replace( 'updates.wenpai.net', 'mirror.example', $u );
+	$sha_reject = static function ( array $item ) use ( $check, $offered, $no_php_warning ): bool {
+		[ $result, $raised ] = $no_php_warning( static fn() => $check( $item ) );
+		return ! $raised && ! $offered( $result );
+	};
+
 	if ( in_array( $mode, [ 'empty', 'string', 'badkey' ], true ) ) {
 		$assert( ! $offered( $check( $signed_item ) ), 'E1 dedicated constant without a valid key: even a validly signed update is not offered (fail closed)' );
 		$assert( ! $offered( $check( $base_item ) ), 'E2 dedicated constant without a valid key: unsigned update is not offered' );
@@ -436,6 +488,100 @@ namespace {
 		}
 		$assert( $kept, 'D11 PluginUpdater::check_updates leaves the wpbridge self-update offer untouched' );
 
+		// R2: guard runs before PluginUpdater::filter_download (5) and receives hook_extra; final check is last.
+		$guard = $filter_priority( 'enforce_self_update_record' );
+		$final = $filter_priority( 'final_self_update_check' );
+		$assert( 1 === count( $guard ) && $guard[0][0] < 5 && 4 === $guard[0][1], 'R2 download guard priority < 5 and accepts 4 args (hook_extra)' );
+		$assert( [ [ PHP_INT_MAX, 4 ] ] === $final, 'R2 final self-update check runs at PHP_INT_MAX with 4 args' );
+
+		// Full upgrader_pre_download chain (WordPress order) with the review's T scenarios.
+		$GLOBALS['wpb_download_body'] = $body;
+		$check( $signed_item );
+		[ $by, $h ] = $run_chain( $package );
+		$assert( 'filter' === $by && $sha256 === $h, 'T1 chain: the verified local file is what the upgrader gets' );
+
+		$evil_file = tempnam( sys_get_temp_dir(), 'wpb-evil-' );
+		file_put_contents( $evil_file, $evil );
+		$check( $signed_item );
+		[ $by ] = $run_chain( $package, [ 'plugin' => 'wpbridge/wpbridge.php' ], [ 10 => static fn( $r ) => $evil_file ] );
+		$assert( 'error' === $by, 'T2 a later filter replacing the verified path is rejected by the final check' );
+
+		$check( $signed_item );
+		[ $by ] = $run_chain(
+			$package,
+			[ 'plugin' => 'wpbridge/wpbridge.php' ],
+			[
+				20 => static function ( $r ) use ( $evil ) {
+					if ( is_string( $r ) && is_file( $r ) ) {
+						file_put_contents( $r, $evil );
+					}
+					return $r;
+				},
+			]
+		);
+		$assert( 'error' === $by, 'T2b in-place rewrite of the verified file after the guard is rejected by the final check' );
+
+		$check( $signed_item );
+		$early = tempnam( sys_get_temp_dir(), 'wpb-early-' );
+		file_put_contents( $early, $evil );
+		[ $by ] = $run_chain( $package, [ 'plugin' => 'wpbridge/wpbridge.php' ], [ 0 => static fn( $r ) => $early ] );
+		$assert( 'error' === $by && ! file_exists( $early ), 'T3 strict: an earlier filter returning a tampered local file is re-verified, rejected and deleted' );
+
+		$check( $signed_item );
+		$early_ok = tempnam( sys_get_temp_dir(), 'wpb-early-' );
+		file_put_contents( $early_ok, $body );
+		[ $by, $h ] = $run_chain( $package, [ 'plugin' => 'wpbridge/wpbridge.php' ], [ 0 => static fn( $r ) => $early_ok ] );
+		$assert( 'filter' === $by && $sha256 === $h, 'T3 strict: an earlier filter returning the genuine package passes re-verification' );
+
+		$check( $signed_item );
+		[ $by, $c ] = $run_chain( $package, [ 'plugin' => 'wpbridge/wpbridge.php' ], [ 0 => static fn( $r ) => new WP_Error( 'early_failure' ) ] );
+		$assert( 'error' === $by && 'early_failure' === $c, 'T3 strict: an earlier WP_Error is returned unchanged' );
+
+		$check( $signed_item );
+		[ $by ] = $run_chain( $package, [ 'plugin' => 'wpbridge/wpbridge.php' ], [ 0 => static fn( $r ) => 'https://elsewhere.example/x.zip' ] );
+		$assert( 'error' === $by, 'T3 strict: an earlier non-file reply is rejected' );
+
+		$check( $signed_item );
+		$GLOBALS['wpb_download_body'] = static fn( $u ) => false !== strpos( $u, 'mirror' ) ? $evil : $body;
+		[ $by ] = $run_chain( $mirror( $package ) );
+		$assert( 'error' === $by, 'T4 URL rewritten by upgrader_package_options (hook_extra plugin) is still strictly verified and rejected' );
+		$check( $signed_item );
+		[ $by ] = $run_chain( $mirror( $package ), [ 'plugins' => [ 'wpbridge/wpbridge.php' ] ] );
+		$assert( 'error' === $by, 'T4 bulk-style hook_extra plugins => [wpbridge] with a rewritten URL is rejected' );
+		$GLOBALS['wpb_download_body'] = static fn( $u ) => $body;
+		$check( $signed_item );
+		[ $by, $h ] = $run_chain( $mirror( $package ) );
+		$assert( 'filter' === $by && $sha256 === $h, 'T4 rewritten URL serving the genuine package installs after strict verification' );
+		$GLOBALS['wpb_download_body'] = $body;
+
+		// R16: temp file removed after a failed strict verification.
+		$check( $signed_item );
+		$GLOBALS['wpb_dl_files'] = [];
+		$download( $package, $evil );
+		$assert( [] !== $GLOBALS['wpb_dl_files'] && ! file_exists( end( $GLOBALS['wpb_dl_files'] ) ), 'R16 strict verification failure deletes the downloaded temp file' );
+
+		// D14: strict check_update stores the dedicated ring, so the priority-10 verifier agrees with the guard (kills M6).
+		$check( $signed_item );
+		$record = PackageIntegrityVerifier::expected_integrity( $package );
+		$assert( ( $record['artifact_public_keys'] ?? null ) == PackageIntegrityVerifier::trusted_keys( WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS ), 'D14 strict record carries the dedicated ring' );
+		$GLOBALS['wpb_download_body'] = $body;
+		$assert( 'file' === $code( PackageIntegrityVerifier::verify( false, $package ) ), 'D14 verify(false, $package) bypassing the guard installs the genuine package' );
+
+		// N1: a stale sha-only record must not make an unsigned response look recorded.
+		$GLOBALS['wpb_site_transients'] = [];
+		PackageIntegrityVerifier::remember( $package, $sha256, 86400, [ 'slug' => 'wpbridge', 'version' => '1.3.2' ] );
+		$assert( ! $offered( $check( $sha_only, false ) ), 'N1 strict: unsigned response is not offered even with a stale sha-only record' );
+
+		// N8: download-stage security errors are not deduped.
+		$GLOBALS['wpb_transients'] = [];
+		$before                    = count( array_filter( Logger::$history, static fn( $e ) => 'error' === $e[0] ) );
+		$check( $signed_item );
+		$download( $package, $evil );
+		$check( $signed_item, false );
+		$download( $package, $evil );
+		$errors = count( array_filter( Logger::$history, static fn( $e ) => 'error' === $e[0] ) ) - $before;
+		$assert( $errors >= 2, 'N8 two strict verification failures for the same version log two errors' );
+
 		// D13 (review N4): takeover by wp-china-yes means our hooks are not registered.
 		$GLOBALS['wpb_override'] = true;
 		$status                  = $health_status();
@@ -482,6 +628,7 @@ namespace {
 
 		$check( $base_item + [ 'sha256' => '', 'checksum_sha256' => $sha256 ] );
 		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'S11 empty sha256 does not mask a valid checksum_sha256 (review N2)' );
+		$assert( $sha_reject( $sha_only + [ 'checksum_sha256' => [ 'x' ] ] ), "S12 shared: malformed checksum_sha256 rejects even with a valid sha256 (N2')" );
 
 		$status = $health_status();
 		$assert( $status['registered'] && 'good' === ( $status['status'] ?? '' ) && false !== strpos( (string) ( $status['description'] ?? '' ), 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' ), 'S8 Site Health is good (not recommended) and explains WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' );
@@ -521,8 +668,21 @@ namespace {
 		$check( $base_item + [ 'sha256' => '', 'checksum_sha256' => $sha256 ] );
 		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'N10 empty sha256 does not mask a valid checksum_sha256 (review N2)' );
 
-		[ $result, $raised ] = $no_php_warning( static fn() => $check( $base_item + [ 'sha256' => [ 'x' ], 'signature' => [ 'y' ] ] ) );
-		$assert( ! $raised && $offered( $result ), 'N11 non-string sha256/signature are treated as absent without PHP warnings (review N2)' );
+		[ $result, $raised ] = $no_php_warning( static fn() => $check( $base_item + [ 'signature' => [ 'y' ] ] ) );
+		$assert( ! $raised && $offered( $result ), 'N11 a non-string signature is treated as absent without PHP warnings' );
+		$assert( $sha_reject( $base_item + [ 'sha256' => [ $sha256 ] ] ), "N2' none: array sha256 is malformed => not offered, no PHP warning" );
+		$assert( $sha_reject( $base_item + [ 'sha256' => 12345 ] ), "N2' none: numeric sha256 is malformed => not offered" );
+		$assert( $sha_reject( $base_item + [ 'sha256' => (object) [ 'a' => 1 ] ] ), "N2' none: object sha256 is malformed => not offered" );
+		$assert( $sha_reject( $base_item + [ 'sha256' => $sha256, 'checksum_sha256' => [ 'x' ] ] ), "N2' none: a malformed checksum_sha256 next to a valid sha256 is still rejected" );
+		$check( $base_item + [ 'sha256' => null, 'checksum_sha256' => $sha256 ] );
+		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), "N2' none: null sha256 counts as absent and checksum_sha256 is enforced" );
+
+		// T4 (all modes keep the checksum): rewritten URL still checks the advertised digest.
+		$check( $sha_only );
+		$GLOBALS['wpb_download_body'] = static fn( $u ) => $evil;
+		[ $by, $c ] = $run_chain( $mirror( $package ) );
+		$assert( 'error' === $by && 'wpbridge_checksum_mismatch' === $c, 'T4 none: rewritten URL still enforces the advertised sha256' );
+		$GLOBALS['wpb_download_body'] = $body;
 
 		$before = $warnings_total();
 		$check( $base_item );

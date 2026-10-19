@@ -68,6 +68,15 @@ class WPBridge_Updater {
 	private $version;
 
 	/**
+	 * 严格模式下这次自更新下载已验签的文件：path 和验签前算的 sha256.
+	 *
+	 * 由 enforce_self_update_record() 写入，final_self_update_check() 读取后清空.
+	 *
+	 * @var array{path: string, sha256: string}|null
+	 */
+	private $verified_download = null;
+
+	/**
 	 * 初始化更新器。
 	 *
 	 * @param string $plugin_file 插件主文件路径（plugin_basename 格式）.
@@ -113,8 +122,11 @@ class WPBridge_Updater {
 
 		// 自更新包下载前核对完整性记录；严格模式下在这里用专用公钥重新验签.
 		// 优先级 1：先于 PluginUpdater::filter_download（5）和
-		// PackageIntegrityVerifier::verify（10）.
-		add_filter( 'upgrader_pre_download', [ $this, 'enforce_self_update_record' ], 1, 2 );
+		// PackageIntegrityVerifier::verify（10）。要 4 个参数：用 $hook_extra['plugin']
+		// 判断是不是自更新，包地址被 upgrader_package_options 改过也认得出.
+		add_filter( 'upgrader_pre_download', [ $this, 'enforce_self_update_record' ], 1, 4 );
+		// 严格模式的最后一道检查：交给升级器的必须是上面验过的那个文件，内容没变.
+		add_filter( 'upgrader_pre_download', [ $this, 'final_self_update_check' ], PHP_INT_MAX, 4 );
 	}
 
 	/**
@@ -162,11 +174,9 @@ class WPBridge_Updater {
 		$data               = $response['plugins'][ $this->plugin_file ];
 		$new_version        = sanitize_text_field( self::string_field( $data, 'version' ) );
 		$package            = esc_url_raw( self::string_field( $data, 'package' ) );
-		// 取第一个非空字符串：空串或非字符串都按没给处理，不会盖掉另一个字段.
 		// wpbridge-server 的 checksum 字段算法未约定，有意不读.
-		$sha256             = '' !== trim( self::string_field( $data, 'sha256' ) ) ? self::string_field( $data, 'sha256' ) : self::string_field( $data, 'checksum_sha256' );
-		$sha256             = strtolower( sanitize_text_field( $sha256 ) );
-		$sha256_valid       = 1 === preg_match( '/^[a-f0-9]{64}$/', $sha256 );
+		[ $sha256, $sha256_invalid ] = self::sha256_fields( $data );
+		$sha256_valid                = '' !== $sha256 && ! $sha256_invalid;
 		// 三种模式，都只由本站 wp-config.php 决定，服务端字段只能加严、不能放宽：
 		// - 定义了 WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS（只看 defined）：严格模式，必须带
 		// 有效签名和 SHA-256，否则拒绝（防止响应去掉签名字段把校验降级）；常量里
@@ -224,8 +234,15 @@ class WPBridge_Updater {
 			return $update;
 		}
 
-		// 服务端给了摘要但格式不对：无法保证下载校验，不提供这次更新.
-		if ( '' !== $sha256 && ! $sha256_valid ) {
+		// 严格模式必须带签名。在这里就拦下，不依赖 remember()：同一包地址可能还留着
+		// 一条只有 SHA-256 的旧记录，会让下面的“记录已写入”判断误判为成功.
+		if ( $strict && '' === $signature ) {
+			$this->log_integrity_event( 'error', 'strict_unsigned', '严格模式：自更新包没有签名，已拒绝提供这次更新', $integrity_context );
+			return $update;
+		}
+
+		// 服务端给了摘要但格式不对（含非字符串、两个字段不一致）：无法保证下载校验，不提供这次更新.
+		if ( $sha256_invalid ) {
 			$this->log_integrity_event( 'error', 'sha256_malformed', '自更新包的 SHA-256 格式无效，已拒绝提供这次更新', $integrity_context );
 			return $update;
 		}
@@ -309,6 +326,9 @@ class WPBridge_Updater {
 			return true;
 		}
 		$record = \WPBridge\Security\PackageIntegrityVerifier::expected_integrity( $package );
+		if ( $this->strict_mode() && empty( $record['signature_required'] ) ) {
+			return false;
+		}
 		return isset( $record['sha256'], $record['signature'] )
 			&& hash_equals( (string) $record['sha256'], $sha256 )
 			&& hash_equals( (string) $record['signature'], $signature );
@@ -319,41 +339,75 @@ class WPBridge_Updater {
 	 *
 	 * 记录过期或被对象缓存淘汰时，PackageIntegrityVerifier::verify() 会按旧
 	 * 来源放行，这里把这个缺口堵上。需要记录的情况：严格模式；WordPress 缓存的
-	 * 更新带 SHA-256；或带签名且本站有可用公钥。只处理本插件当前缓存的更新包；
-	 * 手动上传、WP-CLI 传 URL 等管理员主动发起的安装不在范围内.
+	 * 更新带 SHA-256；或带签名且本站有可用公钥.
+	 *
+	 * 是否自更新先看 $hook_extra（plugin，或只含本插件的 plugins），没有时才按
+	 * WordPress 缓存的更新包地址匹配；完整性记录始终按缓存的更新包地址查，所以
+	 * upgrader_package_options 改写下载地址后照样校验。手动上传、WP-CLI 传 URL
+	 * 等管理员主动发起的安装不在范围内.
 	 *
 	 * 严格模式下不信任记录里存的公钥环（记录可能由别的代码路径写入）：要求
-	 * slug 是本插件、带 signature_required 标记和签名，然后在这里下载并用
-	 * WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS 重新验签.
+	 * slug 是本插件、带 signature_required 标记和签名，然后用
+	 * WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS 重新验签。前面的 filter 已给出结果时：
+	 * WP_Error 原样返回；本地文件重新验签，失败删除；其它值一律拒绝.
 	 *
-	 * @param mixed $reply   之前的 upgrader_pre_download 结果.
-	 * @param mixed $package 安装包地址.
+	 * @param mixed $reply      之前的 upgrader_pre_download 结果.
+	 * @param mixed $package    安装包地址.
+	 * @param mixed $upgrader   WP_Upgrader 实例（不使用）.
+	 * @param mixed $hook_extra 升级上下文.
 	 * @return mixed
 	 */
-	public function enforce_self_update_record( $reply, $package ) {
-		if ( false !== $reply || ! is_string( $package ) ) {
+	public function enforce_self_update_record( $reply, $package, $upgrader = null, $hook_extra = [] ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed -- upgrader_pre_download 的参数顺序由 WordPress 决定.
+		$this->verified_download = null;
+		if ( ! is_string( $package ) ) {
 			return $reply;
 		}
-
-		$updates = get_site_transient( 'update_plugins' );
-		$offer   = is_object( $updates ) && isset( $updates->response[ $this->plugin_file ] ) ? $updates->response[ $this->plugin_file ] : null;
-		if ( ! is_object( $offer ) || ! isset( $offer->package ) || $offer->package !== $package ) {
+		$self = $this->self_update_download( $package, $hook_extra );
+		if ( null === $self ) {
 			return $reply;
 		}
+		[ $record_key, $version ] = $self;
 
-		$strict = $this->strict_mode();
-		if ( $strict ) {
-			return $this->verify_strict_download( $package, (string) ( $offer->new_version ?? '' ) );
+		if ( $this->strict_mode() ) {
+			if ( is_wp_error( $reply ) ) {
+				return $reply;
+			}
+			if ( false === $reply ) {
+				return $this->verify_strict_download( $record_key, $package, $version, '' );
+			}
+			if ( is_string( $reply ) && '' !== $reply && is_file( $reply ) ) {
+				return $this->verify_strict_download( $record_key, $package, $version, $reply );
+			}
+			$this->log_integrity_event(
+				'error',
+				'strict_unexpected_reply',
+				'严格模式：其它代码提前给出了无法校验的下载结果，已中止安装',
+				[
+					'plugin'  => $this->plugin_file,
+					'version' => $version,
+				],
+				false
+			);
+			return new WP_Error(
+				'wpbridge_selfupdate_unverifiable_package',
+				__( 'WPBridge 更新包无法校验，已中止安装。', 'wpbridge' )
+			);
 		}
+
+		if ( false !== $reply ) {
+			return $reply;
+		}
+		$updates    = get_site_transient( 'update_plugins' );
+		$offer      = is_object( $updates ) && isset( $updates->response[ $this->plugin_file ] ) && is_object( $updates->response[ $this->plugin_file ] ) ? $updates->response[ $this->plugin_file ] : null;
 		$can_verify = [] !== $this->artifact_public_keys();
-		$needs_sig  = $strict || ( $can_verify && '' !== (string) ( $offer->signature ?? '' ) );
-		$needs_sha  = '' !== (string) ( $offer->sha256 ?? '' );
+		$needs_sig  = null !== $offer && $can_verify && '' !== (string) ( $offer->signature ?? '' );
+		$needs_sha  = null !== $offer && '' !== (string) ( $offer->sha256 ?? '' );
 		if ( ! $needs_sig && ! $needs_sha ) {
 			return $reply;
 		}
 
 		$record = class_exists( '\\WPBridge\\Security\\PackageIntegrityVerifier' )
-			? \WPBridge\Security\PackageIntegrityVerifier::expected_integrity( $package )
+			? \WPBridge\Security\PackageIntegrityVerifier::expected_integrity( $record_key )
 			: [];
 		if ( [] === $record || ( $needs_sig && '' === (string) ( $record['signature'] ?? '' ) ) ) {
 			$this->log_integrity_event(
@@ -362,8 +416,9 @@ class WPBridge_Updater {
 				'自更新包没有完整性记录，已中止安装',
 				[
 					'plugin'  => $this->plugin_file,
-					'version' => (string) ( $offer->new_version ?? '' ),
-				]
+					'version' => $version,
+				],
+				false
 			);
 			return new WP_Error(
 				'wpbridge_selfupdate_signature_record_missing',
@@ -371,20 +426,112 @@ class WPBridge_Updater {
 			);
 		}
 
+		// 下载地址被改写过：把记录复制到实际下载地址，让 PackageIntegrityVerifier::verify()（10）照样校验.
+		if ( $record_key !== $package && ! \WPBridge\Security\PackageIntegrityVerifier::remember( $package, (string) $record['sha256'], DAY_IN_SECONDS, $record ) ) {
+			$copied = \WPBridge\Security\PackageIntegrityVerifier::expected_integrity( $package );
+			if ( ( $copied['sha256'] ?? '' ) !== $record['sha256'] ) {
+				return new WP_Error(
+					'wpbridge_selfupdate_signature_record_missing',
+					__( 'WPBridge 更新包缺少完整性校验记录，已中止安装。请重新检查更新后再试。', 'wpbridge' )
+				);
+			}
+		}
+
 		return $reply;
+	}
+
+	/**
+	 * 严格模式的最后一道检查（PHP_INT_MAX）：交给升级器的必须是守卫验过的文件.
+	 *
+	 * 防止后面的 filter 换掉路径或改写文件内容。不是自更新、或不在严格模式时不处理.
+	 *
+	 * @param mixed $reply      之前的 upgrader_pre_download 结果.
+	 * @param mixed $package    安装包地址.
+	 * @param mixed $upgrader   WP_Upgrader 实例（不使用）.
+	 * @param mixed $hook_extra 升级上下文.
+	 * @return mixed
+	 */
+	public function final_self_update_check( $reply, $package, $upgrader = null, $hook_extra = [] ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed -- upgrader_pre_download 的参数顺序由 WordPress 决定.
+		$verified                = $this->verified_download;
+		$this->verified_download = null;
+		if ( ! $this->strict_mode() || ! is_string( $package ) ) {
+			return $reply;
+		}
+		$self = $this->self_update_download( $package, $hook_extra );
+		if ( null === $self ) {
+			return $reply;
+		}
+		if ( is_wp_error( $reply ) ) {
+			if ( null !== $verified && is_file( $verified['path'] ) ) {
+				wp_delete_file( $verified['path'] );
+			}
+			return $reply;
+		}
+		if ( null !== $verified && is_string( $reply ) && $reply === $verified['path'] && is_file( $reply ) && hash_equals( $verified['sha256'], (string) hash_file( 'sha256', $reply ) ) ) {
+			return $reply;
+		}
+
+		if ( null !== $verified && is_file( $verified['path'] ) ) {
+			wp_delete_file( $verified['path'] );
+		}
+		$this->log_integrity_event(
+			'error',
+			'strict_package_changed',
+			'严格模式：验签后的自更新包被替换或改动，已中止安装',
+			[
+				'plugin'  => $this->plugin_file,
+				'version' => $self[1],
+			],
+			false
+		);
+		return new WP_Error(
+			'wpbridge_selfupdate_package_changed',
+			__( 'WPBridge 更新包在校验后被替换或改动，已中止安装。', 'wpbridge' )
+		);
+	}
+
+	/**
+	 * 判断这次下载是不是本插件的自更新.
+	 *
+	 * @param string $package    实际下载地址.
+	 * @param mixed  $hook_extra 升级上下文.
+	 * @return array{0: string, 1: string}|null [完整性记录的键（缓存的更新包地址）, 版本号]；不是自更新时为 null.
+	 */
+	private function self_update_download( string $package, $hook_extra ): ?array {
+		$updates       = get_site_transient( 'update_plugins' );
+		$offer         = is_object( $updates ) && isset( $updates->response[ $this->plugin_file ] ) && is_object( $updates->response[ $this->plugin_file ] ) ? $updates->response[ $this->plugin_file ] : null;
+		$offer_package = null !== $offer && isset( $offer->package ) && is_string( $offer->package ) ? $offer->package : '';
+		$version       = null !== $offer && isset( $offer->new_version ) && is_scalar( $offer->new_version ) ? (string) $offer->new_version : '';
+
+		$target = null;
+		if ( is_array( $hook_extra ) && isset( $hook_extra['plugin'] ) && is_string( $hook_extra['plugin'] ) ) {
+			$target = $hook_extra['plugin'] === $this->plugin_file;
+		} elseif ( is_array( $hook_extra ) && isset( $hook_extra['plugins'] ) && is_array( $hook_extra['plugins'] ) && [] !== $hook_extra['plugins'] ) {
+			$target = [ $this->plugin_file ] === array_values( $hook_extra['plugins'] );
+		}
+
+		if ( false === $target ) {
+			return null;
+		}
+		if ( null === $target && ( '' === $offer_package || $offer_package !== $package ) ) {
+			return null;
+		}
+		return [ '' !== $offer_package ? $offer_package : $package, $version ];
 	}
 
 	/**
 	 * 严格模式的下载校验：只认专用公钥环.
 	 *
-	 * @param string $package 安装包地址.
-	 * @param string $version WordPress 缓存的更新版本号（只用于日志）.
+	 * @param string $record_key 完整性记录的键（WordPress 缓存的更新包地址）.
+	 * @param string $package    实际下载地址.
+	 * @param string $version    WordPress 缓存的更新版本号（只用于日志）.
+	 * @param string $local      前面的 filter 已给出的本地文件；为空时自己下载.
 	 * @return string|WP_Error 校验通过的临时文件路径，或错误.
 	 */
-	private function verify_strict_download( string $package, string $version ) {
-		$ring   = $this->self_update_public_keys();
-		$record = class_exists( '\\WPBridge\\Security\\PackageIntegrityVerifier' )
-			? \WPBridge\Security\PackageIntegrityVerifier::expected_integrity( $package )
+	private function verify_strict_download( string $record_key, string $package, string $version, string $local ) {
+		$ring    = $this->self_update_public_keys();
+		$record  = class_exists( '\\WPBridge\\Security\\PackageIntegrityVerifier' )
+			? \WPBridge\Security\PackageIntegrityVerifier::expected_integrity( $record_key )
 			: [];
 		$context = [
 			'plugin'  => $this->plugin_file,
@@ -392,7 +539,10 @@ class WPBridge_Updater {
 		];
 
 		if ( [] === $ring || [] === $record || $this->slug !== ( $record['slug'] ?? '' ) || empty( $record['signature_required'] ) || '' === (string) ( $record['signature'] ?? '' ) ) {
-			$this->log_integrity_event( 'error', 'strict_record_invalid', '严格模式：自更新包没有可信的签名完整性记录，已中止安装', $context );
+			if ( '' !== $local ) {
+				wp_delete_file( $local );
+			}
+			$this->log_integrity_event( 'error', 'strict_record_invalid', '严格模式：自更新包没有可信的签名完整性记录，已中止安装', $context, false );
 			return new WP_Error(
 				'wpbridge_selfupdate_signature_record_missing',
 				__( 'WPBridge 更新包缺少签名校验记录，已中止安装。请重新检查更新后再试。', 'wpbridge' )
@@ -402,23 +552,65 @@ class WPBridge_Updater {
 		// 不信任记录里存的公钥环，只用专用常量.
 		$record['artifact_public_keys'] = $ring;
 
-		if ( ! function_exists( 'download_url' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/file.php';
-		}
-		$file = download_url( $package, 300 );
-		if ( is_wp_error( $file ) ) {
-			return $file;
+		$file = $local;
+		if ( '' === $file ) {
+			if ( ! function_exists( 'download_url' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/file.php';
+			}
+			$file = download_url( $package, 300 );
+			if ( is_wp_error( $file ) ) {
+				return $file;
+			}
 		}
 
+		// 先算摘要再验签：验签后文件再被改动，最后一道检查能发现.
+		$digest   = (string) hash_file( 'sha256', $file );
 		$verified = \WPBridge\Security\PackageIntegrityVerifier::verify_downloaded_file( $file, $record );
 		if ( is_wp_error( $verified ) ) {
 			wp_delete_file( $file );
-			$this->log_integrity_event( 'error', 'strict_verify_failed', '严格模式：自更新包签名校验失败，已中止安装', $context );
+			$this->log_integrity_event( 'error', 'strict_verify_failed', '严格模式：自更新包签名校验失败，已中止安装', $context, false );
 			return $verified;
 		}
 
-		\WPBridge\Security\PackageIntegrityVerifier::forget( $package );
+		\WPBridge\Security\PackageIntegrityVerifier::forget( $record_key );
+		$this->verified_download = [
+			'path'   => $file,
+			'sha256' => $digest,
+		];
 		return $file;
+	}
+
+	/**
+	 * 读取 sha256 / checksum_sha256.
+	 *
+	 * 缺失、null 或空串按没给处理；给了但不是字符串（数组、数字、对象）、格式不对，
+	 * 或两个字段都有效但不一致，都算格式错误。无效字段不会被另一个有效字段盖掉.
+	 *
+	 * @param array $data 响应数据.
+	 * @return array{0: string, 1: bool} [有效的小写摘要或空串, 是否有格式错误].
+	 */
+	private static function sha256_fields( array $data ): array {
+		$sha256  = '';
+		$invalid = false;
+		foreach ( [ 'sha256', 'checksum_sha256' ] as $field ) {
+			if ( ! isset( $data[ $field ] ) ) {
+				continue;
+			}
+			if ( ! is_string( $data[ $field ] ) ) {
+				$invalid = true;
+				continue;
+			}
+			$value = strtolower( trim( sanitize_text_field( $data[ $field ] ) ) );
+			if ( '' === $value ) {
+				continue;
+			}
+			if ( 1 !== preg_match( '/^[a-f0-9]{64}$/', $value ) || ( '' !== $sha256 && $sha256 !== $value ) ) {
+				$invalid = true;
+				continue;
+			}
+			$sha256 = $value;
+		}
+		return [ $sha256, $invalid ];
 	}
 
 	/**
@@ -433,28 +625,32 @@ class WPBridge_Updater {
 	}
 
 	/**
-	 * 记录完整性相关日志，同一插件、版本、事件每天最多一条.
+	 * 记录完整性相关日志.
 	 *
-	 * 只使用本次请求里已经加载的 Logger 和 Settings；该级别不落库时不写去重
-	 * transient（与版本号守卫的日志一致）.
+	 * 检查更新阶段的日志和警告按插件、版本、事件每天最多一条；下载、安装阶段的
+	 * 校验错误传 $dedupe = false，每次都记。只使用本次请求里已经加载的 Logger 和
+	 * Settings；该级别不落库时不写去重 transient（与版本号守卫的日志一致）.
 	 *
 	 * @param string $level   error 或 warning.
 	 * @param string $event   事件标识，参与去重.
 	 * @param string $message 日志内容.
 	 * @param array  $context 上下文，version 参与去重.
+	 * @param bool   $dedupe  是否每天去重.
 	 */
-	private function log_integrity_event( string $level, string $event, string $message, array $context ): void {
+	private function log_integrity_event( string $level, string $event, string $message, array $context, bool $dedupe = true ): void {
 		if ( ! class_exists( '\\WPBridge\\Core\\Logger', false ) || ! class_exists( '\\WPBridge\\Core\\Settings', false ) ) {
 			return;
 		}
 		if ( ! method_exists( '\\WPBridge\\Core\\Logger', 'is_enabled' ) || ! \WPBridge\Core\Logger::is_enabled( $level ) ) {
 			return;
 		}
-		$key = 'wpbridge_updater_integ_' . md5( $this->plugin_file . '|' . (string) ( $context['version'] ?? '' ) . '|' . $event );
-		if ( false !== get_transient( $key ) ) {
-			return;
+		if ( $dedupe ) {
+			$key = 'wpbridge_updater_integ_' . md5( $this->plugin_file . '|' . (string) ( $context['version'] ?? '' ) . '|' . $event );
+			if ( false !== get_transient( $key ) ) {
+				return;
+			}
+			set_transient( $key, 1, DAY_IN_SECONDS );
 		}
-		set_transient( $key, 1, DAY_IN_SECONDS );
 		if ( 'error' === $level ) {
 			\WPBridge\Core\Logger::error( $message, $context );
 			return;

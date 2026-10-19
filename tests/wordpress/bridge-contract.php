@@ -25,6 +25,20 @@ function wpbridge_local_client( string $base, int $timeout = 2 ): \WPBridge\Comm
 	return new \WPBridge\Commercial\BridgeClient( $base, 'test-key', $timeout );
 }
 
+// Default deny: any outbound request no fixture answered (other than the local mock) fails the test.
+add_filter(
+	'pre_http_request',
+	static function ( $preempt, $request, $url ) {
+		if ( false !== $preempt || in_array( wp_parse_url( $url, PHP_URL_HOST ), [ '127.0.0.1', 'localhost' ], true ) ) {
+			return $preempt;
+		}
+		wpbridge_contract_assert( false, 'Unmocked outbound request blocked: ' . $url );
+		return new WP_Error( 'wpbridge_test_blocked', 'Unmocked outbound request blocked' );
+	},
+	PHP_INT_MAX,
+	3
+);
+
 $resolver = static function ( $resolved, $host ) {
 	return 'mock.wpbridge.test' === $host ? [ '93.184.216.34' ] : $resolved;
 };
@@ -106,7 +120,7 @@ wpbridge_contract_assert( $previous === $result, 'Downgrade and insecure package
 $stale_network_calls = 0;
 $stale_fixture       = static function ( $preempt, $request, $url ) use ( &$stale_network_calls ) {
 	$stale_network_calls++;
-	return $preempt;
+	return new WP_Error( 'wpbridge_test_blocked', 'Stale updater must not reach the network' );
 };
 add_filter( 'pre_http_request', $stale_fixture, 10, 3 );
 $result = $updater->check_update( $previous, [ 'Version' => '1.2.3' ], 'wpbridge/wpbridge.php', [] );
