@@ -168,7 +168,7 @@ class WPBridge_Updater {
 		// SHA-256，否则拒绝（防止响应去掉签名字段把校验降级）.
 		// - 只定义了共用的 WPBRIDGE_ARTIFACT_PUBLIC_KEYS（商业源/Hub-Spoke 用）：
 		// 带了签名就用它验证，无效或 kid 不受信即拒绝；没带签名照旧放行并记警告.
-		// - 都没定义：无法验证签名，放行并记警告.
+		// - 都没定义：无法验证签名，放行并记警告；但服务端声明需要签名却没给，拒绝.
 		// 任何模式下，服务端给了 SHA-256 就必须与下载的包一致.
 		$self_keys          = $this->self_update_public_keys();
 		$strict             = [] !== $self_keys;
@@ -198,6 +198,13 @@ class WPBridge_Updater {
 			'has_signature'   => $has_signature,
 			'signature_kid'   => $signature_kid,
 		];
+
+		// 服务端字段只能加严：声明需要签名却没给签名，任何模式下都拒绝.
+		// （签名给了但本站没有公钥时无法验证，按下面的警告分支放行.）
+		if ( ! empty( $data['signature_required'] ) && '' === $signature ) {
+			$this->log_integrity_event( 'error', '更新服务器声明需要签名，但自更新包没有签名，已拒绝提供这次更新', $integrity_context );
+			return $update;
+		}
 
 		// 服务端给了摘要但格式不对：无法保证下载校验，不提供这次更新.
 		if ( '' !== $sha256 && ! $sha256_valid ) {

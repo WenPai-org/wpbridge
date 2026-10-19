@@ -358,6 +358,9 @@ namespace {
 		PackageIntegrityVerifier::forget( $package );
 		$assert( is_wp_error( $download( $package, $body ) ), 'S7 advertised sha256 whose record was lost is refused at download' );
 
+		$result = $check( $sha_only + [ 'signature_required' => true ] );
+		$assert( ! $offered( $result ), 'S9 server signature_required=true with the signature missing is rejected in shared mode' );
+
 		$status = $health_status();
 		$assert( $status['registered'] && 'good' === ( $status['status'] ?? '' ) && false !== strpos( (string) ( $status['description'] ?? '' ), 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' ), 'S8 Site Health is good (not recommended) and explains WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' );
 	} else {
@@ -377,7 +380,10 @@ namespace {
 		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'N4 unverifiable signature does not skip the SHA-256 check' );
 
 		$result = $check( $sha_only + [ 'signature_required' => true ] );
-		$assert( $offered( $result ), 'N5 server signature_required without any local key cannot be verified: offered with warning' );
+		$assert( ! $offered( $result ) && in_array( 'error', Logger::levels(), true ), 'N5 server signature_required=true with the signature missing is rejected even without keys (server may only tighten)' );
+
+		$result = $check( $signed_item );
+		$assert( $offered( $result ) && $warned_with( '未配置公钥，签名未校验' ), 'N5b server signature_required=true with a signature present but no key is allowed with warning' );
 
 		$malformed           = $base_item;
 		$malformed['sha256'] = 'not-a-sha256';
