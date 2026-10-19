@@ -2,10 +2,12 @@
 /**
  * Self-update signature policy contracts (P0: signature downgrade).
  *
- * Run three times, because the key rings are constants:
+ * Run once per mode, because the key rings are constants:
  *   php tests/selfupdate-signature-policy-test.php dedicated  (WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS set: strict)
  *   php tests/selfupdate-signature-policy-test.php shared     (only WPBRIDGE_ARTIFACT_PUBLIC_KEYS set)
  *   php tests/selfupdate-signature-policy-test.php none       (shipped default: no key)
+ *   php tests/selfupdate-signature-policy-test.php empty|string|badkey
+ *       (WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS defined but holds no valid key: strict, fail closed)
  *
  * Policy under test:
  * - Dedicated ring set => every self-update must carry a valid Ed25519
@@ -31,18 +33,22 @@ namespace WPBridge\Security {
 namespace WPBridge\Core {
 	class Logger {
 		public static array $entries = [];
+		public static array $history = [];
 
 		public static function is_enabled( string $level ): bool {
 			return true;
 		}
 		public static function debug( string $message, array $context = [] ): void {
 			self::$entries[] = [ 'debug', $message, $context ];
+			self::$history[] = [ 'debug', $message, $context ];
 		}
 		public static function warning( string $message, array $context = [] ): void {
 			self::$entries[] = [ 'warning', $message, $context ];
+			self::$history[] = [ 'warning', $message, $context ];
 		}
 		public static function error( string $message, array $context = [] ): void {
 			self::$entries[] = [ 'error', $message, $context ];
+			self::$history[] = [ 'error', $message, $context ];
 		}
 		public static function levels(): array {
 			return array_column( self::$entries, 0 );
@@ -55,8 +61,8 @@ namespace WPBridge\Core {
 
 namespace {
 	$mode = $argv[1] ?? '';
-	if ( ! in_array( $mode, [ 'dedicated', 'shared', 'none' ], true ) ) {
-		fwrite( STDERR, "usage: php selfupdate-signature-policy-test.php dedicated|shared|none\n" );
+	if ( ! in_array( $mode, [ 'dedicated', 'shared', 'none', 'empty', 'string', 'badkey' ], true ) ) {
+		fwrite( STDERR, "usage: php selfupdate-signature-policy-test.php dedicated|shared|none|empty|string|badkey\n" );
 		exit( 2 );
 	}
 
@@ -82,8 +88,17 @@ namespace {
 			],
 		];
 	};
+	define( 'WPBRIDGE_BASENAME', 'wpbridge/wpbridge.php' );
+	if ( 'empty' === $mode ) {
+		define( 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS', [] );
+	} elseif ( 'string' === $mode ) {
+		define( 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS', $public_key );
+	} elseif ( 'badkey' === $mode ) {
+		define( 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS', [ 'release-2026q3' => 'not-a-key' ] );
+	}
 	if ( 'dedicated' === $mode ) {
-		define( 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS', $ring( $public_key ) );
+		// One valid key plus one broken entry: Site Health must count only the valid one.
+		define( 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS', $ring( $public_key ) + [ 'broken' => 'not-a-key' ] );
 		// Same kid, different key: proves the self-updater does not read the shared ring in strict mode.
 		$other = sodium_crypto_sign_publickey( sodium_crypto_sign_seed_keypair( str_repeat( "\x44", SODIUM_CRYPTO_SIGN_SEEDBYTES ) ) );
 		define( 'WPBRIDGE_ARTIFACT_PUBLIC_KEYS', $ring( $b64url( $other ) ) );
@@ -139,7 +154,16 @@ namespace {
 		return parse_url( $url, $component );
 	}
 	function apply_filters( $hook, $value ) {
+		if ( 'wenpai_updater_override' === $hook && isset( $GLOBALS['wpb_override'] ) ) {
+			return $GLOBALS['wpb_override'];
+		}
 		return $value;
+	}
+	function get_plugins(): array {
+		return [ 'wpbridge/wpbridge.php' => [ 'Name' => 'WPBridge', 'Version' => WPBRIDGE_VERSION ] ];
+	}
+	function get_site_url(): string {
+		return 'https://example.test';
 	}
 	function add_filter( ...$args ): bool {
 		return true;
@@ -185,6 +209,7 @@ namespace {
 	require_once dirname( __DIR__ ) . '/includes/Security/PackageIntegrityVerifier.php';
 	require_once dirname( __DIR__ ) . '/includes/class-wenpai-updater.php';
 	require_once dirname( __DIR__ ) . '/includes/Core/SiteHealth.php';
+	require_once dirname( __DIR__ ) . '/includes/UpdateSource/PluginUpdater.php';
 
 	use WPBridge\Security\PackageIntegrityVerifier;
 	use WPBridge\Security\SafeHttpClient;
@@ -237,6 +262,7 @@ namespace {
 		Logger::$entries                = [];
 		if ( $fresh ) {
 			$GLOBALS['wpb_site_transients'] = [];
+			$GLOBALS['wpb_transients']      = [];
 		}
 		$result                         = $updater->check_update( $previous, [ 'Version' => WPBRIDGE_VERSION ], 'wpbridge/wpbridge.php', [] );
 		if ( is_object( $result ) && isset( $result->package ) ) {
@@ -260,10 +286,6 @@ namespace {
 		return is_wp_error( $value ) ? (string) $value->get_error_code() : ( is_string( $value ) && is_file( $value ) ? 'file' : var_export( $value, true ) );
 	};
 
-	// Shared by both modes: a present-but-wrong signature never installs.
-	$bad_sig              = $signed_item;
-	$bad_sig['signature'] = str_repeat( 'A', 86 );
-
 	// A present-but-wrong signature, and a tampered body, are shared fixtures.
 	$bad_sig              = $signed_item;
 	$bad_sig['signature'] = str_repeat( 'A', 86 );
@@ -285,7 +307,56 @@ namespace {
 		return false;
 	};
 
-	if ( 'dedicated' === $mode ) {
+	// Signs an arbitrary record with a given secret key (fixtures for other code paths).
+	$sign_record = static function ( string $slug, string $secret ) use ( $body, $sha256, $signed_at, $b64url ): array {
+		$file      = $slug . '-1.3.2.zip';
+		$canonical = "WENPAI-RELEASE-SIGNATURE-V1\nslug:{$slug}\nversion:1.3.2\nfile:{$file}\nsize:" . strlen( $body ) . "\nsha256:{$sha256}\nsigned_at:{$signed_at}\n";
+		return [
+			'slug'               => $slug,
+			'version'            => '1.3.2',
+			'artifact_file'      => $file,
+			'artifact_size'      => strlen( $body ),
+			'artifact_signed_at' => $signed_at,
+			'signature_scheme'   => 'ed25519',
+			'signature_kid'      => 'release-2026q3',
+			'signature'          => $b64url( sodium_crypto_sign_detached( $canonical, $secret ) ),
+			'signature_required' => true,
+		];
+	};
+	// Caches an offer for the wpbridge package and a record written by some other code path.
+	$plant = static function ( array $record, array $keyring ) use ( $package, $sha256 ): void {
+		$GLOBALS['wpb_site_transients']                   = [];
+		$GLOBALS['wpb_site_transients']['update_plugins'] = (object) [ 'response' => [ 'wpbridge/wpbridge.php' => (object) [ 'package' => $package, 'new_version' => '1.3.2', 'sha256' => $sha256, 'signature' => $record['signature'] ] ] ];
+		PackageIntegrityVerifier::remember( $package, $sha256, 86400, $record + [ 'artifact_public_keys' => $keyring ] );
+	};
+	$digest_tail_changed = substr( $sha256, 0, 32 ) . strrev( substr( $sha256, 32 ) );
+	if ( $digest_tail_changed === $sha256 ) {
+		$digest_tail_changed = substr( $sha256, 0, 63 ) . ( 'f' === $sha256[63] ? 'e' : 'f' );
+	}
+	$warnings_total = static function (): int {
+		return count( array_filter( Logger::$history, static fn( $e ) => 'warning' === $e[0] ) );
+	};
+	$no_php_warning = static function ( callable $fn ) {
+		$raised = false;
+		set_error_handler(
+			static function () use ( &$raised ) {
+				$raised = true;
+				return true;
+			}
+		);
+		$result = $fn();
+		restore_error_handler();
+		return [ $result, $raised ];
+	};
+
+	if ( in_array( $mode, [ 'empty', 'string', 'badkey' ], true ) ) {
+		$assert( ! $offered( $check( $signed_item ) ), 'E1 dedicated constant without a valid key: even a validly signed update is not offered (fail closed)' );
+		$assert( ! $offered( $check( $base_item ) ), 'E2 dedicated constant without a valid key: unsigned update is not offered' );
+		$plant( $sign_record( 'wpbridge', $secret_key ), [ 'release-2026q3' => [ 'public_key' => $public_key, 'status' => 'active' ] ] );
+		$assert( is_wp_error( $download( $package, $body ) ), 'E3 dedicated constant without a valid key: install is refused even with a planted valid record' );
+		$status = $health_status();
+		$assert( 'recommended' === ( $status['status'] ?? '' ) && false !== strpos( (string) ( $status['description'] ?? '' ) . (string) ( $status['label'] ?? '' ), '配置错误：WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS 无有效公钥，自更新已暂停' ), 'E4 Site Health reports the configuration error as recommended' );
+	} elseif ( 'dedicated' === $mode ) {
 		// Shared constant holds a DIFFERENT key under the same kid: D1 only passes if the dedicated ring is used.
 		$result = $check( $signed_item );
 		$assert( $offered( $result ) && true === $result->signature_required, 'D1 valid signed response is offered and marked signature_required' );
@@ -325,6 +396,51 @@ namespace {
 
 		$status = $health_status();
 		$assert( $status['registered'] && 'good' === ( $status['status'] ?? '' ) && false !== strpos( (string) ( $status['description'] ?? '' ), 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' ), 'D10 Site Health is good and names the strict-mode constant' );
+		$assert( false !== strpos( (string) ( $status['description'] ?? '' ), '（1 个公钥）' ), 'D10 Site Health counts only valid keys (1 valid + 1 broken entry => 1)' );
+
+		// D11 (review B1/P1): a record written by another path (PluginUpdater / preset source), signed by a key
+		// that is only in the SHARED ring and carrying that ring, must not install in strict mode.
+		$other_secret = sodium_crypto_sign_secretkey( sodium_crypto_sign_seed_keypair( str_repeat( "\x44", SODIUM_CRYPTO_SIGN_SEEDBYTES ) ) );
+		$plant( $sign_record( 'wpbridge', $other_secret ), WPBRIDGE_ARTIFACT_PUBLIC_KEYS );
+		$assert( is_wp_error( $download( $package, $body ) ), 'D11 strict: record signed by a shared-ring-only key (stored shared keyring) is re-verified against the dedicated ring and rejected' );
+
+		$plant( $sign_record( 'other-plugin', $secret_key ), WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS );
+		$assert( is_wp_error( $download( $package, $body ) ), 'D11 strict: validly signed record for another slug is rejected for the wpbridge package' );
+
+		$plant( [ 'signature_required' => false ] + $sign_record( 'wpbridge', $secret_key ), WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS );
+		$assert( is_wp_error( $download( $package, $body ) ), 'D12 strict: record without the signature_required marker is rejected (M10)' );
+
+		$plant( $sign_record( 'wpbridge', $secret_key ), WPBRIDGE_ARTIFACT_PUBLIC_KEYS );
+		$assert( 'file' === $code( $download( $package, $body ) ), 'D12 positive control: a dedicated-key signature installs even if the stored ring was the shared one' );
+
+		// D11 PluginUpdater must leave wpbridge's own plugin to WPBridge_Updater.
+		$pu = ( new ReflectionClass( \WPBridge\UpdateSource\PluginUpdater::class ) )->newInstanceWithoutConstructor();
+		try {
+			$skipped_download = false === $pu->filter_download( false, 'https://updates.wenpai.net/api/v1/download/wpbridge', null );
+		} catch ( \Throwable $e ) {
+			$skipped_download = false;
+		}
+		$assert( $skipped_download, 'D11 PluginUpdater::filter_download (priority 5) skips the wpbridge package' );
+		try {
+			$skipped_info = false === $pu->plugin_info( false, 'plugin_information', (object) [ 'slug' => 'wpbridge' ] );
+		} catch ( \Throwable $e ) {
+			$skipped_info = false;
+		}
+		$assert( $skipped_info, 'D11 PluginUpdater::plugin_info skips wpbridge' );
+		$offer = (object) [ 'package' => $package, 'new_version' => '1.3.2' ];
+		try {
+			$transient = $pu->check_updates( (object) [ 'response' => [ 'wpbridge/wpbridge.php' => $offer ], 'no_update' => [] ] );
+			$kept      = ( $transient->response['wpbridge/wpbridge.php'] ?? null ) === $offer;
+		} catch ( \Throwable $e ) {
+			$kept = false;
+		}
+		$assert( $kept, 'D11 PluginUpdater::check_updates leaves the wpbridge self-update offer untouched' );
+
+		// D13 (review N4): takeover by wp-china-yes means our hooks are not registered.
+		$GLOBALS['wpb_override'] = true;
+		$status                  = $health_status();
+		unset( $GLOBALS['wpb_override'] );
+		$assert( false !== strpos( (string) ( $status['label'] ?? '' ), '集中更新' ) && false === strpos( (string) ( $status['label'] ?? '' ), '已启用' ), 'D13 Site Health does not claim strict verification is active when wp-china-yes took over' );
 	} elseif ( 'shared' === $mode ) {
 		$result = $check( $base_item );
 		$assert( $offered( $result ), 'S1 unsigned response is offered when only the shared ring is set (commercial-source sites keep self-updating)' );
@@ -361,6 +477,12 @@ namespace {
 		$result = $check( $sha_only + [ 'signature_required' => true ] );
 		$assert( ! $offered( $result ), 'S9 server signature_required=true with the signature missing is rejected in shared mode' );
 
+		$check( $base_item + [ 'sha256' => $digest_tail_changed ] );
+		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body ) ), 'S10 digest differing only in its second half is rejected (M5)' );
+
+		$check( $base_item + [ 'sha256' => '', 'checksum_sha256' => $sha256 ] );
+		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'S11 empty sha256 does not mask a valid checksum_sha256 (review N2)' );
+
 		$status = $health_status();
 		$assert( $status['registered'] && 'good' === ( $status['status'] ?? '' ) && false !== strpos( (string) ( $status['description'] ?? '' ), 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' ), 'S8 Site Health is good (not recommended) and explains WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' );
 	} else {
@@ -392,6 +514,21 @@ namespace {
 		$check( $sha_only );
 		PackageIntegrityVerifier::forget( $package );
 		$assert( is_wp_error( $download( $package, $body ) ), 'N7 advertised sha256 whose record was lost is refused at download' );
+
+		$check( $base_item + [ 'sha256' => $digest_tail_changed ] );
+		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body ) ), 'N9 digest differing only in its second half is rejected (M5)' );
+
+		$check( $base_item + [ 'sha256' => '', 'checksum_sha256' => $sha256 ] );
+		$assert( 'wpbridge_checksum_mismatch' === $code( $download( $package, $body . 'x' ) ), 'N10 empty sha256 does not mask a valid checksum_sha256 (review N2)' );
+
+		[ $result, $raised ] = $no_php_warning( static fn() => $check( $base_item + [ 'sha256' => [ 'x' ], 'signature' => [ 'y' ] ] ) );
+		$assert( ! $raised && $offered( $result ), 'N11 non-string sha256/signature are treated as absent without PHP warnings (review N2)' );
+
+		$before = $warnings_total();
+		$check( $base_item );
+		$check( $base_item, false );
+		$check( $base_item, false );
+		$assert( 1 === $warnings_total() - $before, 'N12 the unsigned-offer warning is logged once per plugin+version+event per day (review N3)' );
 
 		$status = $health_status();
 		$assert( $status['registered'] && 'good' === ( $status['status'] ?? '' ) && false !== strpos( (string) ( $status['description'] ?? '' ), 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' ), 'N8 Site Health is good (not recommended) and explains WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' );

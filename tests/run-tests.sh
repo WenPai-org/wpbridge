@@ -23,6 +23,9 @@ run "Updater version guard and Site Health" php tests/version-guard-contract-tes
 run "Self-update signature policy (dedicated key: strict)" php tests/selfupdate-signature-policy-test.php dedicated
 run "Self-update signature policy (shared key only)" php tests/selfupdate-signature-policy-test.php shared
 run "Self-update signature policy (no key)" php tests/selfupdate-signature-policy-test.php none
+run "Self-update signature policy (dedicated constant: empty array)" php tests/selfupdate-signature-policy-test.php empty
+run "Self-update signature policy (dedicated constant: string)" php tests/selfupdate-signature-policy-test.php string
+run "Self-update signature policy (dedicated constant: invalid key)" php tests/selfupdate-signature-policy-test.php badkey
 run "Update authorization" php tests/update-authorization-test.php
 run "Hub-Spoke contract" php tests/hub-spoke-contract-test.php
 run "Hub credential boundary" php tests/hub-credential-boundary-test.php
