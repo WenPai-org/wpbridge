@@ -31,26 +31,57 @@
 
 ## 1.3.1：升级、回滚安全 ← 当前目标
 
-- [ ] WordPress 在同一请求里替换插件文件后，旧版本的更新器对象不再发起网络请求（fail closed）
-- [ ] HTTP 客户端在文件切换期间不可用时，返回错误而不是致命错误
-- [ ] CI 打包版本号从插件头读取，不再写死 1.2.4
-- [ ] 回归测试：`npm test` 全绿，测试站验收 1.3.0 → 1.3.1 → 回滚
-- [ ] 发版说明，`readme.txt` 和 `CHANGELOG.md` 同步更新
+范围已冻结（2026-10-19）。合并顺序：#12 → #19 → #16 → #20 → #15 → #13 → #14 → #17 → #21 → 发版准备。
 
-## 1.3.x 后续小版本：质量和合同
+### 升级与回滚
+- [ ] WordPress 在同一请求里替换插件文件后，旧版本的更新器对象不再发起网络请求，按失败关闭处理（#12）
+- [ ] HTTP 客户端在文件切换期间不可用时，返回错误而不是致命错误（#12）
+- [ ] CI 打包版本号从插件头读取，不再写死 1.2.4（#12）
+- [ ] Site Health 检查插件头版本和 `WPBRIDGE_VERSION` 是否一致；不一致时暂停自更新检查，`plugin_info()` 加同样的守卫（#16）
+
+### 安全
+- [ ] 自更新验签：新增 `WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS`，服务端返回的字段只能加严不能放宽；服务端下发 `sha256` 后，安装包必须和它一致（#20）
+
+### 修复
+- [ ] 启用默认 wenpai-open 源时，打开 Site Health 不再出现致命错误（#19）
 
 ### 可访问性
-- [ ] 8 个后台表单 label：单个控件补 `for`，成组输入改用 `role=group` 加 `aria-labelledby`
-- [ ] 19 处站外链接补 `rel`：文派自家域名只加 `noopener`，第三方链接加 `noopener noreferrer`
-- [ ] 合同测试守住 label 和 rel 规则，测试站上对真实后台页面做 axe 前后对比
+- [ ] 8 个后台表单 label：单个控件补 `for`，成组输入改用 `role=group` 加 `aria-labelledby`（#14）
+- [ ] 19 处站外链接补 `rel`：写死的文派域名只加 `noopener`，第三方和动态 URL 加 `noopener noreferrer`（#14）
+- [ ] 补 aria-label，并修正两处低对比度文字（#17）
 
-### 管理后台
+### 测试与发版
+- [ ] 服务端接口合同测试：v2 路由权限、bridge/v1 错误码、capabilities 回退（#21）
+- [ ] `npm test` 全绿；测试站 1.3.0 → 1.3.1 → 回滚验收（单站点和多站点，WP 7.1.3）
+- [ ] Tested up to 改为 7.1；plugin-registry 的 `tested_wp` 同步改为 7.1（由服务端维护人改）
+- [ ] 发版说明，`readme.txt` 和 `CHANGELOG.md` 同步更新
+
+## 1.3.2：安全加固和 i18n
+
+### 安全（排第一）
+- [ ] bridge/v1 的限流改到认证之前执行，用错 key 的请求也要计数，避免暴力猜 key
+- [ ] `require_auth=false` 时，限流不再按 key 区分，换 key 绕不过去
+- [ ] 公开的 `/status` 不再暴露插件版本号（去掉，还是只给登录用户看，待定）
+- [ ] `repo` 参数第二段允许 `..`：如果会拼进路径，改进 1.3.1；如果只用作查找的键，在这里收紧
+
+### 接口和错误码
+- [ ] `POST /wpbridge/v2/spoke-links/accept` 按错误类型返回 400、403、409、503 或 502；远端 Hub 的状态码不再透传，原值放进 `hub_status`（topic `wpbridge-spoke-accept-status`）
+- [ ] 预设源 `PluginUpdater::plugin_info` 也加上版本守卫
+- [ ] 补 #20 之后的签名和校验和合同测试：CT-1、2、3、5、6、7、11，以及 CT-12 里的 sha256 部分
+
+### 可访问性和 i18n
+- [ ] 对比度：#9ca3af 的白底正文和「已安装」徽标提到 4.5 以上；「即将上线」卡片要用文字或 aria 写明状态，不能只靠变灰（topic `wpbridge-a11y-contrast`）
+- [ ] admin.js 文案统一走 `wp.i18n`，用 `wp_set_script_translations`，重新生成 .pot；同时清理没注入和没用到的翻译键
+
+## 1.3.x 后续小版本：管理后台
+
 - [ ] 16 处写死的 `admin.php?page=wpbridge` 收口到 `AdminPage::url()`，加合同测试（为以后迁移菜单做准备，本阶段不搬菜单、不碰加密）
 - [ ] 后台 CSS 同时兼容现有一级菜单和以后「设置」子菜单两套页面选择器
 
-### 服务端接口合同
-- [ ] 梳理插件与 wpbridge-server、wenpai-bridge 之间的接口
-- [ ] 形成合同测试清单，补到 `tests/`
+### 服务端（不在本仓库，问题单已转维护人）
+- [ ] wenpai-bridge 的 update-check 下发 `sha256` 和 Ed25519 签名，release.yml 生成签名附件
+- [ ] wpbridge-server 下载接口要求签名或 grant；`checksum` 和 `sha256` 字段名对齐；补上 `/capabilities`
+- [ ] 确认 `/api/v1/updates/pair` 和 `/api/v1/updates/grants` 由哪个服务提供
 
 ## 后续：接入文派 Admin UI 套件
 
