@@ -211,6 +211,15 @@ class PackageIntegrityVerifier {
 		return $normalized;
 	}
 
+	/**
+	 * Return only the well-formed active / verify-only keys of a keyring.
+	 *
+	 * @param mixed $keyring Deployment keyring.
+	 */
+	public static function trusted_keys( $keyring ): array {
+		return self::normalize_keyring( $keyring );
+	}
+
 	/** Accept active and verify-only public keys, indexed by kid. */
 	private static function normalize_keyring( $keyring ): array {
 		if ( ! is_array( $keyring ) ) {

@@ -107,6 +107,12 @@ class PluginUpdater {
 		$plugins = get_plugins();
 
 		foreach ( $plugins as $plugin_file => $plugin_data ) {
+			// WPBridge 自身的更新只交给 WPBridge_Updater（带签名策略），这里不碰
+			// 它的 offer 和完整性记录.
+			if ( $this->is_self_plugin( $plugin_file ) ) {
+				continue;
+			}
+
 			$slug = $this->get_plugin_slug( $plugin_file );
 
 			$item_key             = 'plugin:' . $plugin_file;
@@ -284,7 +290,7 @@ class PluginUpdater {
 
 		$slug = $args->slug ?? '';
 
-		if ( empty( $slug ) ) {
+		if ( empty( $slug ) || $this->is_self_plugin( (string) $slug ) ) {
 			return $result;
 		}
 
@@ -354,7 +360,10 @@ class PluginUpdater {
 		if ( ! preg_match( '#/(?:api/v1/download|wp-json/wpbridge/v2/hub-proxy/plugins)/([a-z0-9][a-z0-9-]{1,99})(?:/package)?/?$#', $path, $matches ) ) {
 			return $reply;
 		}
-		$slug     = $matches[1];
+		$slug = $matches[1];
+		if ( $this->is_self_plugin( $slug ) ) {
+			return $reply;
+		}
 		$resolved = $this->source_resolver->resolve( $this->get_item_key_from_slug( $slug ), $slug, 'plugin' );
 		foreach ( (array) ( $resolved['sources'] ?? [] ) as $source ) {
 			$handler = $source instanceof SourceModel ? $source->get_handler() : null;
@@ -401,6 +410,19 @@ class PluginUpdater {
 			return false;
 		}
 		return true;
+	}
+
+	/**
+	 * 是否是 WPBridge 自身（插件文件或 slug）.
+	 *
+	 * @param string $plugin_file_or_slug 插件文件路径或 slug.
+	 * @return bool
+	 */
+	private function is_self_plugin( string $plugin_file_or_slug ): bool {
+		if ( ! defined( 'WPBRIDGE_BASENAME' ) ) {
+			return false;
+		}
+		return WPBRIDGE_BASENAME === $plugin_file_or_slug || dirname( WPBRIDGE_BASENAME ) === $plugin_file_or_slug;
 	}
 
 	/**

@@ -70,6 +70,11 @@ class SiteHealth {
 			'test'  => [ $this, 'test_updater_version' ],
 		];
 
+		$tests['direct']['wpbridge_selfupdate_signature'] = [
+			'label' => __( 'WPBridge 自身更新包签名校验', 'wpbridge' ),
+			'test'  => [ $this, 'test_selfupdate_signature' ],
+		];
+
 		return $tests;
 	}
 
@@ -333,6 +338,93 @@ class SiteHealth {
 				esc_html__( '前往插件页面', 'wpbridge' )
 			),
 			'test'        => 'wpbridge_updater_version',
+		];
+	}
+
+	/**
+	 * 自更新包签名校验状态
+	 *
+	 * 看 wp-config.php 里的 WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS（只要 defined 就是
+	 * 严格模式）和 wenpai_updater_override 接管状态，不发请求、不存状态。
+	 *
+	 * @return array
+	 */
+	public function test_selfupdate_signature(): array {
+		$good_badge = [
+			'label' => __( '正常', 'wpbridge' ),
+			'color' => 'green',
+		];
+
+		// 被 wp-china-yes 集中更新接管时，WPBridge_Updater 不注册钩子，这里的策略不生效.
+		$overridden = (bool) apply_filters(
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+			'wenpai_updater_override',
+			false,
+			dirname( WPBRIDGE_BASENAME )
+		);
+		if ( $overridden ) {
+			return [
+				'label'       => __( 'WPBridge: 自身更新已由集中更新接管', 'wpbridge' ),
+				'status'      => 'good',
+				'badge'       => $good_badge,
+				'description' => sprintf(
+					'<p>%s</p>',
+					esc_html__( 'WPBridge 自身的更新由 wp-china-yes 集中更新接管，本插件的自更新签名策略（包括 WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS）不在此生效。', 'wpbridge' )
+				),
+				'test'        => 'wpbridge_selfupdate_signature',
+			];
+		}
+
+		if ( defined( 'WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS' ) ) {
+			$valid_keys = is_array( WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS ) && class_exists( '\\WPBridge\\Security\\PackageIntegrityVerifier' )
+				? \WPBridge\Security\PackageIntegrityVerifier::trusted_keys( WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS )
+				: [];
+
+			if ( [] === $valid_keys ) {
+				return [
+					'label'       => __( '配置错误：WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS 无有效公钥，自更新已暂停', 'wpbridge' ),
+					'status'      => 'recommended',
+					'badge'       => [
+						'label' => __( '建议', 'wpbridge' ),
+						'color' => 'orange',
+					],
+					'description' => sprintf(
+						'<p>%s</p><p>%s</p>',
+						esc_html__( '配置错误：WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS 无有效公钥，自更新已暂停', 'wpbridge' ),
+						esc_html__( '常量已定义，所以严格验签已开启，但其中没有一个格式有效的 Ed25519 公钥（应为以 kid 为键的数组）。在修正或删除该常量之前，WPBridge 不会提供或安装自身的更新。', 'wpbridge' )
+					),
+					'test'        => 'wpbridge_selfupdate_signature',
+				];
+			}
+
+			return [
+				'label'       => __( 'WPBridge: 自身更新包严格验签已启用', 'wpbridge' ),
+				'status'      => 'good',
+				'badge'       => $good_badge,
+				'description' => sprintf(
+					'<p>%s</p>',
+					esc_html(
+						sprintf(
+							/* translators: %d: number of valid configured public keys */
+							__( '已在 wp-config.php 配置 WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS（%d 个公钥）。WPBridge 自身的更新包必须带有效的 Ed25519 签名和 SHA-256，缺少或无效时会拒绝更新。', 'wpbridge' ),
+							count( $valid_keys )
+						)
+					)
+				),
+				'test'        => 'wpbridge_selfupdate_signature',
+			];
+		}
+
+		return [
+			'label'       => __( 'WPBridge: 自身更新包签名校验（未启用严格模式）', 'wpbridge' ),
+			'status'      => 'good',
+			'badge'       => $good_badge,
+			'description' => sprintf(
+				'<p>%s</p><p>%s</p>',
+				esc_html__( 'WPBridge 自身的更新包目前不强制要求签名：更新服务器提供 SHA-256 时会校验摘要；带签名且已配置 WPBRIDGE_ARTIFACT_PUBLIC_KEYS 时会验证签名，无效即拒绝；没有签名时照常更新并记录日志。', 'wpbridge' ),
+				esc_html__( '更新服务器开始发布签名后，可在 wp-config.php 定义 WPBRIDGE_SELF_UPDATE_PUBLIC_KEYS 启用严格验签，之后缺少签名或签名无效的自更新都会被拒绝。', 'wpbridge' )
+			),
+			'test'        => 'wpbridge_selfupdate_signature',
 		];
 	}
 
