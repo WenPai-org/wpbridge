@@ -102,7 +102,7 @@ $assert( false !== strpos( $admin, "'update_private_key', 'update_site_url', 'up
 
 $integrity = (string) file_get_contents( $root . '/includes/Security/PackageIntegrityVerifier.php' );
 $assert( false !== strpos( $integrity, "hash_file( 'sha256'" ) && false !== strpos( $integrity, 'hash_equals(' ), 'Advertised SHA-256 digests are verified before installation' );
-$assert( false !== strpos( $integrity, "const SIGNATURE_SCHEME = 'ed25519'" ) && false !== strpos( $integrity, 'sodium_crypto_sign_verify_detached(' ) && false !== strpos( $integrity, 'WENPAI-RELEASE-SIGNATURE-V1' ) && false !== strpos( $integrity, "'signed_at:'" ), 'Detached Ed25519 verification uses the frozen release canonical contract including signing time' );
+$assert( false !== strpos( $integrity, "const SIGNATURE_SCHEME = 'ed25519'" ) && false !== strpos( $integrity, 'SodiumSafe::verify_detached(' ) && false === strpos( $integrity, 'sodium_crypto_sign_verify_detached(' ) && false !== strpos( $integrity, 'WENPAI-RELEASE-SIGNATURE-V1' ) && false !== strpos( $integrity, "'signed_at:'" ), 'Detached Ed25519 verification uses the frozen release canonical contract including signing time' );
 $assert( false !== strpos( $integrity, "[ 'active', 'verify-only' ]" ) && false !== strpos( $integrity, 'wpbridge_signature_unknown_key' ), 'Artifact keyring supports verify-only rotation and rejects unknown key ids' );
 
 $resolver = (string) file_get_contents( $root . '/includes/UpdateSource/SourceResolver.php' );

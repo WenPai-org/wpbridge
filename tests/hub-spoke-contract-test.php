@@ -106,6 +106,7 @@ function is_wp_error( $value ): bool {
 }
 
 require_once dirname( __DIR__ ) . '/includes/Security/Encryption.php';
+require_once dirname( __DIR__ ) . '/includes/Security/SodiumSafe.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/InstallationIdentity.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/CredentialEnvelope.php';
 require_once dirname( __DIR__ ) . '/includes/HubSpoke/HubSpokeStore.php';

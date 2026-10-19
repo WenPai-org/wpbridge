@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace WPBridge\HubSpoke;
 
 use WPBridge\Security\Encryption;
+use WPBridge\Security\SodiumSafe;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -40,8 +41,8 @@ final class InstallationIdentity {
 		try {
 			$ciphertext = Encryption::encrypt( $encoded );
 		} finally {
-			sodium_memzero( $secret );
-			sodium_memzero( $keypair );
+			SodiumSafe::memzero( $secret );
+			SodiumSafe::memzero( $keypair );
 		}
 		if ( '' === $ciphertext ) {
 			return false;
@@ -74,7 +75,7 @@ final class InstallationIdentity {
 			return new \WP_Error( 'wpbridge_link_key_unavailable', __( '安装身份密钥不可用。', 'wpbridge' ) );
 		}
 		$signature = sodium_crypto_sign_detached( $canonical, $secret );
-		sodium_memzero( $secret );
+		SodiumSafe::memzero( $secret );
 		return self::base64url( $signature );
 	}
 

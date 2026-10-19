@@ -52,6 +52,26 @@ class Logger {
 	}
 
 	/**
+	 * 判断某个级别的日志当前是否会被记录，本身不写入任何内容
+	 *
+	 * 错误日志始终记录；其他级别只在调试模式开启时记录。
+	 * $settings 为空时会 new Settings()，调用方如需避免自动加载，
+	 * 应先用 class_exists( ..., false ) 确认 Settings 已加载。
+	 *
+	 * @param string $level 日志级别
+	 * @return bool
+	 */
+	public static function is_enabled( string $level ): bool {
+		if ( self::LEVEL_ERROR === $level ) {
+			return true;
+		}
+		if ( null === self::$settings ) {
+			self::$settings = new Settings();
+		}
+		return self::$settings->is_debug();
+	}
+
+	/**
 	 * 记录调试日志
 	 *
 	 * @param string $message 消息
@@ -100,13 +120,8 @@ class Logger {
 	 */
 	public static function log( string $level, string $message, array $context = [] ): void {
 		// 检查是否启用调试模式（错误日志始终记录）
-		if ( $level !== self::LEVEL_ERROR ) {
-			if ( null === self::$settings ) {
-				self::$settings = new Settings();
-			}
-			if ( ! self::$settings->is_debug() ) {
-				return;
-			}
+		if ( ! self::is_enabled( $level ) ) {
+			return;
 		}
 
 		$logs = get_option( self::OPTION_LOGS, [] );

@@ -27,6 +27,7 @@ class WP_Error {
 }
 require_once dirname( __DIR__ ) . '/includes/Security/Validator.php';
 require_once dirname( __DIR__ ) . '/includes/Security/Encryption.php';
+require_once dirname( __DIR__ ) . '/includes/Security/SodiumSafe.php';
 require_once dirname( __DIR__ ) . '/includes/Commercial/UpdateAuthorizationClient.php';
 use WPBridge\Commercial\UpdateAuthorizationClient;
 $failures = 0;

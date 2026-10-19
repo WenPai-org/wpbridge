@@ -172,7 +172,7 @@ class PackageIntegrityVerifier {
 		}
 
 		$canonical = self::canonical( $record );
-		if ( ! sodium_crypto_sign_verify_detached( $signature, $canonical, $public_key ) ) {
+		if ( ! SodiumSafe::verify_detached( $signature, $canonical, $public_key ) ) {
 			return new \WP_Error( 'wpbridge_signature_mismatch', __( '更新包 Ed25519 签名校验失败，已中止安装。', 'wpbridge' ) );
 		}
 		return true;
@@ -209,6 +209,15 @@ class PackageIntegrityVerifier {
 			return new \WP_Error( 'wpbridge_signature_metadata_invalid', __( '更新包签名元数据不完整或格式无效。', 'wpbridge' ) );
 		}
 		return $normalized;
+	}
+
+	/**
+	 * Return only the well-formed active / verify-only keys of a keyring.
+	 *
+	 * @param mixed $keyring Deployment keyring.
+	 */
+	public static function trusted_keys( $keyring ): array {
+		return self::normalize_keyring( $keyring );
 	}
 
 	/** Accept active and verify-only public keys, indexed by kid. */

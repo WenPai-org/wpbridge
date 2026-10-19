@@ -27,7 +27,7 @@ jobs:
         uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Hadolint Dockerfile 检查
-        shell: bash
+        shell: bash  # command -v ... &> /dev/null is bash-only
         run: |
           # 检查是否存在 Dockerfile
           DOCKERFILES=$(find . -name 'Dockerfile*' -not -path './.git/*' 2>/dev/null)
@@ -99,7 +99,7 @@ jobs:
           fi
 
       - name: Go 依赖漏洞检查
-        shell: bash
+        shell: bash  # command -v ... &> /dev/null is bash-only
         run: |
           if [ ! -f go.mod ]; then
             echo "未找到 go.mod，跳过"
@@ -117,7 +117,7 @@ jobs:
           echo "Go 依赖安全检查通过"
 
       - name: Trivy 容器镜像扫描
-        shell: bash
+        shell: bash  # command -v ... &> /dev/null is bash-only
         run: |
           DOCKERFILES=$(find . -name 'Dockerfile' -not -path './.git/*' 2>/dev/null)
           if [ -z "$DOCKERFILES" ]; then
