@@ -579,6 +579,28 @@ namespace {
 		);
 		$assert( 'error' === $by && is_link( $late_link ), 'NB2 strict: a re-pointed symlink at the final check is rejected and not deleted' );
 
+		// NB2: the verified path itself swapped for a symlink to identical bytes is still refused (target may change
+		// after the check), and the symlink is neither followed nor deleted.
+		$keep = tempnam( sys_get_temp_dir(), 'wpb-keep-' );
+		$swap = null;
+		$check( $signed_item );
+		[ $by ] = $run_chain(
+			$package,
+			[ 'plugin' => 'wpbridge/wpbridge.php' ],
+			[
+				20 => static function ( $r ) use ( $keep, &$swap ) {
+					if ( is_string( $r ) && is_file( $r ) ) {
+						copy( $r, $keep );
+						unlink( $r );
+						symlink( $keep, $r );
+						$swap = $r;
+					}
+					return $r;
+				},
+			]
+		);
+		$assert( 'error' === $by && is_string( $swap ) && is_link( $swap ) && file_exists( $keep ), 'NB2 strict: verified path replaced by a symlink to identical bytes is rejected; link and target are kept' );
+
 		// NB6/X15: a later WP_Error still removes the guard's own verified download.
 		$check( $signed_item );
 		$seen   = null;

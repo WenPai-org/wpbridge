@@ -627,13 +627,14 @@ class WPBridge_Updater {
 	}
 
 	/**
-	 * 删除守卫自己下载的临时文件：路径必须与记下的 download_url() 返回值完全一致.
+	 * 删除守卫自己下载的临时文件：路径必须与记下的 download_url() 返回值完全一致，
+	 * 且不是 symlink（被换成 symlink 时只拒绝、不删）.
 	 *
 	 * @param string $path 要删的路径.
 	 * @param string $own  守卫记下的自己下载的路径；为空表示这次没有自己下载.
 	 */
 	private static function delete_own_download( string $path, string $own ): void {
-		if ( '' !== $own && $path === $own ) {
+		if ( '' !== $own && $path === $own && ! is_link( $own ) ) {
 			wp_delete_file( $own );
 		}
 	}
