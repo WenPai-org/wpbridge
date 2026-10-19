@@ -78,6 +78,9 @@
 - [ ] 更新 `class-wenpai-updater.php` 里过时的注释：两个摘要字段不一致现在单独报 `sha256_field_mismatch`，不再算格式错误（#20 复审 NB11）
 - [ ] 被换进来的 symlink 会留在临时目录里，考虑清理（#20 复审 NB12，目前可以接受）
 - [ ] 完整性事件码（`strict_*`、`download_rejected` 等）写进 `wpbridge_logs`，现在只记消息文字（#20 验收）
+- [ ] SodiumSafe：放宽 4 处 `sodium_memzero` 是否存在的前置检查（#23 评审）
+- [ ] 生成签名和密钥对的 sodium 调用也包上 try，异常按失败处理（#23 评审）
+- [ ] 文档写明：产品代码不依赖 vendor 里的 `paragonie/sodium_compat`，它只是测试用的 dev 依赖；线上没有扩展时用 WordPress 自带的 sodium_compat（#23 评审）
 
 ### 可访问性和 i18n
 - [ ] 对比度：#9ca3af 的白底正文和「已安装」徽标提到 4.5 以上；「即将上线」卡片要用文字或 aria 写明状态，不能只靠变灰（topic `wpbridge-a11y-contrast`）
