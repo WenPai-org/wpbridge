@@ -21,6 +21,17 @@ run "Security regressions" php tests/security-regression-test.php
 run "REST repo param (no dot segments)" php tests/repo-param-dotdot-test.php
 run "Updater regressions" php tests/updater-regression-test.php
 run "Updater version guard and Site Health" php tests/version-guard-contract-test.php
+run "Self-update signature policy (dedicated key: strict)" php tests/selfupdate-signature-policy-test.php dedicated
+run "Self-update signature policy (shared key only)" php tests/selfupdate-signature-policy-test.php shared
+run "Self-update signature policy (no key)" php tests/selfupdate-signature-policy-test.php none
+run "Self-update signature policy (dedicated constant: empty array)" php tests/selfupdate-signature-policy-test.php empty
+run "Self-update signature policy (dedicated constant: string)" php tests/selfupdate-signature-policy-test.php string
+run "Self-update signature policy (dedicated constant: invalid key)" php tests/selfupdate-signature-policy-test.php badkey
+run "Self-update integrity logging (admin context)" php tests/selfupdate-logger-context-test.php admin
+run "Self-update integrity logging (cli context)" php tests/selfupdate-logger-context-test.php cli
+run "Self-update integrity logging (cron context)" php tests/selfupdate-logger-context-test.php cron
+run "Self-update integrity logging (switching context)" php tests/selfupdate-logger-context-test.php switching
+run "Self-update integrity logging (unavailable context)" php tests/selfupdate-logger-context-test.php unavailable
 run "Update authorization" php tests/update-authorization-test.php
 run "Hub-Spoke contract" php tests/hub-spoke-contract-test.php
 run "Hub credential boundary" php tests/hub-credential-boundary-test.php
