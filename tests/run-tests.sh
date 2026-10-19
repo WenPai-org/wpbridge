@@ -50,6 +50,9 @@ run "Sodium safe wrappers" "$PHP_BIN" "$SODIUM_PREPEND" tests/sodium-safe-test.p
 run "Site Health sources" "$PHP_BIN" "$SODIUM_PREPEND" tests/site-health-sources-test.php
 run "Repository contracts" "$PHP_BIN" "$SODIUM_PREPEND" tests/static-contract-test.php
 run "Admin JavaScript syntax" node --check assets/js/admin.js
+run "REST route contracts" php tests/rest-contract-test.php
+run "REST contracts (Hub-Spoke flag off)" php tests/rest-contract-flag-off-test.php
+run "Bridge client contracts" php tests/bridge-client-contract-test.php
 
 if (( failures > 0 )); then
   echo "Test groups failed: ${failures}"
