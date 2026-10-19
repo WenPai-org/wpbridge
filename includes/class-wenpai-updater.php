@@ -628,8 +628,13 @@ class WPBridge_Updater {
 	 * 记录完整性相关日志.
 	 *
 	 * 检查更新阶段的日志和警告按插件、版本、事件每天最多一条；下载、安装阶段的
-	 * 校验错误传 $dedupe = false，每次都记。只使用本次请求里已经加载的 Logger 和
-	 * Settings；该级别不落库时不写去重 transient（与版本号守卫的日志一致）.
+	 * 校验错误传 $dedupe = false，每次都记.
+	 *
+	 * WP-CLI 和 cron 进程里 Logger 往往还没被加载（后台页面会先加载）。磁盘上的插件
+	 * 文件就是当前运行的版本时，这里主动自动加载 Logger 和 Settings；文件切换中途
+	 * 不自动加载，避免混入另一个版本的类。仍然拿不到 Logger 时写 error_log 兜底，
+	 * 不静默丢弃。Logger 可用但该级别不落库（warning 只在调试模式下记）时不写
+	 * 去重 transient，与版本号守卫的日志一致.
 	 *
 	 * @param string $level   error 或 warning.
 	 * @param string $event   事件标识，参与去重.
@@ -638,10 +643,8 @@ class WPBridge_Updater {
 	 * @param bool   $dedupe  是否每天去重.
 	 */
 	private function log_integrity_event( string $level, string $event, string $message, array $context, bool $dedupe = true ): void {
-		if ( ! class_exists( '\\WPBridge\\Core\\Logger', false ) || ! class_exists( '\\WPBridge\\Core\\Settings', false ) ) {
-			return;
-		}
-		if ( ! method_exists( '\\WPBridge\\Core\\Logger', 'is_enabled' ) || ! \WPBridge\Core\Logger::is_enabled( $level ) ) {
+		$ready = $this->integrity_logger_ready();
+		if ( $ready && ! \WPBridge\Core\Logger::is_enabled( $level ) ) {
 			return;
 		}
 		if ( $dedupe ) {
@@ -651,11 +654,33 @@ class WPBridge_Updater {
 			}
 			set_transient( $key, 1, DAY_IN_SECONDS );
 		}
+		if ( ! $ready ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Logger 不可用时的兜底，安全相关事件不能静默丢弃.
+			error_log( sprintf( '[WPBridge] %s %s: %s %s', $level, $event, $message, (string) wp_json_encode( $context ) ) );
+			return;
+		}
 		if ( 'error' === $level ) {
 			\WPBridge\Core\Logger::error( $message, $context );
 			return;
 		}
 		\WPBridge\Core\Logger::warning( $message, $context );
+	}
+
+	/**
+	 * Logger 和 Settings 是否可用；必要时按上面的条件自动加载.
+	 *
+	 * @return bool
+	 */
+	private function integrity_logger_ready(): bool {
+		$loaded = class_exists( '\\WPBridge\\Core\\Logger', false ) && class_exists( '\\WPBridge\\Core\\Settings', false );
+		if ( ! $loaded ) {
+			$plugin_dir = defined( 'WP_PLUGIN_DIR' ) ? WP_PLUGIN_DIR : '';
+			if ( '' === $plugin_dir || $this->version !== $this->disk_version( $plugin_dir . '/' . $this->plugin_file ) ) {
+				return false;
+			}
+			$loaded = class_exists( '\\WPBridge\\Core\\Logger' ) && class_exists( '\\WPBridge\\Core\\Settings' );
+		}
+		return $loaded && method_exists( '\\WPBridge\\Core\\Logger', 'is_enabled' );
 	}
 
 	/**
