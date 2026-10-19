@@ -66,9 +66,11 @@ jobs:
             echo "未找到 JS 锁文件，跳过"
             exit 0
           fi
-          # npm audit 只报告 high 和 critical
+          # npm audit 只报告 high 和 critical；阻断门只覆盖生产依赖（插件发布包不含 node 依赖）。
+          # 开发依赖的已知问题（@wordpress/env → simple-git<=4.0.0，无不破坏 wp-env 的补丁版本）
+          # 由下方「npm 全量审计（含开发依赖，非阻断）」步骤持续展示。
           if [ -f package-lock.json ]; then
-            npm_config_registry=https://registry.npmjs.org npm audit --audit-level=high || {
+            npm_config_registry=https://registry.npmjs.org npm audit --omit=dev --audit-level=high || {
               echo "::error::npm 依赖存在高危安全漏洞"
               exit 1
             }
@@ -84,6 +86,16 @@ jobs:
             }
           fi
           echo "JS 依赖安全审计通过"
+
+      - name: npm 全量审计（含开发依赖，非阻断）
+        continue-on-error: true
+        run: |
+          # 已知：@wordpress/env 依赖的 simple-git<=4.0.0 存在 critical 公告，上游修复前保持可见但不阻断。
+          if [ -f package-lock.json ]; then
+            npm_config_registry=https://registry.npmjs.org npm audit --audit-level=high
+          else
+            echo "未找到 package-lock.json，跳过"
+          fi
 
       - name: Go 依赖漏洞检查
         run: |
