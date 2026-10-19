@@ -51,7 +51,7 @@
 
 .wpbridge-version {
     font-size: var(--wpbridge-text-xs);
-    color: var(--wpbridge-gray-500);
+    color: var(--wpbridge-gray-600); /* gray-500 on gray-100 is 4.39:1, below WCAG AA */
     background: var(--wpbridge-gray-100);
     padding: 2px 8px;
     border-radius: var(--wpbridge-radius-sm);

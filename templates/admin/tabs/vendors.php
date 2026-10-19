@@ -450,6 +450,7 @@ $all_plugins = $bridge_manager->get_all_available_plugins();
 						<div class="wpbridge-plugin-list-main">
 							<?php if ( $is_installed && ! empty( $vendor_id ) ) : ?>
 								<input type="checkbox" class="wpbridge-bulk-check"
+									aria-label="<?php echo esc_attr( sprintf( /* translators: %s: plugin name. */ __( '选择 %s', 'wpbridge' ), $info['name'] ?? $slug ) ); ?>"
 									data-slug="<?php echo esc_attr( $slug ); ?>"
 									data-vendor-id="<?php echo esc_attr( $vendor_id ); ?>"
 									data-item-type="<?php echo esc_attr( $item_type ); ?>"

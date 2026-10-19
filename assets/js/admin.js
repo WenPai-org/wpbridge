@@ -2329,10 +2329,11 @@
 
                                 // 插入批量 checkbox
                                 if (!$main.find('.wpbridge-bulk-check').length) {
-                                    $main.prepend('<input type="checkbox" class="wpbridge-bulk-check"'
+                                    $main.prepend($('<input type="checkbox" class="wpbridge-bulk-check"'
                                         + ' data-slug="' + slug + '"'
                                         + ' data-vendor-id="' + vendorId + '"'
-                                        + ' data-item-type="plugin" data-bound="0">');
+                                        + ' data-item-type="plugin" data-bound="0">')
+                                        .attr('aria-label', '选择 ' + $.trim($main.find('.wpbridge-plugin-list-name').first().text())));
                                 }
                             }
                         } else {
